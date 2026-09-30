@@ -9,9 +9,9 @@
 :root{--bg:#050608;--panel:#0c1014;--line:#2a333d;--text:#d8e2ea;--dim:#7d8a96;--green:#3ddc84;--yellow:#ffd23f;--red:#ff3b3b;--black:#c070ff;--cyan:#4fd8ff}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{width:100%;height:100%;background:var(--bg);overflow:hidden;color:var(--text);font-family:'Share Tech Mono',ui-monospace,monospace;user-select:none;-webkit-user-select:none;touch-action:none}
-canvas{display:block;position:fixed;inset:0;cursor:none}
+canvas{display:block;position:fixed;left:0;top:0;width:100%;height:100%;cursor:none}
 .hidden{display:none!important}
-#screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,rgba(20,4,4,.82),rgba(0,0,0,.95));z-index:20;padding:16px;overflow:auto}
+#screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,rgba(20,4,4,.82),rgba(0,0,0,.95));z-index:20;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));overflow:auto}
 #screen::after{content:'';position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.025) 0 1px,transparent 1px 3px)}
 .card{max-width:640px;width:100%;text-align:center}
 h1{font-family:'Black Ops One',Impact,sans-serif;font-size:clamp(40px,11vw,86px);letter-spacing:4px;line-height:.95;color:#e9eef2;text-shadow:0 0 30px rgba(255,59,59,.45),0 4px 0 #400}
@@ -57,11 +57,11 @@ h2{font-family:'Black Ops One',Impact,sans-serif;font-size:clamp(30px,8vw,56px);
 <body>
 <canvas id="c"></canvas>
 <div id="touch" class="hidden">
-  <button class="tbtn" id="tUse" style="right:18px;bottom:190px">USE</button>
-  <button class="tbtn" id="tNade" style="right:86px;bottom:210px">NADE</button>
-  <button class="tbtn" id="tWep" style="right:150px;bottom:180px">GUN</button>
-  <button class="tbtn" id="tPause" style="right:12px;top:104px;width:44px;height:44px">II</button>
-  <button class="tbtn" id="tPad" style="right:64px;top:104px;width:44px;height:44px">PAD</button>
+  <button class="tbtn" id="tUse" style="right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(190px + env(safe-area-inset-bottom,0px))">USE</button>
+  <button class="tbtn" id="tNade" style="right:calc(86px + env(safe-area-inset-right,0px));bottom:calc(210px + env(safe-area-inset-bottom,0px))">NADE</button>
+  <button class="tbtn" id="tWep" style="right:calc(150px + env(safe-area-inset-right,0px));bottom:calc(180px + env(safe-area-inset-bottom,0px))">GUN</button>
+  <button class="tbtn" id="tPause" style="right:calc(12px + env(safe-area-inset-right,0px));top:calc(104px + env(safe-area-inset-top,0px));width:44px;height:44px">II</button>
+  <button class="tbtn" id="tPad" style="right:calc(64px + env(safe-area-inset-right,0px));top:calc(104px + env(safe-area-inset-top,0px));width:44px;height:44px">PAD</button>
 </div>
 <div id="panel" class="hidden"></div>
 <div id="screen"><div class="card"><h1>BUNKER<span>CODE RED</span></h1><p class="sub">Loading…<br><br>If this screen stays like this, the app you opened it in can't run games (for example the iPhone Files preview).<br>Open it in Safari or Chrome instead.</p></div></div>
@@ -74,13 +74,19 @@ h2{font-family:'Black Ops One',Impact,sans-serif;font-size:clamp(30px,8vw,56px);
 const TS = 32;
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 const dark = document.createElement('canvas'), dctx = dark.getContext('2d');
-let VW = 0, VH = 0, DPR = 1, ZOOM = 1;
+let VW = 0, VH = 0, DPR = 1, ZOOM = 1, SAFE = { t: 0, r: 0, b: 0, l: 0 };
+const safeProbe = document.createElement('div');
+safeProbe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)';
+document.body.appendChild(safeProbe);
 function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
   VW = innerWidth; VH = innerHeight;
   cv.width = Math.floor(VW * DPR); cv.height = Math.floor(VH * DPR);
+  cv.style.width = VW + 'px'; cv.style.height = VH + 'px'; // CSS size = screen size, backing store = screen * DPR
   dark.width = Math.ceil(cv.width / 2); dark.height = Math.ceil(cv.height / 2);
-  ZOOM = Math.max(0.55, Math.min(1.35, VW / (TS * 22), VH / (TS * 13)));
+  ZOOM = Math.max(0.55, Math.min(1.35, VW / (TS * 16), VH / (TS * 13)));
+  const cs = getComputedStyle(safeProbe);
+  SAFE = { t: parseFloat(cs.paddingTop) || 0, r: parseFloat(cs.paddingRight) || 0, b: parseFloat(cs.paddingBottom) || 0, l: parseFloat(cs.paddingLeft) || 0 };
 }
 addEventListener('resize', resize); resize();
 
@@ -156,13 +162,14 @@ const LEVELS = [
 {
   name: 'SECTOR B', sub: 'BIOLABS', base: 'YELLOW', w: 56, h: 26,
   rooms: [[1,1,8,6],[10,1,45,3],[10,5,12,8],[23,5,12,8],[36,5,19,8],[36,14,19,5],[10,14,25,5],[10,20,12,5],[23,20,20,5],[44,20,11,5]],
-  doors: [[9,2,'D'],[15,4,'D'],[28,4,'D'],[45,4,'D','lock'],[45,13,'h'],[35,16,'Y'],[15,19,'B',0],[16,19,'B',0],[30,19,'D'],[43,22,'R']],
+  doors: [[9,2,'D'],[15,4,'D'],[28,4,'D'],[45,4,'D','lock'],[45,13,'h'],[28,13,'h'],[35,16,'Y'],[15,19,'B',0],[16,19,'B',0],[30,19,'D'],[43,22,'R']],
   player: [4,3], exit: [50,22], exitName: 'CARGO LIFT',
   keyTrigger: { yellow: 'RED' },
   terminals: [[13,17,0]],
   notes: [
     [6,5,'SECURITY BRIEFING','ALERT CODES:\n\nGREEN — normal operation.\nYELLOW — intruder suspected.\nRED — LOCKDOWN. Containment doors SEAL. Emergency hatches UNLOCK.\nBLACK — reactor failure. Evacuate.\n\nThree wrong keypad entries trigger CODE RED.'],
     [11,6,'LAB 1 — POST-IT','Vault gate (Server Hall) code: {c0}\n\nThe RED keycard is locked in the vault. Nobody goes in there after what happened to Dr. Hale.'],
+    [44,17,'MAINTENANCE — WORK ORDER','Vault keypad keeps rejecting Hale\'s card. Backup code on file: {c0}\n\nIf the lockdown hits, the emergency hatches in Containment and Lab 2 drop you into the lower level.'],
   ],
   items: [[20,11,'M'],[12,6,'a'],[33,11,'H'],[50,10,'y'],[53,17,'W'],[38,17,'a'],[48,15,'s'],[15,23,'r'],[19,22,'A'],[11,23,'H'],[33,6,'q'],[25,22,'a'],[40,22,'H'],[20,16,'q'],[7,4,'s']],
   enemies: [[18,8,'soldier'],[12,10,'grunt'],[26,8,'grunt'],[32,10,'grunt'],[30,6,'drone'],[40,2,'grunt'],[52,2,'soldier'],[40,8,'drone'],[48,7,'drone'],[52,6,'soldier'],[42,11,'grunt'],[40,16,'grunt'],[50,16,'grunt'],[22,16,'turret'],[15,15,'soldier'],[28,17,'soldier'],[18,22,'grunt'],[12,21,'grunt'],[30,22,'soldier'],[36,21,'grunt'],[40,23,'drone']],
@@ -445,15 +452,20 @@ addEventListener('keydown', e => {
   else if ((k === 'enter' || k === ' ') && screenPrimary) { e.preventDefault(); screenPrimary(); }
 });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
-cv.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; touch.on = false; });
-cv.addEventListener('mousedown', e => { audioInit(); if (e.button === 0) mouse.down = true; if (e.button === 2) throwGrenade(); });
+let lastTouch = -1e9;
+const fromTouch = () => performance.now() - lastTouch < 800;
+cv.addEventListener('mousemove', e => { if (fromTouch()) return; mouse.x = e.clientX; mouse.y = e.clientY; touch.on = false; });
+cv.addEventListener('mousedown', e => { if (fromTouch()) return; audioInit(); if (e.button === 0) mouse.down = true; if (e.button === 2 && G.state === 'play') throwGrenade(); });
+function releaseInputs() { for (const k in keys) keys[k] = false; mouse.down = false; touch.move = touch.aim = null; }
+addEventListener('blur', releaseInputs);
+document.addEventListener('visibilitychange', () => { if (document.hidden) { releaseInputs(); if (G.state === 'play') pause(); } });
 addEventListener('mouseup', e => { if (e.button === 0) mouse.down = false; });
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => { if (G.state === 'play') cycleWeapon(e.deltaY > 0 ? 1 : -1); }, { passive: true });
 
 function tpos(t) { return { x: t.clientX, y: t.clientY }; }
 cv.addEventListener('touchstart', e => {
-  e.preventDefault(); audioInit(); touch.on = true; document.getElementById('touch').classList.remove('hidden');
+  e.preventDefault(); audioInit(); touch.on = true; lastTouch = performance.now(); document.getElementById('touch').classList.remove('hidden');
   for (const t of e.changedTouches) {
     const p = tpos(t);
     if (p.x < VW / 2 && !touch.move) touch.move = { id: t.identifier, ox: p.x, oy: p.y, x: p.x, y: p.y };
@@ -472,6 +484,7 @@ cv.addEventListener('touchmove', e => {
   }
 }, { passive: false });
 function tend(e) {
+  lastTouch = performance.now();
   for (const t of e.changedTouches) {
     if (touch.move && touch.move.id === t.identifier) touch.move = null;
     if (touch.aim && touch.aim.id === t.identifier) touch.aim = null;
@@ -539,7 +552,7 @@ function shoot() {
     P.cd = .25; sfx('deny'); msg('OUT OF ' + (W.ammo === 'shells' ? 'SHELLS' : 'SMG AMMO') + ' — switching', '#ff8a3d'); selectWeapon('pistol'); return;
   }
   if (W.ammo) P.ammo[W.ammo]--;
-  P.cd = W.rate; G.stats.shots++;
+  P.cd = W.rate; G.stats.shots += W.pellets;
   const bx = P.x + Math.cos(P.angle) * (P.r + W.len), by = P.y + Math.sin(P.angle) * (P.r + W.len);
   for (let i = 0; i < W.pellets; i++) {
     const a = P.angle + rand(-W.spread, W.spread), sp = W.speed * rand(.9, 1.05);
@@ -554,7 +567,7 @@ function throwGrenade() {
   if (P.grenades <= 0) { msg('No grenades', '#7d8a96'); sfx('deny'); return; }
   P.grenades--; sfx('throw');
   const sp = 460;
-  grenades.push({ x: P.x + Math.cos(P.angle) * 14, y: P.y + Math.sin(P.angle) * 14, vx: Math.cos(P.angle) * sp, vy: Math.sin(P.angle) * sp, r: 5, fuse: 1.3 });
+  grenades.push({ x: P.x, y: P.y, vx: Math.cos(P.angle) * sp, vy: Math.sin(P.angle) * sp, r: 5, fuse: 1.3 });
 }
 function explode(x, y, R, dmg, fromPlayer) {
   sfx('boom'); shake(12); flashLight(x, y, R * 3.2, 1, .25); scorch(x, y, R * .8);
@@ -616,10 +629,11 @@ function killEnemy(e) {
   if (e.type === 'drone' || e.type === 'turret') { burst(e.x, e.y, '#ffb347', 20, 220, .5, 4); burst(e.x, e.y, '#888', 12, 140, .8, 4); sfx('boom'); scorch(e.x, e.y, 22); }
   else { burst(e.x, e.y, e.type === 'grunt' ? '#5f8f1f' : '#9b1026', 22, 200, .6, 4); splat(e.x, e.y, e.type === 'grunt' ? '#2f4a0c' : '#5a0a12', 9); sfx('die'); }
   if (e.type === 'boss') {
-    for (let i = 0; i < 6; i++) setTimeout(() => { if (L) explode(e.x + rand(-50, 50), e.y + rand(-50, 50), 60, 0, true); }, i * 180);
+    const lvl = L;
+    for (let i = 0; i < 6; i++) setTimeout(() => { if (L === lvl) explode(e.x + rand(-50, 50), e.y + rand(-50, 50), 60, 0, true); }, i * 180);
     L.boss = null;
     for (const d of L.doorList) if (d.type === 'B' && d.gate === 1) { d.locked = false; d.perm = true; }
-    setTimeout(() => { if (G.state === 'play' || G.state === 'dying') { setAlert('BLACK', 'CORE BREACH — REACH THE ESCAPE POD'); sfx('gate'); msg('EAST BLAST GATE OPENING', '#c070ff'); } }, 1200);
+    setTimeout(() => { if (L === lvl && (G.state === 'play' || G.state === 'dying' || G.state === 'panel' || G.state === 'paused')) { setAlert('BLACK', 'CORE BREACH — REACH THE ESCAPE POD'); sfx('gate'); msg('EAST BLAST GATE OPENING', '#c070ff'); } }, 1200);
   } else if (!T.stat && Math.random() < .3) {
     const k = pick(['a', 'a', 's', 'H', 's']); L.items.push({ x: e.x, y: e.y, k, bob: 0 });
   }
@@ -788,12 +802,17 @@ function update(dt) {
   moveCircle(P, mx * spd * dt, my * spd * dt);
   if (ml > 0) P.walk += dt * (sprint ? 16 : 11);
   // aim
-  const cam = camera();
+  const cam = camera(true);
   if (touch.on) {
     if (touch.aim) {
       const dx = touch.aim.x - touch.aim.ox, dy = touch.aim.y - touch.aim.oy, d = Math.hypot(dx, dy);
       if (d > 10) P.angle = Math.atan2(dy, dx);
       firing = d > 26;
+      if (firing) { // aim assist: snap to the closest visible enemy near the stick direction
+        let best = null, bd = .35;
+        for (const e of L.enemies) { const ed = Math.hypot(e.x - P.x, e.y - P.y); if (!e.los || ed > 520) continue; const ad = Math.abs(angDiff(P.angle, Math.atan2(e.y - P.y, e.x - P.x))); if (ad < bd) { bd = ad; best = e; } }
+        if (best) P.angle = Math.atan2(best.y - P.y, best.x - P.x);
+      }
     } else if (ml > 0) P.angle = turnTo(P.angle, Math.atan2(my, mx), 8 * dt);
   } else {
     mouse.wx = cam.x + mouse.x / ZOOM; mouse.wy = cam.y + mouse.y / ZOOM;
@@ -907,7 +926,8 @@ function pickup(it) {
       if (I.key) {
         P.keys[I.key] = true; sfx('key'); banner(I.name, 'ACQUIRED', I.color, 2);
         const trig = L.def.keyTrigger && L.def.keyTrigger[I.key];
-        if (trig) setTimeout(() => { if (G.state === 'play') setAlert(trig, 'CONTAINMENT BREACH — LOCKDOWN'); }, 700);
+        const lvl = L;
+        if (trig) setTimeout(() => { if (L === lvl && G.state !== 'dead' && G.state !== 'menu') setAlert(trig, 'CONTAINMENT BREACH — LOCKDOWN'); }, 700);
         return true;
       }
   }
@@ -915,13 +935,11 @@ function pickup(it) {
   return true;
 }
 
-function camera() {
+// The camera is always centred on the player so you never lose track of yourself.
+function camera(noShake) {
   const vw = VW / ZOOM, vh = VH / ZOOM;
   let x = P.x - vw / 2, y = P.y - vh / 2;
-  if (!touch.on && G.state === 'play') { x += (mouse.x - VW / 2) / ZOOM * .18; y += (mouse.y - VH / 2) / ZOOM * .18; }
-  x = clamp(x, -40, Math.max(-40, L.w * TS - vw + 40)); y = clamp(y, -40, Math.max(-40, L.h * TS - vh + 40));
-  if (vw > L.w * TS) x = (L.w * TS - vw) / 2; if (vh > L.h * TS) y = (L.h * TS - vh) / 2;
-  if (G.shake > 0) { x += rand(-G.shake, G.shake) / ZOOM * .5; y += rand(-G.shake, G.shake) / ZOOM * .5; }
+  if (!noShake && G.shake > 0) { x += rand(-G.shake, G.shake) / ZOOM * .5; y += rand(-G.shake, G.shake) / ZOOM * .5; }
   return { x, y, w: vw, h: vh };
 }
 
@@ -1013,6 +1031,7 @@ function render() {
   const ip = G.state === 'play' && nearInteractable();
   if (ip) { ctx.font = 'bold 11px monospace'; ctx.fillStyle = '#000'; ctx.fillRect(P.x - 52, P.y - 42, 104, 16); ctx.fillStyle = '#3ddc84'; ctx.fillText((touch.on ? '[USE] ' : '[E] ') + ip, P.x, P.y - 30); }
 
+  drawThreatArrows(cam);
   // crosshair
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   if (!touch.on && G.state === 'play') {
@@ -1126,6 +1145,8 @@ function drawEnemy(e, now) {
 function drawPlayer(now) {
   const W = WEAPONS[P.weapon];
   ctx.save(); ctx.translate(P.x, P.y);
+  ctx.strokeStyle = `rgba(79,216,255,${.45 + .2 * Math.sin(now * 4)})`; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, 0, 19, 0, TAU); ctx.stroke();
   ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.ellipse(2, 8, 12, 5, 0, 0, TAU); ctx.fill();
   ctx.rotate(P.angle);
   const k = -P.kick;
@@ -1136,7 +1157,8 @@ function drawPlayer(now) {
   ctx.fillStyle = P.hazmat ? '#c9c21f' : '#3f5566'; ctx.beginPath(); ctx.arc(6 + k, -6, 4, 0, TAU); ctx.arc(8 + k, 6, 4, 0, TAU); ctx.fill();
   // body
   const flash = P.hurt > 0 && Math.sin(now * 60) > 0;
-  ctx.fillStyle = flash ? '#fff' : P.hazmat ? '#e8d52a' : '#4b6478'; ctx.beginPath(); ctx.ellipse(0, 0, 9, 12, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = flash ? '#fff' : P.hazmat ? '#e8d52a' : '#5f86a3'; ctx.beginPath(); ctx.ellipse(0, 0, 9, 12, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#d8f3ff'; ctx.lineWidth = 1.5; ctx.stroke();
   if (P.armor > 0) { ctx.fillStyle = P.armor > 100 ? '#2f7dff' : '#4fd8ff'; ctx.fillRect(-7, -11, 8, 5); ctx.fillRect(-7, 6, 8, 5); ctx.fillRect(-5, -4, 5, 8); }
   ctx.fillStyle = flash ? '#fff' : P.hazmat ? '#b5a818' : '#2a3a47'; ctx.beginPath(); ctx.arc(0, 0, 6.5, 0, TAU); ctx.fill();
   if (P.hazmat) { ctx.fillStyle = '#4fd8ff'; ctx.fillRect(2, -3, 4, 6); }
@@ -1186,8 +1208,8 @@ function drawDarkness(cam, now) {
 
 function drawHUD(now) {
   const A = ALERTS[G.alert], small = VW < 640, u = small ? .82 : 1;
-  ctx.setTransform(DPR * u, 0, 0, DPR * u, 0, 0);
-  const W = VW / u, H = VH / u;
+  ctx.setTransform(DPR * u, 0, 0, DPR * u, SAFE.l * DPR, SAFE.t * DPR);
+  const W = (VW - SAFE.l - SAFE.r) / u, H = (VH - SAFE.t - SAFE.b) / u;
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   // --- alert badge
   const blink = ALERTS[G.alert].lvl >= 2 ? (Math.sin(now * 8) > 0 ? 1 : .55) : 1;
@@ -1225,10 +1247,10 @@ function drawHUD(now) {
   const obj = objective();
   const ox = small ? W / 2 + 60 : W / 2, oy = small ? 200 : 26;
   ctx.fillStyle = '#7d8a96'; ctx.font = '11px "Share Tech Mono",monospace';
-  ctx.fillText(L.def.name + ' // ' + L.def.sub, small ? W / 2 : ox, small ? H - 16 : 22);
+  ctx.fillText(L.def.name + ' // ' + L.def.sub, small ? W / 2 : ox, small ? H - 10 : 22);
   ctx.font = 'bold 13px "Share Tech Mono",monospace';
   const ow = Math.min(W - 24, ctx.measureText(obj).width + 24);
-  const objY = small ? H - 44 : 32;
+  const objY = small ? H - 50 : 32;
   ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(W / 2 - ow / 2, objY, ow, 22);
   ctx.fillStyle = '#e9eef2'; ctx.fillText(fitText(obj, ow - 12), W / 2, objY + 15);
   // meltdown timer
@@ -1241,7 +1263,7 @@ function drawHUD(now) {
   // boss bar
   const boss = L.boss && L.boss.aware ? L.boss : null;
   if (boss) {
-    const bw = Math.min(W - 40, 520), by = H - (small ? 250 : 60);
+    const bw = Math.min(W - 40, 520), by = small ? 214 : H - 60;
     ctx.fillStyle = 'rgba(0,0,0,.75)'; ctx.fillRect(W / 2 - bw / 2 - 4, by - 18, bw + 8, 34);
     ctx.fillStyle = '#ff3b3b'; ctx.font = 'bold 12px "Share Tech Mono",monospace'; ctx.fillText('JUGGERNAUT — REACTOR GUARDIAN', W / 2, by - 5);
     ctx.fillStyle = '#330'; ctx.fillRect(W / 2 - bw / 2, by, bw, 10);
@@ -1249,7 +1271,7 @@ function drawHUD(now) {
   }
   // messages
   ctx.font = 'bold 13px "Share Tech Mono",monospace';
-  const my0 = small ? H - 80 : H - 30;
+  const my0 = small ? H - 64 : H - 30;
   G.msgs.slice().reverse().forEach((m, i) => {
     ctx.globalAlpha = clamp(m.life, 0, 1);
     const t = fitText(m.text, W - 30), tw = ctx.measureText(t).width + 16, yy = my0 - i * 22 - (boss && !small ? 50 : 0);
@@ -1271,6 +1293,11 @@ function drawHUD(now) {
   drawMinimap(W, small);
   // touch sticks
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (touch.on && G.state === 'play') {
+    ctx.font = '11px "Share Tech Mono",monospace'; ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.textAlign = 'center';
+    if (!touch.move) ctx.fillText('◀ DRAG TO MOVE ▶', VW * .25, VH - 120 - SAFE.b);
+    if (!touch.aim) ctx.fillText('◀ DRAG TO AIM + FIRE ▶', VW * .75, VH - 120 - SAFE.b);
+  }
   if (touch.on) for (const [s, lbl] of [[touch.move, 'MOVE'], [touch.aim, 'FIRE']]) if (s) {
     ctx.strokeStyle = 'rgba(255,255,255,.3)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(s.ox, s.oy, 60, 0, TAU); ctx.stroke();
     ctx.fillStyle = lbl === 'FIRE' ? 'rgba(255,59,59,.45)' : 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.arc(s.x, s.y, 26, 0, TAU); ctx.fill();
@@ -1294,7 +1321,27 @@ function drawMinimap(W, small) {
   for (const t of L.terminals) { const tx = Math.floor(t.x / TS), ty = Math.floor(t.y / TS); if (L.explored[ty * L.w + tx]) { ctx.fillStyle = t.solved ? '#3ddc84' : '#ff3b3b'; ctx.fillRect(x0 + tx * sc - 1, y0 + ty * sc - 1, sc + 2, sc + 2); } }
   for (const it of L.items) if (ITEMS[it.k].key) { const tx = Math.floor(it.x / TS), ty = Math.floor(it.y / TS); if (L.explored[ty * L.w + tx]) { ctx.fillStyle = ITEMS[it.k].color; ctx.fillRect(x0 + tx * sc - 1, y0 + ty * sc - 1, sc + 2, sc + 2); } }
   for (const e of L.enemies) if (e.los) { ctx.fillStyle = '#ff3b3b'; ctx.fillRect(x0 + e.x / TS * sc - 1, y0 + e.y / TS * sc - 1, e.type === 'boss' ? 5 : 3, e.type === 'boss' ? 5 : 3); }
-  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x0 + P.x / TS * sc, y0 + P.y / TS * sc, 2.5, 0, TAU); ctx.fill();
+  const pr = 3 + Math.sin(performance.now() / 150) * .8;
+  ctx.fillStyle = '#4fd8ff'; ctx.beginPath(); ctx.arc(x0 + P.x / TS * sc, y0 + P.y / TS * sc, pr + 1.5, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x0 + P.x / TS * sc, y0 + P.y / TS * sc, pr, 0, TAU); ctx.fill();
+}
+// Red arrows on the screen edge pointing at hostiles that are hunting you but are off-screen.
+function drawThreatArrows(cam) {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const m = 26, cx = VW / 2, cy = VH / 2;
+  for (const e of L.enemies) {
+    if (!e.aware) continue;
+    const sx = (e.x - cam.x) * ZOOM, sy = (e.y - cam.y) * ZOOM;
+    if (sx > 0 && sx < VW && sy > 0 && sy < VH) continue;
+    if (Math.hypot(e.x - P.x, e.y - P.y) > 1100) continue;
+    const a = Math.atan2(sy - cy, sx - cx), k = Math.min((cx - m) / Math.abs(Math.cos(a) || 1e-6), (cy - m) / Math.abs(Math.sin(a) || 1e-6));
+    const ax = cx + Math.cos(a) * k, ay = cy + Math.sin(a) * k;
+    ctx.save(); ctx.translate(ax, ay); ctx.rotate(a);
+    ctx.fillStyle = e.type === 'boss' ? '#ff9f1a' : 'rgba(255,59,59,.85)';
+    const sz = e.type === 'boss' ? 14 : 9;
+    ctx.beginPath(); ctx.moveTo(sz, 0); ctx.lineTo(-sz * .7, -sz * .8); ctx.lineTo(-sz * .7, sz * .8); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
 }
 
 function objective() {
@@ -1305,7 +1352,7 @@ function objective() {
   }
   if (i === 1) {
     if (!P.keys.yellow) return 'Retrieve the YELLOW keycard from Containment (east)';
-    if (!P.keys.red) return L.terminals[0].solved ? 'Grab the RED keycard from the Vault' : 'LOCKDOWN! Escape by hatch → open the VAULT (code in Lab 1)';
+    if (!P.keys.red) return L.terminals[0].solved ? 'Grab the RED keycard from the Vault' : 'LOCKDOWN! Use an emergency hatch → open the VAULT (code: Lab 1 or Maintenance)';
     return 'Reach the CARGO LIFT behind the RED door';
   }
   if (G.alert === 'BLACK') return 'MELTDOWN! Run east to the ESCAPE POD';
@@ -1345,8 +1392,11 @@ function codeKey(k) {
       c.t.tries++; sfx('err'); disp.className = 'disp err'; c.busy = true;
       if (c.t.tries >= 3) {
         stat.textContent = 'SECURITY VIOLATION — ALARM TRIGGERED';
+        const lvl = L;
         setTimeout(() => {
-          closePanel(); c.t.tries = 0;
+          c.t.tries = 0;
+          if (L !== lvl) return;
+          closePanel();
           if (ALERTS[G.alert].lvl < 2) setAlert('RED', 'SECURITY VIOLATION AT KEYPAD');
           else { msg('SECURITY VIOLATION — REINFORCEMENTS INBOUND', '#ff3b3b'); sfx('alarm'); for (let i = 0; i < 3; i++) { const v = pick(L.vents); if (v) { const e = makeEnemy(pick(['grunt', 'soldier', 'drone']), v.x, v.y); e.aware = true; L.enemies.push(e); } } }
         }, 800);
@@ -1464,7 +1514,8 @@ function startLevel(i) {
   prerender(); computeFlow();
   G.state = 'play';
   banner(def.name + ' — ' + def.sub, ALERTS[def.base].label + ' · ' + ALERTS[def.base].desc, ALERTS[def.base].c, 3.5);
-  if (i === 0) setTimeout(() => G.state === 'play' && msg('Tip: notes on the floor hold keypad codes. TAB opens your datapad.', '#9aa7b3'), 3800);
+  const lvl = L;
+  if (i === 0) setTimeout(() => L === lvl && G.state === 'play' && msg('Tip: notes on the floor hold keypad codes. ' + (touch.on ? 'The PAD button' : 'TAB') + ' opens your datapad.', '#9aa7b3'), 3800);
   last = performance.now();
 }
 function levelComplete() {
@@ -1509,7 +1560,7 @@ function frame(t) {
   render();
   requestAnimationFrame(frame);
 }
-window.BUNKER = { LEVELS, buildLevel, G, get L() { return L; }, get P() { return P; }, startLevel, ACTIONS, setAlert };
+window.BUNKER = { LEVELS, buildLevel, G, get L() { return L; }, get P() { return P; }, startLevel, ACTIONS, setAlert, update, camera, keys, mouse, touch, solidAt };
 menu();
 requestAnimationFrame(frame);
 </script>
