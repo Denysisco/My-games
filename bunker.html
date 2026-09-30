@@ -119,7 +119,7 @@ const ETYPES = {
   soldier: { name: 'RIOT GUARD', hp: 65,   r: 12, speed: 78,  dmg: 9,  ranged: true, rate: 1.05, range: 380, bspeed: 430, color: '#c9a45c', score: 20 },
   drone:   { name: 'SEC-DRONE',  hp: 28,   r: 9,  speed: 165, dmg: 6,  ranged: true, rate: 0.7,  range: 240, bspeed: 390, color: '#5cc8ff', score: 15 },
   turret:  { name: 'TURRET',     hp: 140,  r: 14, speed: 0,   dmg: 8,  ranged: true, rate: 0.32, range: 430, bspeed: 500, color: '#ff8a3d', stat: true, score: 25 },
-  boss:    { name: 'JUGGERNAUT', hp: 1700, r: 26, speed: 72,  dmg: 13, ranged: true, rate: 0.9,  range: 700, bspeed: 380, color: '#ff3b3b', boss: true, score: 500 },
+  boss:    { name: 'JUGGERNAUT', hp: 1300, r: 26, speed: 66,  dmg: 11, ranged: true, rate: 0.9,  range: 700, bspeed: 380, color: '#ff3b3b', boss: true, score: 500 },
 };
 
 const ITEMS = {
@@ -715,12 +715,12 @@ function bossAI(e, dt, dist, toA) {
   if (e.pat === 'walk') {
     const f = flowDir(e); if (f) { mvx = f.x; mvy = f.y; } else if (e.los) { mvx = Math.cos(toA); mvy = Math.sin(toA); }
     e.angle = turnTo(e.angle, toA, 3 * dt);
-    if (e.los && e.cd <= 0) { enemyFire(e, toA + rand(-.08, .08), T.bspeed, T.dmg); e.cd = (rage ? .45 : .7); sfx('eshot'); }
+    if (e.los && e.cd <= 0) { enemyFire(e, toA + rand(-.08, .08), T.bspeed, T.dmg); e.cd = (rage ? .6 : .85); sfx('eshot'); }
     if (e.patT <= 0) {
       const opts = ['burst', 'ring', 'charge']; if (rage) opts.push('ring', 'charge');
       e.pat = e.los ? pick(opts) : 'walk'; e.patT = e.pat === 'burst' ? 1.6 : e.pat === 'ring' ? 1.2 : 1.1;
-      if (e.pat === 'charge') { e.chargeT = .55; sfx('charge'); msg('JUGGERNAUT IS CHARGING!', '#ff3b3b'); }
-      if (e.pat === 'burst') e.burst = rage ? 14 : 9;
+      if (e.pat === 'charge') { e.chargeT = .75; sfx('charge'); msg('JUGGERNAUT IS CHARGING!', '#ff3b3b'); }
+      if (e.pat === 'burst') e.burst = rage ? 10 : 7;
       if (e.pat === 'ring') e.burst = rage ? 3 : 2;
       e.burstT = 0;
     }
@@ -735,7 +735,7 @@ function bossAI(e, dt, dist, toA) {
   } else if (e.pat === 'ring') {
     e.burstT -= dt;
     if (e.burst > 0 && e.burstT <= 0) {
-      e.burstT = .35; e.burst--; const off = Math.random() * TAU, n = rage ? 22 : 16;
+      e.burstT = .35; e.burst--; const off = Math.random() * TAU, n = rage ? 16 : 12;
       for (let i = 0; i < n; i++) enemyFire(e, off + i / n * TAU, 250, T.dmg * .8, '#ff9f1a', 6);
       sfx('eshot'); shake(4); flashLight(e.x, e.y, 200, .7);
     }
@@ -747,18 +747,18 @@ function bossAI(e, dt, dist, toA) {
       const ox = e.x, oy = e.y;
       moveCircle(e, mvx * spd * dt, mvy * spd * dt);
       if (Math.hypot(e.x - ox, e.y - oy) < spd * dt * .4) { e.patT = 0; shake(8); burst(e.x + e.cvx * e.r, e.y + e.cvy * e.r, '#aaa', 14, 200, .5, 4); }
-      if (dist < e.r + P.r + 6 && !e.hitThisCharge) { hurtPlayer(32); e.hitThisCharge = true; const k = 180; moveCircle(P, e.cvx * k * .2, e.cvy * k * .2); }
+      if (dist < e.r + P.r + 6 && !e.hitThisCharge) { hurtPlayer(24); e.hitThisCharge = true; const k = 180; moveCircle(P, e.cvx * k * .2, e.cvy * k * .2); }
       if (e.patT <= 0) { e.pat = 'walk'; e.patT = rand(2, 3); e.hitThisCharge = false; }
       return;
     }
   }
   if (rage && e.summonT <= 0) {
-    e.summonT = 9;
+    e.summonT = 13;
     const live = L.enemies.filter(o => o.type === 'drone').length;
-    if (live < 5) { for (let i = 0; i < 2; i++) { const d = makeEnemy('drone', e.x + rand(-30, 30), e.y + rand(-30, 30)); d.aware = true; L.enemies.push(d); } msg('JUGGERNAUT DEPLOYED DRONES', '#5cc8ff'); }
+    if (live < 5) { for (let i = 0; i < 1; i++) { const d = makeEnemy('drone', e.x + rand(-30, 30), e.y + rand(-30, 30)); d.aware = true; L.enemies.push(d); } msg('JUGGERNAUT DEPLOYED DRONES', '#5cc8ff'); }
   }
   if (e.pat === 'walk' && dist < 140) { mvx *= -.3; mvy *= -.3; }
-  if (dist < e.r + P.r + 4 && e.cd <= 0) { hurtPlayer(18); e.cd = .8; sfx('melee'); }
+  if (dist < e.r + P.r + 4 && e.cd <= 0) { hurtPlayer(14); e.cd = .8; sfx('melee'); }
   moveCircle(e, mvx * spd * dt, mvy * spd * dt);
 }
 function angDiff(a, b) { let d = b - a; while (d > Math.PI) d -= TAU; while (d < -Math.PI) d += TAU; return d; }
