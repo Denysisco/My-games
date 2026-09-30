@@ -29,6 +29,7 @@ h2{font-family:'Black Ops One',Impact,sans-serif;font-size:clamp(30px,8vw,56px);
 .keys b{color:var(--text);font-weight:normal}
 .stats{margin:14px auto 20px;display:grid;grid-template-columns:1fr auto;gap:6px 24px;max-width:320px;text-align:left;font-size:15px}
 .stats b{color:var(--yellow);font-weight:normal;text-align:right}
+#screen,.data{touch-action:pan-y}
 #panel{position:fixed;inset:0;z-index:15;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);padding:16px}
 .term{background:#071009;border:2px solid #1f6b3a;box-shadow:0 0 40px rgba(61,220,132,.2);padding:18px;width:100%;max-width:330px;color:var(--green)}
 .term h3{font-weight:normal;letter-spacing:3px;font-size:14px;margin-bottom:10px;border-bottom:1px dashed #1f6b3a;padding-bottom:8px}
@@ -111,6 +112,8 @@ const WEAPONS = {
 };
 const WEAPON_ORDER = ['pistol', 'shotgun', 'smg'];
 
+// Every hit an enemy lands on you is scaled by this (0.9 = 10% less than the original tuning).
+const ENEMY_DAMAGE = 0.9;
 const ETYPES = {
   grunt:   { name: 'MUTANT',     hp: 45,   r: 12, speed: 100, dmg: 12, melee: true, color: '#8fbf3f', score: 10 },
   soldier: { name: 'RIOT GUARD', hp: 65,   r: 12, speed: 78,  dmg: 9,  ranged: true, rate: 1.05, range: 380, bspeed: 430, color: '#c9a45c', score: 20 },
@@ -377,7 +380,7 @@ function audioInit() {
   try {
     AC = new (window.AudioContext || window.webkitAudioContext)();
     master = AC.createGain(); master.gain.value = 0.32; master.connect(AC.destination);
-    noiseBuf = AC.createBuffer(1, AC.sampleRate, AC.sampleRate);
+    noiseBuf = AC.createBuffer(1, AC.sampleRate * 2, AC.sampleRate);
     const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   } catch (e) { AC = null; }
 }
@@ -438,9 +441,12 @@ const mouse = { x: 0, y: 0, down: false, wx: 0, wy: 0 };
 const touch = { on: false, move: null, aim: null, mx: 0, my: 0, ax: 0, ay: 0, fire: false };
 addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
-  if (G.state === 'panel') { panelKey(e); return; }
+  if (G.state === 'panel') { if (!e.repeat) panelKey(e); else e.preventDefault(); return; }
   keys[k] = true;
   if (k === 'tab') e.preventDefault();
+  if (e.repeat) return;
+  const digit = /^Digit[123]$/.test(e.code) ? e.code.slice(5) : null;
+  if (G.state === 'play' && digit) { selectWeapon(WEAPON_ORDER[+digit - 1]); return; }
   if (G.state === 'play') {
     if (k === 'escape' || k === 'p') pause();
     else if (k === 'e') interact();
@@ -461,7 +467,14 @@ addEventListener('blur', releaseInputs);
 document.addEventListener('visibilitychange', () => { if (document.hidden) { releaseInputs(); if (G.state === 'play') pause(); } });
 addEventListener('mouseup', e => { if (e.button === 0) mouse.down = false; });
 cv.addEventListener('contextmenu', e => e.preventDefault());
-cv.addEventListener('wheel', e => { if (G.state === 'play') cycleWeapon(e.deltaY > 0 ? 1 : -1); }, { passive: true });
+let wheelAcc = 0, wheelLock = 0;
+cv.addEventListener('wheel', e => {
+  if (G.state !== 'play') return;
+  const now = performance.now();
+  wheelAcc += e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;  // lines -> pixels
+  if (now < wheelLock) { wheelAcc = 0; return; }
+  if (Math.abs(wheelAcc) >= 50) { cycleWeapon(wheelAcc > 0 ? 1 : -1); wheelAcc = 0; wheelLock = now + 250; }
+}, { passive: true });
 
 function tpos(t) { return { x: t.clientX, y: t.clientY }; }
 cv.addEventListener('touchstart', e => {
@@ -577,7 +590,7 @@ function explode(x, y, R, dmg, fromPlayer) {
     const d = Math.hypot(e.x - x, e.y - y); if (d < R + e.r && los(x, y, e.x, e.y)) damageEnemy(e, dmg * (1 - d / (R + e.r) * .6), true);
   }
   const d = Math.hypot(P.x - x, P.y - y);
-  if (d < R + P.r && los(x, y, P.x, P.y)) hurtPlayer(dmg * (fromPlayer ? .45 : 1) * (1 - d / (R + P.r) * .6));
+  if (d < R + P.r && los(x, y, P.x, P.y)) hurtPlayer(dmg * (fromPlayer ? .45 : 1) * (1 - d / (R + P.r) * .6), fromPlayer);
 }
 function interact() {
   let best = null, bd = 48;
@@ -594,8 +607,9 @@ function nearInteractable() {
   for (const n of L.notes) if (n.read && Math.hypot(n.x - P.x, n.y - P.y) < 48) return 'READ NOTE';
   return null;
 }
-function hurtPlayer(d) {
+function hurtPlayer(d, self) {
   if (P.hp <= 0 || G.state !== 'play') return;
+  if (!self) d *= ENEMY_DAMAGE;
   let absorb = 0;
   if (P.armor > 0) { absorb = Math.min(P.armor, d * .66); P.armor -= absorb; }
   const real = d - absorb; P.hp -= real; G.stats.dmg += real;
