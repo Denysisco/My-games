@@ -738,6 +738,7 @@ addEventListener('keydown', e => {
   if (k === 'tab' || k === ' ') e.preventDefault();
   if (e.repeat) return;
   const digit = /^Digit[1-9]$/.test(e.code) ? +e.code.slice(5) : (/^[1-9]$/.test(k) ? +k : 0);
+  if (G.state === 'play' && G.pick && (k === 'escape' || k === 'r')) { G.pick = null; msg('Order cancelled', '#86907a'); return; }
   if (G.state === 'play' && G.cmdOpen) {
     if (digit) { runCmd(digit - 1); return; }
     if (k === 'r' || k === 'escape') { closeCmd(); return; }
@@ -761,7 +762,11 @@ addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 let lastTouch = -1e9;
 const fromTouch = () => performance.now() - lastTouch < 800;
 cv.addEventListener('mousemove', e => { if (fromTouch()) return; mouse.x = e.clientX; mouse.y = e.clientY; touch.on = false; });
-cv.addEventListener('mousedown', e => { if (fromTouch()) return; audioInit(); if (e.button === 0) mouse.down = true; if (e.button === 2) mouse.aim = true; });
+cv.addEventListener('mousedown', e => {
+  if (fromTouch()) return; audioInit();
+  if (G.pick && G.state === 'play') { if (e.button === 0) { const cam = camera(true); pickAt(cam.x + e.clientX / ZOOM, cam.y + e.clientY / ZOOM); } else { G.pick = null; msg('Order cancelled', '#86907a'); } return; }
+  if (e.button === 0) mouse.down = true; if (e.button === 2) mouse.aim = true;
+});
 function releaseInputs() { for (const k in keys) keys[k] = false; mouse.down = false; mouse.aim = false; touch.move = touch.aim = null; }
 addEventListener('blur', releaseInputs);
 document.addEventListener('visibilitychange', () => { if (document.hidden) { releaseInputs(); if (G.state === 'play') pause(); } });
@@ -779,6 +784,7 @@ cv.addEventListener('wheel', e => {
 function tpos(t) { return { x: t.clientX, y: t.clientY }; }
 cv.addEventListener('touchstart', e => {
   e.preventDefault(); audioInit(); touch.on = true; lastTouch = performance.now(); document.getElementById('touch').classList.remove('hidden');
+  if (G.pick && G.state === 'play') { const p = tpos(e.changedTouches[0]), cam = camera(true); pickAt(cam.x + p.x / ZOOM, cam.y + p.y / ZOOM); return; }
   for (const t of e.changedTouches) {
     const p = tpos(t);
     if (p.x < VW / 2 && !touch.move) touch.move = { id: t.identifier, ox: p.x, oy: p.y, x: p.x, y: p.y };
@@ -1105,17 +1111,33 @@ function runCmd(i) {
       { const p = SQ.seenT > 0 ? { x: SQ.lastX, y: SQ.lastY } : { x: (L.def.player[0] + .5) * TS, y: (L.def.player[1] + .5) * TS }; G.alert = 'GREEN'; setAlert('RED', 'BASE SECURITY SOUNDED THE ALARM — ALL GUARDS SEARCHING', p.x, p.y); }
       return;
     case 'move': if (solidAt(pt.x, pt.y)) { msg("Can't send them into a wall", '#86907a'); return; } giveOrder({ kind: 'move', x: pt.x, y: pt.y }); return;
-    case 'attack': { const t = aimTarget(pt); if (!t) { msg('Point at an enemy first, then give the order', '#86907a'); return; } giveOrder({ kind: 'attack', t }); return; }
-    case 'kill': {
-      const t = aimTarget(pt, true);
-      if (!t || !ETYPES[t.type].tk) { msg('Point at a guard first (not a camera, turret or drone)', '#86907a'); return; }
-      if (t.state === 'combat') { msg('He already sees us — ATTACK instead', '#ff8a3d'); giveOrder({ kind: 'attack', t }); return; }
-      giveOrder({ kind: 'kill', t }); return;
-    }
+    case 'attack': case 'kill':
+      G.pick = { kind: c[0] }; mouse.down = false;
+      msg((touch.on ? 'TAP' : 'CLICK') + ' the enemy to ' + (c[0] === 'kill' ? 'take down' : 'attack') + (touch.on ? '' : ' · right-click / ESC to cancel'), '#ffd23f'); sfx('beep');
+      return;
     case 'guard': { const g = L.doorTerm || L.exit; giveOrder({ kind: 'guard', x: g.x, y: g.y }); return; }
     case 'hunt': giveOrder({ kind: 'hunt' }); return;
     default: giveOrder({ kind: c[0] });
   }
+}
+// target picking: whoever is under the cursor (or your finger)
+function pickHover(x, y) {
+  const kill = G.pick && G.pick.kind === 'kill';
+  let best = null, bd = 46;
+  for (const h of hostilesOf(P.team)) {
+    if (G.mode === 'def' && h.op && G.time - (h.spottedT || -99) > 4) continue;
+    const d = Math.hypot(h.x - x, h.y - y) - h.r * .5; if (d < bd) { bd = d; best = h; }
+  }
+  return best && { t: best, ok: !kill || (isGuard(best) && ETYPES[best.type].tk) };
+}
+function pickAt(x, y) {
+  const k = G.pick && G.pick.kind; if (!k) return;
+  const hv = pickHover(x, y);
+  if (!hv) { msg('No enemy there — ' + (touch.on ? 'tap' : 'click') + ' right on one', '#86907a'); return; }
+  if (!hv.ok) { msg("Can't knife that — pick a soldier, officer, sniper or heavy", '#86907a'); return; }
+  G.pick = null;
+  if (k === 'kill' && hv.t.state === 'combat') { msg('He already sees us — ATTACK instead', '#ff8a3d'); giveOrder({ kind: 'attack', t: hv.t }); return; }
+  giveOrder({ kind: k, t: hv.t });
 }
 function giveOrder(c) {
   G.cmd = c;
@@ -1185,6 +1207,7 @@ function killEnemy(e, src) {
   e.hp = 0;
   const byP = src && src.who === P;
   if (byP) G.stats.kills++;
+  if (G.cmd && G.cmd.t === e) { G.cmd = { kind: 'follow' }; if (src && src.who && src.who.op && src.who.team === P.team) msg(src.who.name + ': "Target down."', G.mode === 'op' ? '#7fe0d0' : '#d6d0a0'); }
   if (NOBODY.has(e.type)) { burst(e.x, e.y, '#ffb347', 20, 220, .5, 4); burst(e.x, e.y, '#888', 12, 140, .8, 4); if (!(src && src.silent)) sfx('boom', .6); scorch(e.x, e.y, 22); }
   else {
     burst(e.x, e.y, '#9b1026', src && src.silent ? 8 : 22, 200, .6, 4); splat(e.x, e.y, '#5a0a12', src && src.silent ? 4 : 9);
@@ -2089,7 +2112,7 @@ function updateBullets(dt) {
 /* ---------------- MODE: INFILTRATE (you + 2 allies sneak in) ---------------- */
 function startOp(i, diff) {
   hideScreen(); closePanel();
-  G.mode = 'op'; G.level = i; G.diff = diff; G.stats = newStats(); G.msgs = []; G.meltdown = 0; G.calm = 0; G.shake = 0; G.spawnT = 5; G.cmd = { kind: 'follow' }; G.cmdOpen = false; G.alarmUsed = false; G.lastContact = 0; G.flashT = 0; G.time = 0;
+  G.mode = 'op'; G.level = i; G.diff = diff; G.stats = newStats(); G.msgs = []; G.meltdown = 0; G.calm = 0; G.shake = 0; G.spawnT = 5; G.cmd = { kind: 'follow' }; G.cmdOpen = false; G.pick = null; G.alarmUsed = false; G.lastContact = 0; G.flashT = 0; G.time = 0;
   bullets = []; particles = []; grenades = []; floaters = []; lights = []; smokes = [];
   const def = LEVELS[i];
   L = buildLevel(def, null, GDIFF[diff]);
@@ -2156,7 +2179,7 @@ function defSpot(minD) {
 }
 function startDef(i, diff, carry) {
   hideScreen(); closePanel();
-  G.mode = 'def'; G.level = i; G.diff = diff; G.cmd = { kind: 'follow' }; G.cmdOpen = false; G.alarmUsed = false; G.reinfT = 0; G.lastContact = 0; G.flashT = 0; G.time = 0;
+  G.mode = 'def'; G.level = i; G.diff = diff; G.cmd = { kind: 'follow' }; G.cmdOpen = false; G.pick = null; G.alarmUsed = false; G.reinfT = 0; G.lastContact = 0; G.flashT = 0; G.time = 0;
   if (!carry) { G.stats = newStats(); G.dealt = 0; G.lost = 0; G.deaths = 0; G.defStart = performance.now(); }
   G.msgs = []; G.meltdown = 0; G.calm = 0; G.shake = 0; G.spawnT = 5;
   bullets = []; particles = []; grenades = []; floaters = []; lights = []; smokes = [];
@@ -2344,6 +2367,7 @@ function render() {
     ctx.beginPath(); ctx.moveTo(m.x - g - 7, m.y); ctx.lineTo(m.x - g, m.y); ctx.moveTo(m.x + g, m.y); ctx.lineTo(m.x + g + 7, m.y);
     ctx.moveTo(m.x, m.y - g - 7); ctx.lineTo(m.x, m.y - g); ctx.moveTo(m.x, m.y + g); ctx.lineTo(m.x, m.y + g + 7); ctx.stroke();
     if (sc) { ctx.beginPath(); ctx.arc(m.x, m.y, 22, 0, TAU); ctx.stroke(); }
+    if (G.pick) { ctx.strokeStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(m.x, m.y, 14, 0, TAU); ctx.stroke(); }
     ctx.fillStyle = '#ff3b3b'; ctx.fillRect(m.x - 1, m.y - 1, 2, 2);
   }
   drawHUD(now);
@@ -2537,6 +2561,20 @@ function drawCones(cam, now) {
   }
 }
 function drawMarks(now, inView) {
+  if (G.pick && !touch.on) {
+    const hv = pickHover(mouse.wx, mouse.wy);
+    if (hv) {
+      const t = hv.t, col = hv.ok ? (G.pick.kind === 'kill' ? '#4fd8ff' : '#ff3b3b') : '#777';
+      ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(t.x, t.y, t.r + 10 + Math.sin(now * 8) * 2, 0, TAU); ctx.stroke();
+      for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + now; ctx.beginPath(); ctx.moveTo(t.x + Math.cos(a) * (t.r + 14), t.y + Math.sin(a) * (t.r + 14)); ctx.lineTo(t.x + Math.cos(a) * (t.r + 22), t.y + Math.sin(a) * (t.r + 22)); ctx.stroke(); }
+      ctx.fillStyle = col; ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center';
+      ctx.fillText(hv.ok ? (G.pick.kind === 'kill' ? 'TAKE DOWN' : 'ATTACK') : "CAN'T KNIFE", t.x, t.y + t.r + 30);
+    }
+  }
+  if ((G.cmd.kind === 'kill' || G.cmd.kind === 'attack') && G.cmd.t && alive(G.cmd.t)) {
+    const t = G.cmd.t; ctx.strokeStyle = G.cmd.kind === 'kill' ? 'rgba(79,216,255,.8)' : 'rgba(255,59,59,.8)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.arc(t.x, t.y, t.r + 9, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+  }
   ctx.textAlign = 'center';
   for (const e of L.enemies) {
     if (!inView(e.x, e.y)) continue;
