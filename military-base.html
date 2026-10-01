@@ -1545,6 +1545,46 @@ function teamSpotted(team) {
   for (const e of L.enemies) if (e.state === 'combat' && e.target && e.target.team === team && alive(e.target)) return true;
   return false;
 }
+// which tiles some guard or camera can see right now (their flashlight / view cones), refreshed twice a second
+function coneMap() {
+  if (L.coneMap && G.time - L.coneT < .5) return L.coneMap;
+  const m = L.coneMap || (L.coneMap = new Uint8Array(L.w * L.h)); m.fill(0); L.coneT = G.time;
+  const A = ALERTS[G.alert];
+  for (const e of L.enemies) {
+    const T = ETYPES[e.type];
+    if (e.sleep || e.off || e.stun > 0 || e.state === 'combat' || T.boss || e.hp <= 0) continue;
+    const range = A.sight * T.sight * .62 + 20, r = Math.ceil(range / TS), cx = Math.floor(e.x / TS), cy = Math.floor(e.y / TS);
+    for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) {
+      if (x < 0 || y < 0 || x >= L.w || y >= L.h || L.t[y * L.w + x] === 0) continue;
+      const px = (x + .5) * TS, py = (y + .5) * TS, d = Math.hypot(px - e.x, py - e.y);
+      if (d > range || (d > 40 && Math.abs(angDiff(e.angle, Math.atan2(py - e.y, px - e.x))) > T.cone + .15)) continue;
+      if (los(e.x, e.y, px, py)) m[y * L.w + x] = 1;
+    }
+  }
+  return m;
+}
+// a path that goes around the cones when it can (each lit tile costs a lot), straight through only if there's no other way
+const HEAP = new Int32Array(80 * 60 * 4);
+function stealthPath(o, x, y) {
+  const key = tileIdx({ x, y });
+  if (!(key !== o.sKey || o.sPathT <= 0)) return flowDir(o, o.sDist);
+  o.sKey = key; o.sPathT = .4;
+  const w = L.w, n = w * L.h, dist = o.sDist || (o.sDist = new Uint16Array(n)), cm = coneMap(), pass = unitPass(o);
+  dist.fill(65535); dist[key] = 0;
+  let hn = 0; const push = (i, d) => { let k = hn++; HEAP[k * 2] = d; HEAP[k * 2 + 1] = i; while (k > 0) { const pk = (k - 1) >> 1; if (HEAP[pk * 2] <= HEAP[k * 2]) break; for (const j of [0, 1]) { const tmp = HEAP[pk * 2 + j]; HEAP[pk * 2 + j] = HEAP[k * 2 + j]; HEAP[k * 2 + j] = tmp; } k = pk; } };
+  const pop = () => { const d = HEAP[0], i = HEAP[1]; hn--; HEAP[0] = HEAP[hn * 2]; HEAP[1] = HEAP[hn * 2 + 1]; let k = 0; for (;;) { const l = k * 2 + 1, r = l + 1; let m = k; if (l < hn && HEAP[l * 2] < HEAP[m * 2]) m = l; if (r < hn && HEAP[r * 2] < HEAP[m * 2]) m = r; if (m === k) break; for (const j of [0, 1]) { const tmp = HEAP[m * 2 + j]; HEAP[m * 2 + j] = HEAP[k * 2 + j]; HEAP[k * 2 + j] = tmp; } k = m; } return [d, i]; };
+  push(key, 0);
+  while (hn > 0 && hn < HEAP.length / 2 - 8) {
+    const [d, i] = pop(); if (d > dist[i]) continue;
+    const xx = i % w;
+    for (const nb of [xx > 0 ? i - 1 : -1, xx < w - 1 ? i + 1 : -1, i - w, i + w]) {
+      if (nb < 0 || nb >= n || !pass(nb)) continue;
+      const nd = d + 1 + (cm[nb] ? 14 : 0);
+      if (nd < dist[nb] && nd < 65000) { dist[nb] = nd; push(nb, nd); }
+    }
+  }
+  return flowDir(o, dist);
+}
 function opPath(o, x, y) {
   const key = tileIdx({ x, y });
   if (key !== o.distKey || o.pathT <= 0) { bfs(key, unitPass(o), o.dist, 160); o.distKey = key; o.pathT = .35; }
@@ -1700,6 +1740,10 @@ function updateOp(o, dt) {
   const downed = friendly ? OPS.find(x => x !== o && x.team === o.team && x.state === 'down' && Math.hypot(x.x - o.x, x.y - o.y) < 360) : null;
   if (o.claim) {
     gx = o.claim.x; gy = o.claim.y; mode = 'sneak';
+    if (!o.claim.sleep && Math.hypot(o.claim.x - o.x, o.claim.y - o.y) > 70) { // come at him from behind
+      const bx = o.claim.x - Math.cos(o.claim.angle) * 38, by = o.claim.y - Math.sin(o.claim.angle) * 38;
+      if (!solidAt(bx, by)) { gx = bx; gy = by; }
+    }
     if (Math.hypot(o.claim.x - o.x, o.claim.y - o.y) < o.r + o.claim.r + 14) { takedown(o.claim, o); o.claim = null; }
   } else if (downed && (!t || o.lastHit > 2)) {
     gx = downed.x; gy = downed.y;
@@ -1756,7 +1800,15 @@ function updateOp(o, dt) {
   let mvx = 0, mvy = 0;
   if (mode !== 'hold' && toGoal > 14 && !(o.freezeT > 0 && stealthy && mode !== 'sneak')) {
     let f = null;
-    if (toGoal < 70 && los(o.x, o.y, gx, gy)) f = { x: (gx - o.x) / toGoal, y: (gy - o.y) / toGoal };
+    if (mode === 'sneak' && o.claim) {
+      o.sPathT = (o.sPathT || 0) - dt;
+      const near = Math.hypot(o.claim.x - o.x, o.claim.y - o.y) < 60;
+      f = near ? { x: (o.claim.x - o.x) / Math.max(1, Math.hypot(o.claim.x - o.x, o.claim.y - o.y)), y: (o.claim.y - o.y) / Math.max(1, Math.hypot(o.claim.x - o.x, o.claim.y - o.y)) } : (stealthPath(o, gx, gy) || { x: (gx - o.x) / toGoal, y: (gy - o.y) / toGoal });
+      // about to step into a lit cone? crouch and wait for the guard to look away (up to 5s), then go anyway
+      const cm = coneMap(), here = cm[tileIdx(o)], ahead = cm[tileIdx({ x: o.x + f.x * 26, y: o.y + f.y * 26 })];
+      if (!near && !here && ahead && (o.waitT || 0) < 5) { o.waitT = (o.waitT || 0) + dt; f = { x: 0, y: 0 }; o.crouch = true; }
+      else if (!ahead) o.waitT = Math.max(0, (o.waitT || 0) - dt * .5);
+    } else if (toGoal < 70 && los(o.x, o.y, gx, gy)) f = { x: (gx - o.x) / toGoal, y: (gy - o.y) / toGoal };
     else f = opPath(o, gx, gy) || { x: (gx - o.x) / toGoal, y: (gy - o.y) / toGoal };
     mvx = f.x; mvy = f.y;
   }
