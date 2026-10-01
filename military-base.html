@@ -154,7 +154,7 @@ const NOBODY = new Set(['camera', 'turret', 'drone']); // these leave wreckage, 
    TIERS are the AI operators (your squad, the rookies, and the intruder squad).
    GDIFF scales the base personnel when you are the one sneaking in. */
 const TIERS = [
-  { name: 'ROOKIE', stars: 0, hp: 170, speed: 160, spread: .1,   react: .3,  rate: .15, dmg: 9,  lead: true,  nades: 1, sight: 470, armor: 0,   color: '#c9c08a' },
+  { name: 'ROOKIE', stars: 0, hp: 230, speed: 165, spread: .075, react: .24, rate: .13, dmg: 11, lead: true,  nades: 2, sight: 500, armor: .12,   color: '#c9c08a' },
   { name: 'EASY',   stars: 1, hp: 150, speed: 155, spread: .13,  react: .42, rate: .16, dmg: 9,  lead: false, nades: 0, sight: 440, armor: 0,   color: '#3ddc84', time: 150 },
   { name: 'MID',    stars: 2, hp: 210, speed: 162, spread: .09,  react: .3,  rate: .13, dmg: 10, lead: false, nades: 1, sight: 480, armor: .1,  color: '#ffd23f', time: 180 },
   { name: 'HARD',   stars: 3, hp: 290, speed: 170, spread: .06,  react: .2,  rate: .11, dmg: 11, lead: true,  nades: 2, sight: 520, armor: .15, color: '#ff8a3d', time: 210 },
@@ -314,6 +314,7 @@ let L = null;          // current level runtime
 let P = null;          // you
 let OPS = [];          // AI operators: your squad, the rookies, or the intruder squad
 let SQ = null;         // what the intruder squad knows (keycards, codes) in Defend mode
+let INTEL = { A: null, D: null }; // last enemy contact each side has called out
 let G = {
   state: 'menu', mode: 'op', level: 0, diff: 2, alert: 'GREEN', calm: 0, meltdown: 0, time: 0,
   banner: null, shake: 0, msgs: [], spawnT: 0, carry: null, stats: null, totalStats: null, lastWarn: 0,
@@ -966,7 +967,7 @@ function detonate(g) {
     smokes.push({ x: g.x, y: g.y, r: 20, maxr: 115, life: 10 }); sfx('smoke');
     burst(g.x, g.y, '#c8ccd0', 20, 90, 1, 8);
   } else if (g.kind === 'flash') flashbang(g.x, g.y, g.team, g.who);
-  else explode(g.x, g.y, 95, 130, g.team, g.who);
+  else explode(g.x, g.y, 95, 33, g.team, g.who); // frag grenades: 75% less damage than before (130 -> 33)
 }
 function explode(x, y, R, dmg, team, who) {
   sfx('boom'); shake(12); flashLight(x, y, R * 3.2, 1, .25); scorch(x, y, R * .8);
@@ -1534,14 +1535,26 @@ function slotFor(anchor, k, n, a) {
   const bx = anchor.x - ca * 26, by = anchor.y - sa * 26;
   return solidAt(bx, by) ? { x: anchor.x, y: anchor.y } : { x: bx, y: by };
 }
-function opFire(o, t) {
+// is a friendly standing in the way of this shot?
+function lineBlocked(o, ax, ay) {
+  const dx = ax - o.x, dy = ay - o.y, l2 = dx * dx + dy * dy || 1, L0 = Math.sqrt(l2);
+  for (const u of [P, ...OPS]) {
+    if (!u || u === o || u.team !== o.team || (u === P ? P.dead : u.state !== 'ok')) continue;
+    const t = ((u.x - o.x) * dx + (u.y - o.y) * dy) / l2; if (t <= 0 || t >= 1) continue;
+    if (Math.hypot(o.x + dx * t - u.x, o.y + dy * t - u.y) < u.r + 7 && t * L0 < L0 - 10) return true;
+  }
+  return false;
+}
+function opFire(o, t, ax, ay, spreadMul = 1) {
   const T = TIERS[o.tier], W = WEAPONS[o.weapon];
-  o.cd = T.rate * rand(.85, 1.15) * (o.weapon === 'rifle' ? 1.1 : 1);
-  const d = Math.hypot(t.x - o.x, t.y - o.y) || 1;
-  let ax = t.x, ay = t.y;
-  if (T.lead) { const tt = d / 880; ax += (t.vx || 0) * tt; ay += (t.vy || 0) * tt; }
+  const d = Math.hypot((ax ?? t.x) - o.x, (ay ?? t.y) - o.y) || 1;
+  if (ax === undefined) { ax = t.x; ay = t.y; if (T.lead) { const tt = d / 880; ax += (t.vx || 0) * tt; ay += (t.vy || 0) * tt; } }
+  if (lineBlocked(o, ax, ay)) { o.cd = .15; o.blockedT = .6; return; } // check your fire: friendly in the way, sidestep instead
+  o.cd = T.rate * rand(.85, 1.15) * (o.weapon === 'rifle' ? 1.1 : 1) * (spreadMul > 1 ? 1.8 : 1);
   o.angle = Math.atan2(ay - o.y, ax - o.x);
-  const a = o.angle + rand(-T.spread, T.spread) * (o.crouch ? .85 : 1);
+  // aim settles the longer they stay on one target; crouched or standing still is steadier
+  const settle = 1.35 - .7 * clamp(o.seenT / 1.2, 0, 1), steady = (o.crouch || o.still) ? .75 : 1;
+  const a = o.angle + rand(-T.spread, T.spread) * settle * steady * spreadMul;
   bullets.push({ x: o.x, y: o.y, vx: Math.cos(a) * 880, vy: Math.sin(a) * 880, dmg: T.dmg, team: o.team, who: o, r: 4, life: .9,
     color: o.team === P.team ? '#bff3ff' : '#ffcf8a', silenced: !!W.silenced, kind: o.weapon });
   o.muzzle = .05;
@@ -1685,6 +1698,7 @@ function updateOp(o, dt) {
   else if (friendly && G.cmd.kind !== 'follow' && G.cmd.kind !== 'kill') {
     const c = G.cmd, mates = myOps().filter(x => x.state !== 'dead'), k = mates.indexOf(o);
     const off = [[0, 0], [26, 20], [-26, 20]][k % 3];
+    o.overwatch = false;
     if (c.kind === 'hold') { gx = o.holdX; gy = o.holdY; }
     else if (c.kind === 'move' || c.kind === 'guard') { gx = c.x + off[0]; gy = c.y + off[1]; if (solidAt(gx, gy)) { gx = c.x; gy = c.y; } }
     else if (c.kind === 'attack') {
@@ -1695,6 +1709,12 @@ function updateOp(o, dt) {
       const hx = SQ && SQ.seenT > 0 ? SQ.lastX : (L.def.player[0] + .5) * TS, hy = SQ && SQ.seenT > 0 ? SQ.lastY : (L.def.player[1] + .5) * TS;
       gx = hx + off[0]; gy = hy + off[1]; if (solidAt(gx, gy)) { gx = hx; gy = hy; }
     }
+    // bounding overwatch: half the team moves while the other half covers, then swap
+    const live = mates.filter(x => x.state === 'ok');
+    if ((c.kind === 'move' || c.kind === 'hunt' || c.kind === 'guard') && live.length >= 2 && !t && Math.hypot(gx - o.x, gy - o.y) > 170) {
+      const phase = Math.floor(G.time / 1.6) % 2;
+      if (live.indexOf(o) % 2 !== phase) { mode = 'hold'; o.overwatch = true; }
+    }
   }
   else if (anchor) {
     const mates = OPS.filter(x => x.team === o.team && x.role !== 'lead' && x.state !== 'dead');
@@ -1704,6 +1724,7 @@ function updateOp(o, dt) {
     gx = anchor.x + (s.x - anchor.x) * back; gy = anchor.y + (s.y - anchor.y) * back;
     if (solidAt(gx, gy)) { gx = s.x; gy = s.y; }
   } else { gx = o.x; gy = o.y; mode = 'hold'; }
+  if (mode !== 'hold') o.overwatch = false;
   if (o.reviveT > 0 && mode !== 'hold') o.reviveT = 0;
   // ---- stay hidden: freeze while a guard is looking our way
   o.crouch = stealthy && (o.role !== 'escort' || P.crouch || L.enemies.some(e => e.state !== 'combat' && !e.sleep && Math.hypot(e.x - o.x, e.y - o.y) < 450));
@@ -1736,10 +1757,15 @@ function updateOp(o, dt) {
   if (anchor === P && !o.crouch && Math.hypot(P.x - o.x, P.y - o.y) > 200) spd *= 1.45;
   if (o.role === 'lead' && stealthy) spd *= .8;
   // ---- fight
-  if (t && o.seenT >= T.react * (stealthy ? .6 : 1)) {
+  const intel = INTEL[o.team], fresh = intel && G.time - intel.time < 4;
+  const preAimed = t && fresh && Math.hypot(t.x - intel.x, t.y - intel.y) < 160; // a teammate called it out: already aiming there
+  o.blockedT = (o.blockedT || 0) - dt;
+  if (t && sightLine(o.x, o.y, t.x, t.y)) { o.lastVisT = G.time; o.lastTX = t.x; o.lastTY = t.y; o.lastTgt = t; INTEL[o.team] = { x: t.x, y: t.y, time: G.time }; }
+  if (t && o.seenT >= T.react * (stealthy ? .6 : 1) * (preAimed ? .4 : 1)) {
     const dist = Math.hypot(t.x - o.x, t.y - o.y) || 1;
     o.angle = Math.atan2(t.y - o.y, t.x - o.x);
     if (o.cd <= 0) opFire(o, t);
+    if (o.blockedT > 0) { const k = (o.seed > 5 ? 1 : -1); mvx += -(t.y - o.y) / dist * k * 1.2; mvy += (t.x - o.x) / dist * k * 1.2; }
     if (!o.claim && !o.cov) {
       spd *= .7;
       if (dist < 100) { mvx = mvx * .3 - (t.x - o.x) / dist; mvy = mvy * .3 - (t.y - o.y) / dist; }
@@ -1754,8 +1780,19 @@ function updateOp(o, dt) {
         msg(o.name + ': "FRAG OUT!"', friendly ? '#4fd8ff' : '#ff8a3d');
       }
     }
-  } else if (mvx || mvy) o.angle = turnTo(o.angle, Math.atan2(mvy, mvx), 8 * dt);
-  else if (anchor === P) o.angle = turnTo(o.angle, P.heading || 0, 3 * dt);
+  } else if (!stealthy && o.lastTgt && alive(o.lastTgt) && G.time - (o.lastVisT || -9) < 1.2 && !o.cov) {
+    // suppressive fire: they just ducked behind something — keep their head down
+    o.angle = turnTo(o.angle, Math.atan2(o.lastTY - o.y, o.lastTX - o.x), 10 * dt);
+    if (o.cd <= 0) opFire(o, o.lastTgt, o.lastTX + rand(-14, 14), o.lastTY + rand(-14, 14), 1.6);
+  } else if (fresh && !stealthy) o.angle = turnTo(o.angle, Math.atan2(intel.y - o.y, intel.x - o.x), 6 * dt); // eyes on the reported contact
+  else if (o.overwatch) o.angle = turnTo(o.angle, Math.atan2(gy - o.y, gx - o.x), 6 * dt);
+  else if (mvx || mvy) o.angle = turnTo(o.angle, Math.atan2(mvy, mvx), 8 * dt);
+  else if (anchor) {
+    // watch arcs: everyone covers a different direction instead of all staring the same way
+    const mates = OPS.filter(x => x.team === o.team && x.state === 'ok' && x.role !== 'lead'), k = Math.max(0, mates.indexOf(o));
+    const base = anchor === P ? (P.heading || 0) : anchor.angle, arcs = [-1.1, 1.1, Math.PI];
+    o.angle = turnTo(o.angle, base + arcs[k % 3], 3 * dt);
+  }
   // separation from teammates and you
   for (const u of [P, ...OPS]) {
     if (!u || u === o || (u === P ? P.dead : u.state !== 'ok')) continue;
@@ -2033,7 +2070,7 @@ function updateBullets(dt) {
       if (!hitU) continue;
       if (b.rocket) { dead = true; boom = true; break; }
       if (b.who === P && !b.counted) { G.stats.hits++; b.counted = true; }
-      if (b.who === P) { P.focus = hitU; P.focusT = G.time; }
+      if (b.who === P) { P.focus = hitU; P.focusT = G.time; INTEL[P.team] = { x: hitU.x, y: hitU.y, time: G.time }; }
       let dmg = b.dmg;
       const src = { team: b.team, who: b.who, x: b.x - b.vx * .05, y: b.y - b.vy * .05 };
       if (isGuard(hitU)) {
@@ -2059,7 +2096,7 @@ function startOp(i, diff) {
   const c = JSON.parse(JSON.stringify(G.carry || defaultCarry()));
   P = { team: 'A', x: (def.player[0] + .5) * TS, y: (def.player[1] + .5) * TS, r: 11, maxhp: 100, angle: 0, heading: 0, cd: 0, kick: 0, hurt: 0, muzzle: 0, walk: 0, stamina: 1,
         keys: {}, crouch: false, crouchT: false, knife: 0, stepT: 0, dead: false, still: true, ...c };
-  OPS = []; SQ = null;
+  OPS = []; SQ = null; INTEL = { A: null, D: null };
   const tier = Math.max(0, diff - 1);
   ALLY_NAMES.forEach((n, k) => { const s = slotFor(P, k, 2, -Math.PI / 2); OPS.push(makeOp(n, 'A', 'escort', tier, s.x, s.y, 'smgsd')); });
   L.focus = P;
@@ -2161,7 +2198,7 @@ function startDef(i, diff, carry) {
   L.explored.fill(1); // it's your base: you know every room
   L.exitField = new Uint16Array(L.w * L.h); bfs(tileIdx(L.exit), k => L.t[k] !== 0, L.exitField);
   // the intruder squad: a leader at your chosen difficulty, two operators one step below
-  SQ = { keys: {}, read: new Set(), know: {}, seenT: -99, order: { kind: 'follow' } };
+  SQ = { keys: {}, read: new Set(), know: {}, seenT: -99, order: { kind: 'follow' } }; INTEL = { A: null, D: null };
   OPS = [];
   const sx = (def.player[0] + .5) * TS, sy = (def.player[1] + .5) * TS;
   const prev = carry && carry.intr;
