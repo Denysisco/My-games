@@ -1861,6 +1861,12 @@ function updateOp(o, dt) {
   const quiet = friendly && G.mode === 'op' && !P.dead && P.crouch; // you're crouched: so is the squad, and nobody fires
   const holdFire = quiet && G.cmd.kind !== 'attack';
   if (quiet) o.crouch = true;
+  // ordered knife kill: once he's close and looking the other way, stand up and close the gap fast (crouch again for the last step)
+  o.rush = false;
+  if (mode === 'sneak' && o.claim && !o.claim.sleep) {
+    const c = o.claim, d = Math.hypot(c.x - o.x, c.y - o.y);
+    if (d > 52 && d < 180 && (c.sus || 0) < .3 && Math.abs(angDiff(c.angle, Math.atan2(o.y - c.y, o.x - c.x))) > ETYPES[c.type].cone + .45 && sightLine(o.x, o.y, c.x, c.y)) { o.rush = true; o.crouch = false; o.waitT = 0; }
+  }
   if (stealthy && mode !== 'sneak') { const ex = exposedTo(o); if (ex) o.freezeT = Math.max(o.freezeT, .5); }
   const toGoal = Math.hypot(gx - o.x, gy - o.y);
   let mvx = 0, mvy = 0;
@@ -1869,10 +1875,10 @@ function updateOp(o, dt) {
     if (mode === 'sneak' && o.claim) {
       o.sPathT = (o.sPathT || 0) - dt;
       const near = Math.hypot(o.claim.x - o.x, o.claim.y - o.y) < 60;
-      f = near ? { x: (o.claim.x - o.x) / Math.max(1, Math.hypot(o.claim.x - o.x, o.claim.y - o.y)), y: (o.claim.y - o.y) / Math.max(1, Math.hypot(o.claim.x - o.x, o.claim.y - o.y)) } : (stealthPath(o, gx, gy) || { x: (gx - o.x) / toGoal, y: (gy - o.y) / toGoal });
+      f = near || (o.rush && los(o.x, o.y, gx, gy)) ? { x: (o.claim.x - o.x) / Math.max(1, Math.hypot(o.claim.x - o.x, o.claim.y - o.y)), y: (o.claim.y - o.y) / Math.max(1, Math.hypot(o.claim.x - o.x, o.claim.y - o.y)) } : (stealthPath(o, gx, gy) || { x: (gx - o.x) / toGoal, y: (gy - o.y) / toGoal });
       // about to step into a lit cone? crouch and wait for the guard to look away (up to 5s), then go anyway
       const cm = coneMap(), here = cm[tileIdx(o)], ahead = cm[tileIdx({ x: o.x + f.x * 26, y: o.y + f.y * 26 })];
-      if (!near && !here && ahead && (o.waitT || 0) < 5) { o.waitT = (o.waitT || 0) + dt; f = { x: 0, y: 0 }; o.crouch = true; }
+      if (!near && !o.rush && !here && ahead && (o.waitT || 0) < 5) { o.waitT = (o.waitT || 0) + dt; f = { x: 0, y: 0 }; o.crouch = true; }
       else if (!ahead) o.waitT = Math.max(0, (o.waitT || 0) - dt * .5);
     } else if (toGoal < 70 && los(o.x, o.y, gx, gy)) f = { x: (gx - o.x) / toGoal, y: (gy - o.y) / toGoal };
     else f = opPath(o, gx, gy) || { x: (gx - o.x) / toGoal, y: (gy - o.y) / toGoal };
@@ -1897,6 +1903,7 @@ function updateOp(o, dt) {
   if (o.cov) spd *= 1.25;
   if (anchor === P && !o.crouch && Math.hypot(P.x - o.x, P.y - o.y) > 200) spd *= 1.45;
   if (o.role === 'lead' && stealthy) spd *= .8;
+  if (o.rush) spd = T.speed * 1.1;
   // ---- fight
   const intel = INTEL[o.team], fresh = intel && G.time - intel.time < 4;
   const preAimed = t && fresh && Math.hypot(t.x - intel.x, t.y - intel.y) < 160; // a teammate called it out: already aiming there
@@ -2134,6 +2141,16 @@ function update(dt) {
   G.spottedA = teamSpotted('A');
   for (let i = L.enemies.length - 1; i >= 0; i--) { const e = L.enemies[i]; if (e) updateGuard(e, dt); }
   for (const o of OPS) { o.pathT -= dt; updateOp(o, dt); }
+  // a knife order whose man went down (or lost the target) gets handed to whoever is still standing
+  if (G.cmd.kind === 'kill' && G.cmd.t) {
+    const c = G.cmd, by = c.by;
+    if (!alive(c.t)) G.cmd = { kind: 'follow' };
+    else if (!by || by.state !== 'ok' || by.claim !== c.t) {
+      const next = myOps().filter(o => o.state === 'ok' && o !== by).sort((a, b) => Math.hypot(a.x - c.t.x, a.y - c.t.y) - Math.hypot(b.x - c.t.x, b.y - c.t.y))[0];
+      if (next && c.t.state !== 'combat' && ETYPES[c.t.type].tk) { next.claim = c.t; next.cmdClaim = true; c.by = next; msg(next.name + ': "I\'ll take him."', G.mode === 'op' ? '#7fe0d0' : '#d6d0a0'); }
+      else G.cmd = { kind: 'follow' };
+    }
+  }
   for (const o of [P, ...L.enemies, ...OPS]) { if (o.ox !== undefined && dt > 0) { o.vx = (o.x - o.ox) / dt; o.vy = (o.y - o.oy) / dt; } o.ox = o.x; o.oy = o.y; }
   updateBullets(dt);
   if (G.state !== 'play') return;
@@ -2214,6 +2231,7 @@ function updateBullets(dt) {
       if (b.who === P && !b.counted) { G.stats.hits++; b.counted = true; }
       if (b.who === P) { P.focus = hitU; P.focusT = G.time; INTEL[P.team] = { x: hitU.x, y: hitU.y, time: G.time }; }
       let dmg = b.dmg;
+      if (b.kind === 'sniper' && hitU.type !== 'boss') dmg = Math.max(dmg, (hitU.hp || 0) + (hitU.maxhp || 100) * 3); // the sniper rifle is a one-shot kill (IRONCLAD aside)
       const src = { team: b.team, who: b.who, x: b.x - b.vx * .05, y: b.y - b.vy * .05 };
       if (isGuard(hitU)) {
         // silent shots on someone who never saw it coming hit much harder
@@ -3148,6 +3166,7 @@ function resume() { hideScreen(); G.state = 'play'; last = performance.now(); }
 let last = performance.now();
 function frame(t) {
   const dt = Math.min(.05, (t - last) / 1000); last = t;
+  if (G.cmdOpen && (G.state !== 'play' || (G.armoury && (P.dead || Math.hypot(G.armoury.x - P.x, G.armoury.y - P.y) > 90)))) closeCmd(); // no menus left hanging over other screens
   if (G.state === 'play') update(dt);
   else if (G.state === 'dying') {
     G.dieT -= dt; G.shake = Math.max(0, G.shake - dt * 30);
@@ -3158,7 +3177,7 @@ function frame(t) {
   render();
   requestAnimationFrame(frame);
 }
-window.IRON = { G, LEVELS, ETYPES, TIERS, GDIFF, buildLevel, get L() { return L; }, get P() { return P; }, get OPS() { return OPS; }, get SQ() { return SQ; }, startOp, startDef, update, camera, keys, mouse, touch, solidAt, setAlert, ACTIONS, interact, takedownTarget, throwGadget, flowDir, bfs, unitPass, tileIdx, hostilesOf, get ZOOM() { return ZOOM; } };
+window.IRON = { G, LEVELS, ETYPES, TIERS, GDIFF, buildLevel, get L() { return L; }, get P() { return P; }, get OPS() { return OPS; }, get SQ() { return SQ; }, startOp, startDef, update, camera, keys, mouse, touch, solidAt, setAlert, ACTIONS, interact, giveOrder, los, coneMap, takedownTarget, throwGadget, flowDir, bfs, unitPass, tileIdx, hostilesOf, get ZOOM() { return ZOOM; } };
 menu();
 requestAnimationFrame(frame);
 </script>
