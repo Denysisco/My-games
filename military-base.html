@@ -160,7 +160,7 @@ const TIERS = [
   { name: 'EASY',   stars: 1, hp: 150, speed: 155, spread: .13,  react: .42, rate: .16, dmg: 9,  lead: false, nades: 0, sight: 440, armor: 0,   color: '#3ddc84', time: 150 },
   { name: 'MID',    stars: 2, hp: 210, speed: 162, spread: .09,  react: .3,  rate: .13, dmg: 10, lead: false, nades: 1, sight: 480, armor: .1,  color: '#ffd23f', time: 180 },
   { name: 'HARD',   stars: 3, hp: 290, speed: 170, spread: .06,  react: .2,  rate: .11, dmg: 11, lead: true,  nades: 2, sight: 520, armor: .15, color: '#ff8a3d', time: 210 },
-  { name: 'ELITE',  stars: 4, hp: 460, speed: 182, spread: .028, react: .1,  rate: .095, dmg: 13, lead: true,  nades: 4, sight: 600, armor: .25,  color: '#ff3b3b', time: 240 },
+  { name: 'ELITE',  stars: 4, hp: 380, speed: 163, spread: .045, react: .2,  rate: .12,  dmg: 11, lead: true,  nades: 2, sight: 560, armor: .2,   color: '#ff3b3b', time: 240 },
 ];
 const GDIFF = [null,
   { hp: .8,   dmg: .6,  detect: .7,  acc: 1.4, alarm: 1.4 },
@@ -1992,7 +1992,8 @@ function updateOp(o, dt) {
   const preAimed = t && fresh && Math.hypot(t.x - intel.x, t.y - intel.y) < 160; // a teammate called it out: already aiming there
   o.blockedT = (o.blockedT || 0) - dt;
   if (t && sightLine(o.x, o.y, t.x, t.y)) { o.lastVisT = G.time; o.lastTX = t.x; o.lastTY = t.y; o.lastTgt = t; INTEL[o.team] = { x: t.x, y: t.y, time: G.time }; }
-  if (t && o.seenT >= T.react * (stealthy ? .6 : 1) * (preAimed ? .4 : 1)) {
+  const react = G.mode === 'def' && o.team === 'A' && t === P ? Math.max(.55, T.react) : T.react * (stealthy ? .6 : 1) * (preAimed ? .4 : 1);
+  if (t && o.seenT >= react) {
     const dist = Math.hypot(t.x - o.x, t.y - o.y) || 1;
     o.angle = Math.atan2(t.y - o.y, t.x - o.x);
     if (o.cd <= 0 && !holdFire) opFire(o, t);
@@ -2328,7 +2329,7 @@ function updateBullets(dt) {
         burst(b.x, b.y, NOBODY.has(hitU.type) || hitU.type === 'boss' ? '#ffd76a' : '#b3122e', 4, 110, .25, 2);
         if (b.pierce > 0) { b.pierce--; (b.hit || (b.hit = [])).push(hitU); } else dead = true;
         damageEnemy(hitU, dmg, src, b.silenced);
-      } else { dead = true; hurtAny(hitU, dmg, src); }
+      } else { dead = true; if (hitU === P && G.mode === 'def' && b.team === 'A') dmg *= .28; hurtAny(hitU, dmg, src); }
     }
     if (boom) explode(b.x - b.vx * .01, b.y - b.vy * .01, 110, b.rdmg || 170, b.team, b.who);
     if (dead) bullets.splice(i, 1);
