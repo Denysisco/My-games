@@ -145,10 +145,14 @@ const DOORKEY = { G: 'green', Y: 'yellow', R: 'red' };
 
 /* ---------------- MONSTER MODE: bot difficulty ---------------- */
 const BOTDIFF = [null,
-  { name: 'EASY',  stars: 1, hp: 170, speed: 120, spread: .26, react: .75, rate: .24, dmg: 7,  lead: false, nades: 0, regen: 0, strafe: 0,  sight: 380, time: 150, color: '#3ddc84' },
-  { name: 'MID',   stars: 2, hp: 250, speed: 140, spread: .15, react: .42, rate: .17, dmg: 8,  lead: false, nades: 1, regen: 1, strafe: .5, sight: 440, time: 180, color: '#ffd23f' },
-  { name: 'HARD',  stars: 3, hp: 430, speed: 155, spread: .08, react: .24, rate: .13, dmg: 9,  lead: true,  nades: 2, regen: 2, strafe: .8, sight: 500, time: 210, color: '#ff8a3d' },
-  { name: 'ELITE', stars: 4, hp: 800, speed: 175, spread: .035, react: .1, rate: .09, dmg: 11, lead: true,  nades: 4, regen: 6, strafe: 1,  sight: 560, time: 240, color: '#ff3b3b' },
+  { name: 'EASY',  stars: 1, hp: 170, speed: 120, spread: .26, react: .75, rate: .24, dmg: 7,  lead: false, nades: 0, regen: 0, strafe: 0,  sight: 380, time: 150, armor: 0,   dodge: 0,   stims: 0, heal: .15, color: '#3ddc84',
+    skills: 'Slow, shaky aim, no grenades' },
+  { name: 'MID',   stars: 2, hp: 340, speed: 145, spread: .14, react: .4,  rate: .16, dmg: 8,  lead: false, nades: 1, regen: 2, strafe: .5, sight: 440, time: 180, armor: .1,  dodge: 0,   stims: 0, heal: .25, color: '#ffd23f',
+    skills: '+ grenades, light armor (-10% dmg), slow regen' },
+  { name: 'HARD',  stars: 3, hp: 540, speed: 160, spread: .07, react: .22, rate: .12, dmg: 9,  lead: true,  nades: 2, regen: 3, strafe: .8, sight: 500, time: 210, armor: .2,  dodge: .4,  stims: 1, heal: .35, color: '#ff8a3d',
+    skills: '+ leads its shots, dodges 40% of pounces, 1 stim per sector, armor -20%' },
+  { name: 'ELITE', stars: 4, hp: 600, speed: 175, spread: .035, react: .1, rate: .09, dmg: 11, lead: true,  nades: 4, regen: 4, strafe: 1,  sight: 560, time: 240, armor: .25, dodge: .6,  stims: 2, heal: .3,   color: '#ff3b3b',
+    skills: '+ dodges 60% of pounces, 2 stims per sector, heavy armor -25%, fast regen, deadly aim' },
 ];
 const MONSTER = { hp: 320, speed: 200, claw: 30, clawRate: .38, pounce: 40, pounceCd: 3.5, roarCd: 14, hordeCd: 18, regen: 8 };
 
@@ -1118,6 +1122,7 @@ function botFire(D) {
 }
 function hurtBot(d) {
   if (BOT.hp <= 0) return;
+  d *= 1 - BOTDIFF[G.mdiff].armor;
   BOT.hp -= d; BOT.lastHit = 0; BOT.hurt = .2; G.mdealt += d;
   floater(BOT.x + rand(-6, 6), BOT.y - 18, Math.round(d), '#b6ff3d');
   burst(BOT.x, BOT.y, '#b3122e', 5, 120, .3, 3);
@@ -1170,6 +1175,13 @@ function monsterClaw() {
 function monsterPounce() {
   if (P.dead || P.pounceCd > 0) return;
   P.pounceCd = MONSTER.pounceCd; P.pounce = .28; P.pdx = Math.cos(P.angle); P.pdy = Math.sin(P.angle); P.pounceHit = false; sfx('charge');
+  // trained intruders roll out of the way when they see you leap
+  const D = BOTDIFF[G.mdiff], bd = Math.hypot(BOT.x - P.x, BOT.y - P.y);
+  if (BOT.hp > 0 && BOT.stun <= 0 && bd < 280 && Math.random() < D.dodge && los(P.x, P.y, BOT.x, BOT.y)) {
+    const side = Math.random() < .5 ? 1 : -1;
+    BOT.dodgeT = .22; BOT.ddx = -P.pdy * side; BOT.ddy = P.pdx * side;
+    floater(BOT.x, BOT.y - 20, 'DODGE', BOTDIFF[G.mdiff].color);
+  }
 }
 function monsterRoar() {
   if (P.dead || P.roarCd > 0) return;
@@ -1201,6 +1213,11 @@ function updateBot(dt) {
   B.cd -= dt; B.nadeCd -= dt; B.scanT -= dt; B.planT -= dt; B.lastHit += dt; B.muzzle -= dt; B.hurt -= dt;
   if (B.lastHit > 3 && D.regen) B.hp = Math.min(B.maxhp, B.hp + D.regen * dt);
   if (B.stun > 0) { B.stun -= dt; return; }
+  if (B.dodgeT > 0) { B.dodgeT -= dt; moveCircle(B, B.ddx * 560 * dt, B.ddy * 560 * dt); burst(B.x, B.y, '#9aa7b3', 1, 30, .25, 2); return; }
+  if (B.stims > 0 && B.hp < B.maxhp * .35) {
+    B.stims--; B.hp = Math.min(B.maxhp, B.hp + B.maxhp * .4); B.stimFx = .6;
+    burst(B.x, B.y, '#4fd8ff', 18, 140, .5, 3); sfx('pickup'); msg('The intruder injected a STIM (+40% HP)', D.color);
+  }
   if (B.planT <= 0) { B.planT = .5; botPlan(); }
   if (B.scanT <= 0) { B.scanT = .12; B.target = botScan(D); }
   const t = B.target && (B.target === P ? !P.dead : B.target.hp > 0) ? B.target : null;
@@ -1300,7 +1317,8 @@ function updateMonster(dt) {
   }
   // --- win / lose
   if (BOT.hp <= 0) { monsterEnd(true, 'You tore the intruder apart.'); return; }
-  if (Math.hypot(L.exit.x - BOT.x, L.exit.y - BOT.y) < 26) { monsterEnd(false, 'The intruder reached the ' + L.def.exitName.toLowerCase() + ' and got away.'); return; }
+  if (Math.hypot(L.exit.x - BOT.x, L.exit.y - BOT.y) < 26 && G.level < LEVELS.length - 1) { sfx('alarm'); startMonster(G.level + 1, G.mdiff, { hp: BOT.hp, php: P.dead ? P.maxhp : P.hp }); return; }
+  if (Math.hypot(L.exit.x - BOT.x, L.exit.y - BOT.y) < 26) { monsterEnd(false, 'The intruder fought its way up through every sector and escaped at the ' + L.def.exitName.toLowerCase() + '.'); return; }
   if (G.mtime <= 0) { monsterEnd(true, 'You held the line until the clock ran out. The intruder is trapped down here with you.'); return; }
   for (let i = particles.length - 1; i >= 0; i--) { const q = particles[i]; q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= .92; q.vy *= .92; if (q.life <= 0) particles.splice(i, 1); }
   for (let i = floaters.length - 1; i >= 0; i--) { const f = floaters[i]; f.life -= dt; f.y -= 30 * dt; if (f.life <= 0) floaters.splice(i, 1); }
@@ -1309,10 +1327,11 @@ function updateMonster(dt) {
   if (G.banner) { G.banner.life -= dt; if (G.banner.life <= 0) G.banner = null; }
   G.shake = Math.max(0, G.shake - dt * 30);
 }
-function startMonster(i, diff) {
+function startMonster(i, diff, carry) {
   hideScreen(); closePanel();
-  G.mode = 'monster'; G.level = i; G.mdiff = diff; G.mmap = i;
-  G.stats = newStats(); G.msgs = []; G.meltdown = 0; G.calm = 0; G.shake = 0; G.mdealt = 0; G.mdeaths = 0;
+  G.mode = 'monster'; G.level = i; G.mdiff = diff;
+  if (!carry) { G.stats = newStats(); G.mdealt = 0; G.mdeaths = 0; }
+  G.msgs = []; G.meltdown = 0; G.calm = 0; G.shake = 0;
   bullets = []; particles = []; grenades = []; floaters = []; lights = [];
   const def = LEVELS[i], D = BOTDIFF[diff];
   L = buildLevel(def); L.tmp = new Uint16Array(L.w * L.h);
@@ -1322,7 +1341,9 @@ function startMonster(i, diff) {
   P = { x: L.exit.x, y: L.exit.y, r: 14, hp: MONSTER.hp, maxhp: MONSTER.hp, angle: Math.PI, clawCd: 0, pounceCd: 0, roarCd: 3, hordeCd: 5, pounce: 0, slash: 0, roarFx: 0,
         dead: false, respawn: 0, hurt: 0, lastHit: 9, kick: 0, muzzle: 0, walk: 0, stamina: 1, keys: {}, armor: 0, weapon: 'pistol', weapons: {}, ammo: {}, grenades: 0 };
   BOT = { x: (def.player[0] + .5) * TS, y: (def.player[1] + .5) * TS, r: 11, hp: D.hp, maxhp: D.hp, angle: 0, cd: 0, keys: {}, dist: new Uint16Array(L.w * L.h),
-          planT: 0, scanT: 0, seen: 0, stun: 0, nadeCd: 4, nadesUsed: 0, lastHit: 9, seed: Math.random() * 10, stuckT: 0, sx: 0, sy: 0, hurt: 0, muzzle: 0, target: null, goal: L.exit };
+          planT: 0, scanT: 0, seen: 0, stun: 0, nadeCd: 4, nadesUsed: 0, lastHit: 9, seed: Math.random() * 10, stuckT: 0, sx: 0, sy: 0, hurt: 0, muzzle: 0, target: null, goal: L.exit,
+          stims: D.stims, dodgeT: 0, stimFx: 0 };
+  if (carry) { BOT.hp = Math.min(D.hp, carry.hp + D.hp * D.heal); P.hp = carry.php; } // the intruder patches up a bit on the way up
   TGT = BOT; G.alert = 'YELLOW'; G.mtime = D.time;
   L.exitField = new Uint16Array(L.w * L.h); bfs(tileIdx(L.exit), i2 => L.t[i2] !== 0, L.exitField);
   L.exitStart = L.exitField[tileIdx(BOT)] || 1;
@@ -1330,8 +1351,9 @@ function startMonster(i, diff) {
   prerender(); computeFlow(); botPlan();
   setTouchLabels();
   G.state = 'play';
-  banner('MONSTER MODE', 'STOP THE INTRUDER · BOT ' + D.name + ' ' + '★'.repeat(D.stars), '#b6ff3d', 3.5);
-  const run = L; setTimeout(() => L === run && G.mode === 'monster' && G.state === 'play' && msg('LMB claw · SPACE/RMB pounce · Q roar · E call the horde', '#b6ff3d'), 3600);
+  if (carry) banner('INTRUDER WENT UP', def.name + ' — ' + def.sub + ' · ' + (LEVELS.length - i) + ' SECTOR' + (LEVELS.length - i > 1 ? 'S' : '') + ' LEFT TO STOP IT', '#ff8a3d', 3.5);
+  else banner('MONSTER MODE', 'STOP THE INTRUDER · BOT ' + D.name + ' ' + '★'.repeat(D.stars), '#b6ff3d', 3.5);
+  const run = L; if (!carry) setTimeout(() => L === run && G.mode === 'monster' && G.state === 'play' && msg('LMB claw · SPACE/RMB pounce · Q roar · E call the horde', '#b6ff3d'), 3600);
   last = performance.now();
 }
 function monsterEnd(win, reason) {
@@ -1339,19 +1361,20 @@ function monsterEnd(win, reason) {
   const D = BOTDIFF[G.mdiff], tm = Math.floor(G.stats.time);
   showScreen(`<div class="card"><h2 style="color:${win ? '#b6ff3d' : '#ff3b3b'}">${win ? 'BUNKER DEFENDED' : 'INTRUDER ESCAPED'}</h2>
     <p class="sub">${esc(reason)}<br>${esc(L.def.name)} — ${esc(L.def.sub)} · Bot: <span style="color:${D.color}">${D.name} ${'★'.repeat(D.stars)}</span></p>
-    <div class="stats"><span>TIME</span><b>${Math.floor(tm / 60)}:${String(tm % 60).padStart(2, '0')}</b><span>DAMAGE TO INTRUDER</span><b>${Math.round(G.mdealt)}</b><span>MONSTERS LOST</span><b>${G.stats.kills}</b><span>YOUR DEATHS</span><b>${G.mdeaths}</b></div>
-    <button class="btn" data-act="mstart">Play Again</button><button class="btn alt" data-act="monster">Change Bot / Map</button><button class="btn alt" data-act="menu">Main Menu</button></div>`, ACTIONS.mstart);
+    <div class="stats"><span>REACHED</span><b>${esc(L.def.name)} (${G.level + 1}/${LEVELS.length})</b><span>TIME</span><b>${Math.floor(tm / 60)}:${String(tm % 60).padStart(2, '0')}</b><span>DAMAGE TO INTRUDER</span><b>${Math.round(G.mdealt)}</b><span>MONSTERS LOST</span><b>${G.stats.kills}</b><span>YOUR DEATHS</span><b>${G.mdeaths}</b></div>
+    <button class="btn" data-act="mstart">Play Again</button><button class="btn alt" data-act="monster">Change Bot</button><button class="btn alt" data-act="menu">Main Menu</button></div>`, ACTIONS.mstart);
 }
 function monsterMenu() {
   G.state = 'menu'; L = null; stopSiren();
-  const d = G.mdiff || 2, m = G.mmap || 0;
+  const d = G.mdiff || 2;
   const diffs = [1, 2, 3, 4].map(i => { const D = BOTDIFF[i]; return `<button class="btn ${i === d ? '' : 'alt'}" data-act="mdiff" data-arg="${i}" style="font-size:13px;padding:10px 14px;${i === d ? 'border-color:' + D.color : ''}">${i} · ${D.name}<br><span style="color:${D.color}">${'★'.repeat(D.stars)}</span></button>`; }).join('');
-  const maps = LEVELS.map((l, i) => `<button class="btn ${i === m ? '' : 'alt'}" data-act="mmap" data-arg="${i}" style="font-size:11px;padding:8px 10px">${l.name}<br>${l.sub}</button>`).join('');
+  const route = LEVELS.map(l => `<span style="display:inline-block;padding:4px 8px;border:1px solid #2a3a44;margin:2px;font-size:11px">${l.name.replace('SECTOR ', '')} · ${l.sub}</span>`).join(' → ');
   const D = BOTDIFF[d];
   showScreen(`<div class="card"><h2 style="color:#b6ff3d">MONSTER MODE</h2>
-    <p class="sub">You are the <b style="color:#b6ff3d">Alpha Mutant</b>. Every monster in the sector fights for you. A soldier bot is breaking in: it grabs the keycards and runs for the exit. Kill it, or hold it off for ${Math.floor(D.time / 60)}:${String(D.time % 60).padStart(2, '0')}.</p>
+    <p class="sub">You are the <b style="color:#b6ff3d">Alpha Mutant</b>. Every monster in the sector fights for you. A soldier bot breaks in at Sector A, grabs the keycards and runs for the exit. Every time it gets out, it goes up to the next sector. Kill it before it escapes Sector E, or hold it in one sector for ${Math.floor(D.time / 60)}:${String(D.time % 60).padStart(2, '0')}.</p>
     <div style="margin:6px 0 4px;color:#7d8a96;font-size:12px;letter-spacing:2px">BOT DIFFICULTY</div><div>${diffs}</div>
-    <div style="margin:14px 0 4px;color:#7d8a96;font-size:12px;letter-spacing:2px">MAP</div><div>${maps}</div>
+    <div style="margin:8px 0;color:${D.color};font-size:12px">${esc(D.skills)}</div>
+    <div style="margin:14px 0 4px;color:#7d8a96;font-size:12px;letter-spacing:2px">ROUTE</div><div style="color:#9aa7b3">${route}</div>
     <div class="keys">
       <b>LEFT CLICK</b><span>claw (30 dmg)</span>
       <b>SPACE / RIGHT-CLICK</b><span>pounce: leap, hit and stun</span>
@@ -1819,7 +1842,7 @@ function drawMonsterHUD(now, W, H, small) {
   ctx.fillStyle = 'rgba(0,0,0,.75)'; ctx.fillRect(bx - 6, by - 4, bw + 12, 58);
   ctx.fillStyle = '#ff8a3d'; ctx.font = 'bold 12px "Share Tech Mono",monospace';
   const t = Math.max(0, Math.ceil(G.mtime));
-  ctx.fillText('INTRUDER (' + D.name + ')   ·   HOLD ' + Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'), W / 2, by + 10);
+  ctx.fillText('INTRUDER (' + D.name + ')   ·   ' + L.def.name + ' (' + (G.level + 1) + '/' + LEVELS.length + ')   ·   HOLD ' + Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'), W / 2, by + 10);
   ctx.fillStyle = '#331a0a'; ctx.fillRect(bx, by + 16, bw, 9);
   ctx.fillStyle = '#ff8a3d'; ctx.fillRect(bx, by + 16, bw * BOT.hp / BOT.maxhp, 9);
   const prog = clamp(1 - (L.exitField[tileIdx(BOT)] || 0) / L.exitStart, 0, 1);
@@ -1827,7 +1850,7 @@ function drawMonsterHUD(now, W, H, small) {
   ctx.fillStyle = prog > .75 ? '#ff3b3b' : '#4fd8ff'; ctx.fillRect(bx, by + 30, bw * prog, 6);
   ctx.fillStyle = '#9aa7b3'; ctx.font = '10px "Share Tech Mono",monospace';
   const ks = ['green', 'yellow', 'red'].filter(k => BOT.keys[k]).map(k => k.toUpperCase()).join(' ');
-  ctx.fillText('ROUTE TO EXIT ' + Math.round(prog * 100) + '%' + (ks ? '   ·   HAS ' + ks + ' KEY' : '') + (BOT.stun > 0 ? '   ·   STUNNED' : ''), W / 2, by + 48);
+  ctx.fillText('ROUTE TO EXIT ' + Math.round(prog * 100) + '%' + (ks ? '   ·   HAS ' + ks + ' KEY' : '') + (BOT.stims ? '   ·   STIMS ' + BOT.stims : '') + (BOT.stun > 0 ? '   ·   STUNNED' : ''), W / 2, by + 48);
   if (P.dead) {
     ctx.font = 'bold 30px "Black Ops One",Impact,sans-serif'; ctx.fillStyle = col;
     ctx.fillText('RESPAWNING ' + Math.ceil(P.respawn), W / 2, H * .55);
@@ -2002,11 +2025,10 @@ function setSaved(v) { try { if (v > getSaved()) localStorage.setItem('bunker_un
 const ACTIONS = {
   new: () => { G.carry = defaultCarry(); G.totalStats = newStats(); startLevel(0); },
   sector: a => { const i = +a; G.carry = sectorCarry(i); G.totalStats = newStats(); startLevel(i); },
-  retry: () => G.mode === 'monster' ? startMonster(G.level, G.mdiff) : startLevel(G.level),
+  retry: () => G.mode === 'monster' ? startMonster(0, G.mdiff) : startLevel(G.level),
   monster: () => monsterMenu(),
   mdiff: a => { G.mdiff = +a; monsterMenu(); },
-  mmap: a => { G.mmap = +a; monsterMenu(); },
-  mstart: () => startMonster(G.mmap || 0, G.mdiff || 2),
+  mstart: () => startMonster(0, G.mdiff || 2),
   next: () => startLevel(G.level + 1),
   menu: () => menu(),
   resume: () => resume(),
