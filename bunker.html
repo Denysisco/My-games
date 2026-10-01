@@ -121,7 +121,7 @@ const ETYPES = {
   drone:   { name: 'SEC-DRONE',  hp: 28,   r: 9,  speed: 165, dmg: 6,  ranged: true, rate: 0.7,  range: 240, bspeed: 390, color: '#5cc8ff', score: 15 },
   brute:   { name: 'BRUTE',      hp: 190,  r: 16, speed: 62,  dmg: 18, melee: true, charger: true, color: '#9c4a8a', score: 30 },
   turret:  { name: 'TURRET',     hp: 140,  r: 14, speed: 0,   dmg: 8,  ranged: true, rate: 0.32, range: 430, bspeed: 500, color: '#ff8a3d', stat: true, score: 25 },
-  hound:   { name: 'HELLHOUND',  hp: 170,  r: 19, speed: 210, dmg: 13, melee: true, color: '#eeeeee', score: 40 }, // monster mode horde (elite)
+  hound:   { name: 'HELLHOUND',  hp: 260,  r: 13, speed: 220, dmg: 17, melee: true, color: '#eeeeee', score: 40 }, // monster mode horde (elite)
   boss:    { name: 'JUGGERNAUT', hp: 1300, r: 26, speed: 66,  dmg: 11, ranged: true, rate: 0.9,  range: 700, bspeed: 380, color: '#ff3b3b', boss: true, score: 500 },
 };
 
@@ -150,9 +150,9 @@ const BOTDIFF = [null,
     skills: 'Slow, shaky aim, no grenades, 1 auto-heal per sector' },
   { name: 'MID',   stars: 2, hp: 340, speed: 145, spread: .14, react: .4,  rate: .16, dmg: 8,  lead: false, nades: 1, regen: 2, strafe: .5, sight: 440, time: 180, armor: .1,  dodge: 0,   stims: 1, heal: .25, color: '#ffd23f',
     skills: '+ grenades, light armor (-10% dmg), slow regen' },
-  { name: 'HARD',  stars: 3, hp: 880, speed: 165, spread: .06, react: .2,  rate: .11, dmg: 12, lead: true,  nades: 2, regen: 3, strafe: .8, sight: 500, time: 210, armor: .2,  dodge: .4,  stims: 2, heal: .35, color: '#ff8a3d',
+  { name: 'HARD',  stars: 3, hp: 1100, speed: 165, spread: .06, react: .2,  rate: .1,  dmg: 13, lead: true,  nades: 2, regen: 3, strafe: .8, sight: 500, time: 210, armor: .2,  dodge: .4,  stims: 2, heal: .35, color: '#ff8a3d',
     skills: '+ leads its shots, dodges 40% of pounces, 2 auto-heals per sector, armor -20%' },
-  { name: 'ELITE', stars: 4, hp: 900, speed: 175, spread: .035, react: .1, rate: .085, dmg: 13, lead: true,  nades: 4, regen: 4, strafe: 1,  sight: 560, time: 240, armor: .25, dodge: .6,  stims: 3, heal: .3,   color: '#ff3b3b',
+  { name: 'ELITE', stars: 4, hp: 1350, speed: 180, spread: .03, react: .1, rate: .08, dmg: 15, lead: true,  nades: 4, regen: 4, strafe: 1,  sight: 560, time: 240, armor: .25, dodge: .6,  stims: 3, heal: .3,   color: '#ff3b3b',
     skills: '+ dodges 60% of pounces, 3 auto-heals per sector, heavy armor -25%, fast regen, deadly aim' },
 ];
 const MONSTER = { hp: 320, speed: 200, claw: 30, clawRate: .38, pounce: 40, pounceCd: 3.5, roarCd: 14, hordeCd: 22, regen: 8 };
@@ -402,10 +402,10 @@ function enemyPassable(i) {
 const QBUF = new Int32Array(80 * 60);
 function computeFlow() {
   const w = L.w, dist = L.dist; dist.fill(65535);
-  const s = Math.floor(TGT.y / TS) * w + Math.floor(TGT.x / TS);
+  const s = Math.floor(TGT.y / TS) * w + Math.floor(TGT.x / TS), lim = G.mode === 'monster' ? 200 : 70; // monsters hunt the intruder across the whole sector
   let qh = 0, qt = 0; dist[s] = 0; QBUF[qt++] = s;
   while (qh < qt) {
-    const i = QBUF[qh++], d = dist[i] + 1; if (d > 70) continue;
+    const i = QBUF[qh++], d = dist[i] + 1; if (d > lim) continue;
     const x = i % w;
     const nb = [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w];
     for (const n of nb) if (n >= 0 && n < dist.length && dist[n] > d && enemyPassable(n)) { dist[n] = d; QBUF[qt++] = n; }
@@ -805,7 +805,7 @@ function updateEnemy(e, dt) {
       if (f) { mvx = f.x; mvy = f.y; e.angle = Math.atan2(f.y, f.x); }
       else if (e.los) { mvx = dx / dist; mvy = dy / dist; e.angle = toA; }
     }
-    if (T.melee && dist < e.r + TGT.r + 8 && e.cd <= 0) { hurtTgt(T.dmg * agg); e.cd = e.type === 'hound' ? .65 : .75; sfx('melee'); e.lunge = .15; }
+    if (T.melee && dist < e.r + TGT.r + 8 && e.cd <= 0) { hurtTgt(T.dmg * agg); e.cd = e.type === 'hound' ? .6 : .75; sfx('melee'); e.lunge = .15; }
     if (T.ranged && e.los && dist < T.range && e.cd <= 0 && (!T.stat || Math.abs(angDiff(e.angle, toA)) < .3)) {
       const inacc = e.type === 'drone' ? .12 : .07;
       enemyFire(e, (T.stat ? e.angle : toA) + rand(-inacc, inacc), T.bspeed, T.dmg, e.type === 'drone' ? '#5cc8ff' : '#ff6b3d', e.type === 'drone' ? 3 : 4);
@@ -891,7 +891,7 @@ function updateDoors(dt) {
     let pd = P.dead ? 1e9 : Math.hypot(P.x - cx, P.y - cy);
     if (G.mode === 'monster') {
       const bd = Math.hypot(BOT.x - cx, BOT.y - cy);
-      if (d.locked && DOORKEY[d.type] && BOT.keys[DOORKEY[d.type]] && bd < 64) { d.locked = false; msg('Intruder used the ' + DOORKEY[d.type].toUpperCase() + ' keycard', KEYCOL[DOORKEY[d.type]]); sfx('ok'); }
+      if (d.locked && DOORKEY[d.type] && BOT.keys[DOORKEY[d.type]] && (d.codeGate === undefined || L.terminals[d.codeGate].solved) && bd < 64) { d.locked = false; msg('Intruder used the ' + DOORKEY[d.type].toUpperCase() + ' keycard', KEYCOL[DOORKEY[d.type]]); sfx('ok'); }
       pd = Math.min(pd, bd); d.warnT = 9;
     }
     d.warnT -= dt;
@@ -1098,14 +1098,14 @@ function botPassable(i) {
   const v = L.t[i]; if (v === 1) return true; if (v !== 2) return false;
   const d = L.doors.get(i); if (d.sealed) return false;
   if (!d.locked) return true;
-  return !!(DOORKEY[d.type] && BOT.keys[DOORKEY[d.type]]); // locked gates/hatches need a code or an alarm
+  return !!(DOORKEY[d.type] && BOT.keys[DOORKEY[d.type]] && (d.codeGate === undefined || L.terminals[d.codeGate].solved)); // locked gates/hatches need a code or an alarm
 }
 const botKnows = g => { const k = BOT.know[g]; return k && (k.full || (k.a && k.b)); };
 function botPlan() { // keycards first; then the exit if it's open; otherwise hunt for code notes and crack keypads
   const reach = L.tmp; bfs(tileIdx(BOT), botPassable, reach);
   let goal = null, gd = 65535;
   for (const it of L.items) if (ITEMS[it.k].key && !BOT.keys[ITEMS[it.k].key]) { const d = reach[tileIdx(it)]; if (d < gd) { gd = d; goal = { x: it.x, y: it.y, key: true }; } }
-  if (!goal && (reach[tileIdx(L.exit)] === 65535 || (L.liftTerm && !L.liftTerm.solved))) {
+  if (!goal && reach[tileIdx(L.exit)] === 65535) {
     for (const t of L.terminals) if (!t.solved && botKnows(t.gate)) { const d = reach[tileIdx(t)]; if (d < gd) { gd = d; goal = { x: t.x, y: t.y, term: t }; } }
     if (!goal) for (const n of L.notes) if (!BOT.read.has(n) && n.gives.some(([g]) => !L.terminals.find(t => t.gate === g).solved && !botKnows(g))) { const d = reach[tileIdx(n)]; if (d < gd) { gd = d; goal = { x: n.x, y: n.y, note: n }; } }
   }
@@ -1225,7 +1225,7 @@ function updateBot(dt) {
     B.typing -= dt; const t = B.goal.term;
     if (B.typing <= 0 && t && !t.solved) {
       t.solved = true; for (const d of L.doorList) if (d.type === 'B' && d.gate === t.gate) { d.locked = false; d.perm = true; }
-      msg(t.lift ? 'The intruder unlocked the ' + L.def.exitName + '!' : 'The intruder cracked the keypad. BLAST GATE OPEN', t.lift ? '#ff3b3b' : D.color); sfx('ok'); shake(5); B.planT = 0;
+      msg(t === L.doorTerm ? 'The intruder typed the EXIT DOOR code!' : 'The intruder cracked the keypad. BLAST GATE OPEN', t === L.doorTerm ? '#ff3b3b' : D.color); sfx('ok'); shake(5); B.planT = 0;
     }
     return;
   }
@@ -1340,7 +1340,7 @@ function updateMonster(dt) {
   }
   // --- win / lose
   if (BOT.hp <= 0) { monsterEnd(true, 'You tore the intruder apart.'); return; }
-  const atExit = Math.hypot(L.exit.x - BOT.x, L.exit.y - BOT.y) < 26 && (!L.liftTerm || L.liftTerm.solved);
+  const atExit = Math.hypot(L.exit.x - BOT.x, L.exit.y - BOT.y) < 26;
   if (atExit && G.level < LEVELS.length - 1) { sfx('alarm'); startMonster(G.level + 1, G.mdiff, { hp: BOT.hp, php: P.dead ? P.maxhp : P.hp }); return; }
   if (atExit) { monsterEnd(false, 'The intruder fought its way up through every sector and escaped at the ' + L.def.exitName.toLowerCase() + '.'); return; }
   if (G.mtime <= 0) { monsterEnd(true, 'You held the line until the clock ran out. The intruder is trapped down here with you.'); return; }
@@ -1366,22 +1366,36 @@ function startMonster(i, diff, carry) {
     for (const d of L.doorList) if (d.type === 'B' && d.gate === 1) { d.type = 'R'; d.locked = true; d.perm = false; }
     L.items.push({ x: 16.5 * TS, y: 30.5 * TS, k: 'r', bob: 0 });
   }
-  // every elevator is locked: a keypad next to it, and its code on a note hidden somewhere in the sector
-  { const gid = L.terminals.length, code = genCode(), ex = Math.floor(L.exit.x / TS), ey = Math.floor(L.exit.y / TS);
-    let tx = ex, ty = ey;
-    for (const [ox, oy] of [[-2, 0], [2, 0], [0, -2], [0, 2], [-1, -1], [1, -1], [-1, 1], [1, 1]]) if (L.t[(ey + oy) * L.w + ex + ox] === 1) { tx = ex + ox; ty = ey + oy; break; }
-    L.liftTerm = { x: (tx + .5) * TS, y: (ty + .5) * TS, gate: gid, code, solved: false, tries: 0, lift: true };
-    L.terminals.push(L.liftTerm); L.codes.push(code);
-    // hide the note on open floor the intruder can reach without any keycard, well away from the exit
-    const reach = new Uint16Array(L.w * L.h), st = Math.floor(def.player[1]) * L.w + def.player[0];
-    bfs(st, i => L.t[i] === 1 || (L.t[i] === 2 && !L.doors.get(i).locked), reach);
-    const ef = new Uint16Array(L.w * L.h); bfs(ey * L.w + ex, i => L.t[i] !== 0, ef);
-    const spots = []; let far = 0;
-    for (let i = 0; i < reach.length; i++) if (reach[i] !== 65535 && L.t[i] === 1 && !L.toxic[i] && ef[i] !== 65535) far = Math.max(far, ef[i]);
-    for (let i = 0; i < reach.length; i++) if (reach[i] > 3 && reach[i] !== 65535 && L.t[i] === 1 && !L.toxic[i] && ef[i] > far * .45
-      && ![...L.notes, ...L.items, ...L.terminals].some(o => Math.abs(o.x - (i % L.w + .5) * TS) < 40 && Math.abs(o.y - ((i / L.w | 0) + .5) * TS) < 40)) spots.push(i);
-    const i = spots.length ? spots[Math.floor(Math.random() * spots.length)] : st;
-    L.notes.push({ x: (i % L.w + .5) * TS, y: ((i / L.w | 0) + .5) * TS, title: 'ELEVATOR OVERRIDE', text: L.def.exitName + ' lock code: ⟦' + code + '⟧', read: false, gives: [[gid, 'full']] });
+  // the door into the exit room needs its keycard AND a code: keypad beside the door, code on a note hidden in the sector
+  { const w = L.w, ex = tileIdx(L.exit), room = new Set([ex]), q = [ex], entry = new Set();
+    while (q.length) { const i = q.pop(); for (const n of [i - 1, i + 1, i - w, i + w]) { if (room.has(n)) continue; if (L.t[n] === 1) { room.add(n); q.push(n); } else if (L.t[n] === 2) entry.add(L.doors.get(n)); } }
+    const gid = L.terminals.length, code = genCode();
+    let spot = null;
+    for (const d of entry) {
+      d.codeGate = gid;
+      if (spot) continue;
+      const di = d.y * w + d.x;
+      for (const out of [di - 1, di + 1, di - w, di + w]) { // the floor tile just outside the door, then one step along the wall
+        if (L.t[out] !== 1 || room.has(out)) continue;
+        const side = Math.abs(out - di) === 1 ? [out - w, out + w] : [out - 1, out + 1];
+        const pick = side.find(t => L.t[t] === 1 && !room.has(t) && ![...entry].some(e => e.y * w + e.x === t)) ?? out;
+        spot = pick; break;
+      }
+    }
+    if (spot !== null) {
+      L.doorTerm = { x: (spot % w + .5) * TS, y: ((spot / w | 0) + .5) * TS, gate: gid, code, solved: false, tries: 0 };
+      L.terminals.push(L.doorTerm); L.codes.push(code);
+      // hide the note on floor the intruder can reach without any keycard, well away from the exit
+      const reach = new Uint16Array(w * L.h), st = def.player[1] * w + def.player[0];
+      bfs(st, i => L.t[i] === 1 || (L.t[i] === 2 && !L.doors.get(i).locked), reach);
+      const ef = new Uint16Array(w * L.h); bfs(ex, i => L.t[i] !== 0, ef);
+      let far = 0; for (let i = 0; i < reach.length; i++) if (reach[i] !== 65535 && L.t[i] === 1 && !L.toxic[i]) far = Math.max(far, ef[i]);
+      const spots = [];
+      for (let i = 0; i < reach.length; i++) if (reach[i] > 3 && reach[i] !== 65535 && L.t[i] === 1 && !L.toxic[i] && ef[i] > far * .45
+        && ![...L.notes, ...L.items, ...L.terminals].some(o => Math.abs(o.x - (i % w + .5) * TS) < 40 && Math.abs(o.y - ((i / w | 0) + .5) * TS) < 40)) spots.push(i);
+      const i = spots.length ? spots[Math.floor(Math.random() * spots.length)] : st;
+      L.notes.push({ x: (i % w + .5) * TS, y: ((i / w | 0) + .5) * TS, title: 'EXIT DOOR OVERRIDE', text: L.def.exitName + ' door code: ⟦' + code + '⟧', read: false, gives: [[gid, 'full']] });
+    } else for (const d of entry) delete d.codeGate;
   }
   L.items = L.items.filter(it => ITEMS[it.k].key || it.k === 'H');
   L.explored.fill(1); // it's your home: you know the whole map
@@ -1632,7 +1646,7 @@ function drawEnemy(e, now) {
     ctx.fillStyle = fl ? '#fff' : T.color; ctx.beginPath(); ctx.arc(0, 0, 9, 0, TAU); ctx.fill();
     ctx.fillStyle = e.aware ? '#ff3b3b' : '#3ddc84'; ctx.beginPath(); ctx.arc(3, 0, 2.5, 0, TAU); ctx.fill();
   } else if (e.type === 'hound') { // big black-and-white hellhound
-    ctx.rotate(e.angle); ctx.scale(1.4, 1.4);
+    ctx.rotate(e.angle); ctx.scale(1.1, 1.1);
     const run = Math.sin(e.anim * 16) * 5, W = fl ? '#fff' : '#ececec', K = fl ? '#fff' : '#141414';
     ctx.fillStyle = K; // legs
     ctx.fillRect(6 + run, -11, 6, 4); ctx.fillRect(6 - run, 7, 6, 4); ctx.fillRect(-12 - run, -11, 6, 4); ctx.fillRect(-12 + run, 7, 6, 4);
@@ -1910,7 +1924,7 @@ function drawMonsterHUD(now, W, H, small) {
   ctx.fillStyle = prog > .75 ? '#ff3b3b' : '#4fd8ff'; ctx.fillRect(bx, by + 30, bw * prog, 6);
   ctx.fillStyle = '#9aa7b3'; ctx.font = '10px "Share Tech Mono",monospace';
   const ks = ['green', 'yellow', 'red'].filter(k => BOT.keys[k]).map(k => k.toUpperCase()).join(' ');
-  ctx.fillText('ROUTE TO EXIT ' + Math.round(prog * 100) + '%' + (ks ? '   ·   HAS ' + ks + ' KEY' : '') + (BOT.stims ? '   ·   HEALS ' + BOT.stims : '') + (L.liftTerm ? (L.liftTerm.solved ? '   ·   LIFT UNLOCKED' : botKnows(L.liftTerm.gate) ? '   ·   HAS LIFT CODE' : '   ·   LIFT LOCKED') : '') + (BOT.stun > 0 ? '   ·   STUNNED' : ''), W / 2, by + 48);
+  ctx.fillText('ROUTE TO EXIT ' + Math.round(prog * 100) + '%' + (ks ? '   ·   HAS ' + ks + ' KEY' : '') + (BOT.stims ? '   ·   HEALS ' + BOT.stims : '') + (L.doorTerm ? (L.doorTerm.solved ? '   ·   EXIT DOOR CODE IN' : botKnows(L.doorTerm.gate) ? '   ·   HAS DOOR CODE' : '   ·   DOOR CODE NOT FOUND') : '') + (BOT.stun > 0 ? '   ·   STUNNED' : ''), W / 2, by + 48);
   if (P.dead) {
     ctx.font = 'bold 30px "Black Ops One",Impact,sans-serif'; ctx.fillStyle = col;
     ctx.fillText('RESPAWNING ' + Math.ceil(P.respawn), W / 2, H * .55);
