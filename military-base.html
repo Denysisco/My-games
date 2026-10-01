@@ -129,6 +129,7 @@ const WEAPONS = {
   lmg:      { name: 'LMG',        short: 'LMG', rate: .07, dmg: 17, spread: .1,   pellets: 1, speed: 940,  ammo: 'rifle',   noise: 620, kick: 3,   len: 27, heavy: true },
   rpg:      { name: 'RPG',        short: 'RPG', rate: 1.5, dmg: 0,  spread: .01,  pellets: 1, speed: 560,  ammo: 'rockets', noise: 820, kick: 10,  len: 27, rocket: true },
 };
+const SNIPER_MAX = 5; // you never carry more than 5 sniper rounds
 const SNIPER_TOUGH = new Set(['heavy', 'turret', 'boss']); // everything else drops to one sniper round
 const WEAPON_ORDER = ['sdpistol', 'smgsd', 'rifle', 'shotgun', 'sniper', 'lmg', 'rpg'];
 const AMMO_NAME = { smg: 'SMG AMMO', rifle: 'RIFLE AMMO', shells: 'SHELLS', sniper: 'SNIPER ROUNDS', rockets: 'ROCKETS' };
@@ -176,7 +177,7 @@ const ITEMS = {
   b: { name: 'SMG AMMO +60',       color: '#ffd23f' },
   a: { name: 'RIFLE AMMO +60',     color: '#f0b030' },
   s: { name: 'SHELLS +8',          color: '#ff8a3d' },
-  n: { name: 'SNIPER ROUNDS +6',   color: '#e0e0a0' },
+  n: { name: 'SNIPER ROUNDS',      color: '#e0e0a0' },
   p: { name: 'ROCKETS +2',         color: '#ff6b3d' },
   q: { name: 'FRAG GRENADE',       color: '#9fff5f' },
   k: { name: 'SMOKE GRENADE',      color: '#c8ccd0' },
@@ -606,6 +607,7 @@ function smokeBlocks(x0, y0, x1, y1) {
   }
   return false;
 }
+function inSmoke(x, y) { for (const s of smokes) if (s.life >= .5 && Math.hypot(x - s.x, y - s.y) < s.r * .85) return true; return false; }
 function sightLine(x0, y0, x1, y1) { return los(x0, y0, x1, y1) && !smokeBlocks(x0, y0, x1, y1); }
 
 /* ---------------- PATHING ---------------- */
@@ -941,7 +943,7 @@ function shoot() {
     P.cd = .25; sfx('deny'); msg('OUT OF ' + AMMO_NAME[W.ammo] + ' — switching', '#ff8a3d'); P.weapon = bestWeapon(); return;
   }
   if (W.ammo) P.ammo[W.ammo]--;
-  P.cd = W.rate; G.stats.shots += W.pellets;
+  P.cd = W.rate; P.shotT = G.time; G.stats.shots += W.pellets;
   const bx = P.x + Math.cos(P.angle) * (P.r + W.len), by = P.y + Math.sin(P.angle) * (P.r + W.len);
   const moving = Math.hypot(P.vx || 0, P.vy || 0) > 40;
   const spreadMul = (W.pellets > 1 ? (P.aiming ? .55 : .8) : (P.aiming ? .25 : .6)) * (W.heavy && moving ? 1.4 : 1) * (P.crouch ? .8 : 1);
@@ -982,7 +984,7 @@ function throwGadget() {
 }
 function detonate(g) {
   if (g.kind === 'smoke') {
-    smokes.push({ x: g.x, y: g.y, r: 20, maxr: 115, life: 10 }); sfx('smoke');
+    smokes.push({ x: g.x, y: g.y, r: 30, maxr: 140, life: 14 }); sfx('smoke');
     burst(g.x, g.y, '#c8ccd0', 20, 90, 1, 8);
   } else if (g.kind === 'flash') flashbang(g.x, g.y, g.team, g.who);
   else explode(g.x, g.y, 95, 33, g.team, g.who); // frag grenades: 75% less damage than before (130 -> 33)
@@ -1062,7 +1064,7 @@ function useConsole(c) {
   msg('SECURITY CONSOLE: every camera on this floor is OFFLINE', '#3ddc84'); sfx('ok');
 }
 /* ---------------- ARMOURY: take any ONE weapon (your SD pistol stays as a sidearm) ---------------- */
-const ARMOURY = [['smgsd', 'silenced, quiet', 300], ['rifle', 'loud, all-round', 210], ['shotgun', 'loud, close range', 28], ['sniper', 'silenced, one-shot, scope', 16], ['lmg', 'loud, huge mag', 320]];
+const ARMOURY = [['smgsd', 'silenced, quiet', 300], ['rifle', 'loud, all-round', 210], ['shotgun', 'loud, close range', 28], ['sniper', 'silenced, one-shot, 5 rounds', SNIPER_MAX], ['lmg', 'loud, huge mag', 320]];
 function openArmoury(c) {
   if (c.used) { msg('The armoury is empty — you already took your weapon', '#86907a'); return; }
   if (G.cmdOpen) closeCmd();
@@ -1214,7 +1216,7 @@ function hurtOp(o, d, src) {
   if (o.state !== 'ok') return;
   d *= 1 - TIERS[o.tier].armor;
   o.hp -= d; o.hurt = .2; o.lastHit = 0;
-  if (src && src.who) { o.lastHitBy = src.who; if (!o.target || !alive(o.target)) o.target = src.who; }
+  if (src && src.who) { o.lastHitBy = src.who; if (!o.target || !alive(o.target)) o.target = src.who; if (src.who !== P && alive(src.who)) INTEL[o.team] = { x: src.who.x, y: src.who.y, time: G.time }; }
   floater(o.x + rand(-6, 6), o.y - 18, Math.round(d), o.team === P.team ? '#ff8a8a' : '#ffd23f');
   burst(o.x, o.y, '#b3122e', 4, 110, .3, 3);
   if (o.team !== P.team) G.dealt = (G.dealt || 0) + d;
@@ -1250,7 +1252,7 @@ function killEnemy(e, src) {
   else {
     burst(e.x, e.y, '#9b1026', src && src.silent ? 8 : 22, 200, .6, 4); splat(e.x, e.y, '#5a0a12', src && src.silent ? 4 : 9);
     if (!(src && src.silent)) sfx('die', .8);
-    if (e.type !== 'boss') L.bodies.push({ x: e.x, y: e.y, a: e.angle, type: e.type, found: false });
+    if (e.type !== 'boss') { const b = { x: e.x, y: e.y, a: e.angle, type: e.type, found: false }; L.bodies.push(b); if (src && src.who && src.who.team === 'A') hideBody(b, src.who); }
   }
   if (G.mode === 'def') G.lost = (G.lost || 0) + 1;
   if (e.type === 'boss') {
@@ -1267,6 +1269,42 @@ function killEnemy(e, src) {
   }
   if (e.type === 'turret' && G.mode === 'op') L.items.push({ x: e.x, y: e.y, k: 'a', bob: 0 });
   L.enemies.splice(L.enemies.indexOf(e), 1);
+}
+// is this spot inside somebody's view right now?
+function watched(x, y, skip) {
+  for (const w of L.enemies) {
+    if (w === skip || w.sleep || w.off || w.hp <= 0) continue;
+    const T = ETYPES[w.type], d = Math.hypot(x - w.x, y - w.y);
+    if (d < ALERTS[G.alert].sight * T.sight * .8 && Math.abs(angDiff(w.angle, Math.atan2(y - w.y, x - w.x))) < T.cone * 1.3 && los(w.x, w.y, x, y)) return true;
+  }
+  return false;
+}
+function hideBody(b, killer) {
+  if (G.spottedA || ALERTS[G.alert].lvl >= 2) return;
+  // nobody would walk past it anyway? leave it
+  if (!watched(b.x, b.y) && !L.enemies.some(w => !w.sleep && w.hp > 0 && !ETYPES[w.type].stat && (w.route ? w.route.some(p => Math.hypot(p.x - b.x, p.y - b.y) < 200) : Math.hypot(w.x - b.x, w.y - b.y) < 260))) return;
+  const free = OPS.filter(o => o.team === 'A' && o.state === 'ok' && !o.drag && (!o.claim || o === killer) && !o.target && Math.hypot(o.x - b.x, o.y - b.y) < 360 && !(o.team === P.team && (G.cmd.kind === 'hold' || G.cmd.kind === 'move')));
+  const o = killer.op && free.includes(killer) ? killer : free.sort((a, c) => Math.hypot(a.x - b.x, a.y - b.y) - Math.hypot(c.x - b.x, c.y - b.y))[0];
+  if (!o) return;
+  // where the guards look from: their posts, and every stretch of their patrol routes
+  const eyes = [];
+  for (const w of L.enemies) {
+    if (w.hp <= 0 || w.sleep || w.off) continue;
+    const r = ALERTS.YELLOW.sight * ETYPES[w.type].sight;
+    if (w.route) w.route.forEach((p, i) => { const q = w.route[(i + 1) % w.route.length]; for (let k = 0; k < 1; k += .25) eyes.push({ x: p.x + (q.x - p.x) * k, y: p.y + (q.y - p.y) * k, r }); });
+    else eyes.push({ x: w.hx, y: w.hy, r }, { x: w.x, y: w.y, r });
+  }
+  const tx = Math.floor(b.x / TS), ty = Math.floor(b.y / TS); let best = null, bs = 1e9;
+  for (let y = ty - 6; y <= ty + 6; y++) for (let x = tx - 6; x <= tx + 6; x++) {
+    if (x < 1 || y < 1 || x >= L.w - 1 || y >= L.h - 1 || L.t[y * L.w + x] !== 1) continue;
+    const px = (x + .5) * TS, py = (y + .5) * TS, d = Math.hypot(px - b.x, py - b.y);
+    if (d < 48 || d > 200 || watched(px, py)) continue;
+    let exp = 0; for (const e of eyes) { const ed = Math.hypot(e.x - px, e.y - py); if (ed < e.r && los(e.x, e.y, px, py)) exp++; }
+    const sc = exp * 60 + d * .6; if (sc < bs) { bs = sc; best = { x: px, y: py }; }
+  }
+  if (!best) return;
+  o.drag = { b, x: best.x, y: best.y, t: 0 };
+  if (o.team === P.team) msg(o.name + ': "Hiding the body."', '#7fe0d0');
 }
 function hurtAny(u, d, src) { if (u === P) hurtPlayer(d, src); else if (u.op) hurtOp(u, d, src); else damageEnemy(u, d, src); }
 
@@ -1381,7 +1419,7 @@ function updateGuard(e, dt) {
   }
   const h = e.seen && alive(e.seen) ? e.seen : null;
   if (h) {
-    e.lastX = h.x; e.lastY = h.y; e.lastVX = h.vx || 0; e.lastVY = h.vy || 0; e.predicted = false;
+    e.lastX = h.x; e.lastY = h.y; e.lastVX = h.vx || 0; e.lastVY = h.vy || 0; e.predicted = false; if (e.state === 'combat') e.seenAt = G.time;
     if (e.state !== 'combat') {
       const near = 1 - clamp(e.seenD / e.range, 0, 1);
       e.sus += dt * (.5 + 2.4 * near * near) * D.detect * (G.alert !== 'GREEN' ? 1.6 : 1) * (e.state === 'search' ? 1.4 : 1);
@@ -1497,10 +1535,28 @@ function updateGuard(e, dt) {
       }
     } else {
       e.aimT = 0; e.cov = null;
-      const tx = t ? t.x : e.lastX, ty = t ? t.y : e.lastY;
+      const tx = t ? t.x : e.lastX, ty = t ? t.y : e.lastY, ld0 = Math.hypot(e.lastX - e.x, e.lastY - e.y);
+      // they just ducked behind something: keep shooting at that corner for a second so they stay pinned
+      const suppress = T.ranged && !T.sniper && G.time - (e.seenAt || -9) < 1.1 && ld0 < T.range && los(e.x, e.y, e.lastX, e.lastY);
+      if (suppress) {
+        const sa = Math.atan2(e.lastY - e.y, e.lastX - e.x); e.angle = turnTo(e.angle, sa, 8 * dt);
+        if (e.cd <= 0 && Math.abs(angDiff(e.angle, sa)) < .4 && !guardLineBlocked(e, { x: e.lastX, y: e.lastY })) { guardFire(e, { x: e.lastX + rand(-18, 18), y: e.lastY + rand(-18, 18), vx: 0, vy: 0 }); e.cd = T.rate * (T.burst ? 1.4 : 1.7); }
+      }
+      // more than one of them on it: every other guard holds the angle instead of everybody running around the corner
+      const hunters = t && !T.melee ? L.enemies.filter(o => o !== e && o.state === 'combat' && o.target === t && !ETYPES[o.type].stat && !ETYPES[o.type].melee).length : 0;
+      const holdAngle = !T.post && !T.melee && hunters >= 1 && L.enemies.indexOf(e) % 2 === 0 && e.lostT < 6 && ld0 < T.range * .85 && ld0 > 60 && los(e.x, e.y, e.lastX, e.lastY);
+      const sm = smokes.find(c => c.life >= .5 && Math.hypot(e.x - c.x, e.y - c.y) < c.r * .85);
+      const blindT = t && (inSmoke(t.x, t.y) || smokeBlocks(e.x, e.y, t.x, t.y));
+      if (blindT || sm) e.lostT += dt; // lost them in the smoke: they give up the chase sooner
       if (T.post) e.angle = turnTo(e.angle, Math.atan2(ty - e.y, tx - e.x), 2 * dt);
+      else if (sm && !T.melee) { // choking in the cloud: stumble out of it, no idea where you went
+        const d = Math.hypot(e.x - sm.x, e.y - sm.y) || 1; mvx = (e.x - sm.x) / d; mvy = (e.y - sm.y) / d; if (d < 4) { mvx = Math.cos(e.angle + Math.PI); mvy = Math.sin(e.angle + Math.PI); }
+        e.angle = turnTo(e.angle, Math.atan2(mvy, mvx), 4 * dt);
+      }
+      else if (blindT && !T.melee && !suppress) { mvx = mvy = 0; e.angle = turnTo(e.angle, Math.atan2(e.lastY - e.y, e.lastX - e.x), 4 * dt); } // won't walk blind into the smoke after you
+      else if (holdAngle) { if (!suppress) e.angle = turnTo(e.angle, Math.atan2(e.lastY - e.y, e.lastX - e.x), 5 * dt); }
       else {
-        const f = L.focus && t && Math.hypot(t.x - L.focus.x, t.y - L.focus.y) < 200 ? flowDir(e) : null;
+        const f = e.lostT < 2 && L.focus && t && Math.hypot(t.x - L.focus.x, t.y - L.focus.y) < 200 ? flowDir(e) : null;
         if (f) { mvx = f.x; mvy = f.y; e.angle = turnTo(e.angle, Math.atan2(f.y, f.x), 6 * dt); }
         else goTo(e.lastX, e.lastY, 1);
         if (Math.hypot(e.lastX - e.x, e.lastY - e.y) < 20 && !t) e.lostT += dt * 2;
@@ -1516,6 +1572,7 @@ function updateGuard(e, dt) {
   }
   if (T.post && e.state !== 'combat') { mvx = 0; mvy = 0; }
   if (T.post && Math.hypot(e.hx - e.x, e.hy - e.y) > 6) { const d = Math.hypot(e.hx - e.x, e.hy - e.y); mvx = (e.hx - e.x) / d * .5; mvy = (e.hy - e.y) / d * .5; }
+  if (inSmoke(e.x, e.y)) spd *= .6; // coughing, can't see a thing
   { const gdg = !T.stat && !T.post && grenadeDodge(e); if (gdg) { mvx = gdg.x * 1.5; mvy = gdg.y * 1.5; spd = Math.max(spd, T.speed * 1.2); } }
   // separation
   for (const o of L.enemies) if (o !== e) {
@@ -1613,7 +1670,7 @@ function coneMap() {
       if (x < 0 || y < 0 || x >= L.w || y >= L.h || L.t[y * L.w + x] === 0) continue;
       const px = (x + .5) * TS, py = (y + .5) * TS, d = Math.hypot(px - e.x, py - e.y);
       if (d > range || (d > 40 && Math.abs(angDiff(e.angle, Math.atan2(py - e.y, px - e.x))) > T.cone + .15)) continue;
-      if (los(e.x, e.y, px, py)) m[y * L.w + x] = 1;
+      if (sightLine(e.x, e.y, px, py)) m[y * L.w + x] = 1;
     }
   }
   return m;
@@ -1738,6 +1795,13 @@ function findCover(o, t) {
   }
   return best;
 }
+function popSmoke(o, x, y) {
+  if (G.mode !== 'op' || o.team !== P.team) return; // only your Infiltrate squad carries smoke (in Defend it made fights drag on and broke the balance)
+  o.smokeUsed = true; sfx('throw');
+  const a = Math.atan2(y - o.y, x - o.x), d = Math.hypot(x - o.x, y - o.y);
+  grenades.push({ x: o.x, y: o.y, vx: Math.cos(a) * Math.min(420, d * 2.2 + 40), vy: Math.sin(a) * Math.min(420, d * 2.2 + 40), r: 5, fuse: .55, kind: 'smoke', team: o.team, who: o });
+  msg(o.name + ': "Smoke out!"', '#7fe0d0');
+}
 // a live frag grenade close by? run from it
 function grenadeDodge(u) {
   let dx = 0, dy = 0;
@@ -1749,7 +1813,7 @@ function grenadeDodge(u) {
   const l = Math.hypot(dx, dy); return l ? { x: dx / l, y: dy / l } : null;
 }
 function updateOp(o, dt) {
-  o.cd -= dt; o.scanT -= dt; o.lastHit += dt; o.muzzle -= dt; o.hurt -= dt; o.knife -= dt; o.nadeCd -= dt; o.freezeT -= dt;
+  o.cd -= dt; o.scanT -= dt; o.sPathT = (o.sPathT || 0) - dt; o.lastHit += dt; o.muzzle -= dt; o.hurt -= dt; o.knife -= dt; o.nadeCd -= dt; o.freezeT -= dt;
   if (o.state === 'down') {
     o.downT -= dt;
     if (o.downT <= 0) { o.state = 'dead'; msg(o.name + ' is KIA', '#ff3b3b'); }
@@ -1802,10 +1866,15 @@ function updateOp(o, dt) {
   if (o.claim && o.cmdClaim && L.enemies.includes(o.claim) && o.claim.state === 'combat') { const t2 = o.claim; o.claim = null; o.cmdClaim = false; if (friendly && G.cmd.kind === 'kill') { msg(o.name + ': "He spotted me!"', '#ff8a3d'); giveOrder({ kind: 'attack', t: t2 }); } }
   if (o.claim && !L.enemies.includes(o.claim) && o.cmdClaim) { o.claim = null; o.cmdClaim = false; if (friendly && G.cmd.kind === 'kill') G.cmd = { kind: 'follow' }; }
   if (o.claim && !o.cmdClaim && (!L.enemies.includes(o.claim) || o.claim.state === 'combat' || o.claim.sus > .5 || spotted || Math.hypot(o.claim.x - o.x, o.claim.y - o.y) > 260)) o.claim = null;
-  if (!o.claim && !spotted && o.team === 'A' && !t && !(friendly && (G.cmd.kind === 'hold' || G.cmd.kind === 'move')) && Math.random() < dt * 3) o.claim = takedownChance(o);
+  if (!o.claim && !o.drag && !spotted && o.team === 'A' && !t && !(friendly && (G.cmd.kind === 'hold' || G.cmd.kind === 'move')) && Math.random() < dt * 3) o.claim = takedownChance(o);
   if (o.claim !== o.lastClaim) { o.lastClaim = o.claim; o.waitT = 0; o.sKey = -1; }
+  if (o.drag && (spotted || t || o.claim || !L.bodies.includes(o.drag.b) || o.drag.b.found)) o.drag = null;
   const downed = friendly ? OPS.find(x => x !== o && x.team === o.team && x.state === 'down' && Math.hypot(x.x - o.x, x.y - o.y) < 360) : null;
-  if (o.claim) {
+  if (o.drag) { // walk over, grab the body, drag it out of sight
+    const dg = o.drag; dg.t += dt;
+    if (!dg.carry) { gx = dg.b.x; gy = dg.b.y; if (Math.hypot(gx - o.x, gy - o.y) < 22) { dg.carry = true; dg.t = 0; } else if (dg.t > 6) o.drag = null; }
+    else { gx = dg.x; gy = dg.y; if (Math.hypot(gx - o.x, gy - o.y) < 16 || dg.t > 8) o.drag = null; }
+  } else if (o.claim) {
     gx = o.claim.x; gy = o.claim.y; mode = 'sneak';
     if (!o.claim.sleep && Math.hypot(o.claim.x - o.x, o.claim.y - o.y) > 70) { // come at him from behind
       const bx = o.claim.x - Math.cos(o.claim.angle) * 38, by = o.claim.y - Math.sin(o.claim.angle) * 38;
@@ -1816,6 +1885,7 @@ function updateOp(o, dt) {
     gx = downed.x; gy = downed.y;
     if (Math.hypot(downed.x - o.x, downed.y - o.y) < 40) {
       mode = 'hold'; o.reviveT += dt;
+      if (!o.smokeUsed && (o.lastHit < 3 || (spotted && ALERTS[G.alert].lvl >= 2))) popSmoke(o, downed.x, downed.y); // cover the revive
       if (o.reviveT > 1.8) { downed.state = 'ok'; downed.hp = downed.maxhp * .45; o.reviveT = 0; msg(o.name + ' revived ' + downed.name, '#4fd8ff'); sfx('ok'); }
     }
   } else if (o.role === 'lead') { gx = o.goal ? o.goal.x : L.exit.x; gy = o.goal ? o.goal.y : L.exit.y; }
@@ -1871,13 +1941,15 @@ function updateOp(o, dt) {
     const c = o.claim, d = Math.hypot(c.x - o.x, c.y - o.y);
     if (d > 52 && d < 180 && (c.sus || 0) < .3 && Math.abs(angDiff(c.angle, Math.atan2(o.y - c.y, o.x - c.x))) > ETYPES[c.type].cone + .45 && sightLine(o.x, o.y, c.x, c.y)) { o.rush = true; o.crouch = false; o.waitT = 0; }
   }
-  if (stealthy && mode !== 'sneak') { const ex = exposedTo(o); if (ex) o.freezeT = Math.max(o.freezeT, .5); }
+  // freeze while a guard looks our way, but never forever: after a few seconds of a guard just standing there staring, crawl on anyway
+  o.boldT = (o.boldT || 0) - dt;
+  if (stealthy && mode !== 'sneak' && o.boldT <= 0) { const ex = exposedTo(o); if (ex) o.freezeT = Math.max(o.freezeT, .5); }
+  if (o.freezeT > 0 && stealthy && (!friendly || P.dead || Math.hypot(P.x - o.x, P.y - o.y) > 260)) { o.frzAcc = (o.frzAcc || 0) + dt; if (o.frzAcc > 4.5) { o.frzAcc = 0; o.boldT = 2.5; o.freezeT = 0; o.crouch = true; } } else o.frzAcc = Math.max(0, (o.frzAcc || 0) - dt * .5);
   const toGoal = Math.hypot(gx - o.x, gy - o.y);
   let mvx = 0, mvy = 0;
   if (mode !== 'hold' && toGoal > 14 && !(o.freezeT > 0 && stealthy && mode !== 'sneak')) {
     let f = null;
     if (mode === 'sneak' && o.claim) {
-      o.sPathT = (o.sPathT || 0) - dt;
       const near = Math.hypot(o.claim.x - o.x, o.claim.y - o.y) < 60;
       f = near || (o.rush && los(o.x, o.y, gx, gy)) ? { x: (o.claim.x - o.x) / Math.max(1, Math.hypot(o.claim.x - o.x, o.claim.y - o.y)), y: (o.claim.y - o.y) / Math.max(1, Math.hypot(o.claim.x - o.x, o.claim.y - o.y)) } : (stealthPath(o, gx, gy) || { x: (gx - o.x) / toGoal, y: (gy - o.y) / toGoal });
       // about to step into a lit cone? crouch and wait for the guard to look away (up to 5s), then go anyway
@@ -1885,6 +1957,12 @@ function updateOp(o, dt) {
       if (!near && !o.rush && !here && ahead && (o.waitT || 0) < 5) { o.waitT = (o.waitT || 0) + dt; f = { x: 0, y: 0 }; o.crouch = true; }
       else if (!ahead) o.waitT = Math.max(0, (o.waitT || 0) - dt * .5);
     } else if (toGoal < 70 && los(o.x, o.y, gx, gy)) f = { x: (gx - o.x) / toGoal, y: (gy - o.y) / toGoal };
+    else if (stealthy && !friendly && o.role === 'lead' && !o.drag) {
+      f = stealthPath(o, gx, gy) || opPath(o, gx, gy) || { x: (gx - o.x) / toGoal, y: (gy - o.y) / toGoal };
+      const cm = coneMap(), here = cm[tileIdx(o)], ahead = cm[tileIdx({ x: o.x + f.x * 26, y: o.y + f.y * 26 })];
+      if (!here && ahead && (o.lwaitT || 0) < 3.5) { o.lwaitT = (o.lwaitT || 0) + dt; f = { x: 0, y: 0 }; o.crouch = true; } // let him look away first
+      else if (!ahead) o.lwaitT = Math.max(0, (o.lwaitT || 0) - dt * .5);
+    }
     else f = opPath(o, gx, gy) || { x: (gx - o.x) / toGoal, y: (gy - o.y) / toGoal };
     mvx = f.x; mvy = f.y;
   }
@@ -1908,6 +1986,7 @@ function updateOp(o, dt) {
   if (anchor === P && !o.crouch && Math.hypot(P.x - o.x, P.y - o.y) > 200) spd *= 1.45;
   if (o.role === 'lead' && stealthy) spd *= .8;
   if (o.rush) spd = T.speed * 1.1;
+  if (o.drag && o.drag.carry) spd *= .55;
   // ---- fight
   const intel = INTEL[o.team], fresh = intel && G.time - intel.time < 4;
   const preAimed = t && fresh && Math.hypot(t.x - intel.x, t.y - intel.y) < 160; // a teammate called it out: already aiming there
@@ -1932,6 +2011,7 @@ function updateOp(o, dt) {
         msg(o.name + ': "FRAG OUT!"', friendly ? '#4fd8ff' : '#ff8a3d');
       }
     }
+    if (!o.smokeUsed && o.lastHit < .4 && o.hp < o.maxhp * .45 && dist > 90 && !holdFire) popSmoke(o, o.x + (t.x - o.x) * .35, o.y + (t.y - o.y) * .35);
   } else if (!stealthy && o.lastTgt && alive(o.lastTgt) && G.time - (o.lastVisT || -9) < 1.2 && !o.cov) {
     // suppressive fire: they just ducked behind something — keep their head down
     o.angle = turnTo(o.angle, Math.atan2(o.lastTY - o.y, o.lastTX - o.x), 10 * dt);
@@ -1945,6 +2025,10 @@ function updateOp(o, dt) {
     const base = anchor === P ? (P.heading || 0) : anchor.angle, arcs = [-1.1, 1.1, Math.PI];
     o.angle = turnTo(o.angle, base + arcs[k % 3], 3 * dt);
   }
+  if (friendly && !P.dead && (P.aiming || G.time - (P.shotT || -9) < .7)) {
+    const ca = Math.cos(P.angle), sa = Math.sin(P.angle), rx = o.x - P.x, ry = o.y - P.y, along = rx * ca + ry * sa, perp = ry * ca - rx * sa;
+    if (along > 12 && along < 560 && Math.abs(perp) < o.r + 14) { const sd = perp >= 0 ? 1 : -1; mvx += -sa * sd * 1.6; mvy += ca * sd * 1.6; }
+  }
   { const gdg = grenadeDodge(o); if (gdg) { mvx = gdg.x * 1.5; mvy = gdg.y * 1.5; spd = Math.max(spd, T.speed * 1.3); o.cov = null; } }
   // separation from teammates and you
   for (const u of [P, ...OPS]) {
@@ -1957,6 +2041,7 @@ function updateOp(o, dt) {
   o.sprinting = !o.crouch && spd > T.speed * 1.2 && !o.still;
   if (!o.still) { o.heading = Math.atan2(mvy, mvx); o.walk += dt * (o.crouch ? 7 : 11); }
   moveCircle(o, mvx * spd * dt, mvy * spd * dt);
+  if (o.drag && o.drag.carry) { const b = o.drag.b, bx = o.x - Math.cos(o.heading) * 15, by = o.y - Math.sin(o.heading) * 15; if (!solidAt(bx, by)) { b.x = bx; b.y = by; } else { b.x = o.x; b.y = o.y; } b.a = o.heading + Math.PI; }
   // un-stick
   o.stuckT += dt;
   if (o.stuckT > 1.4) { if (ml > .5 && Math.hypot(o.x - o.sx, o.y - o.sy) < 8) { const a = Math.random() * TAU; moveCircle(o, Math.cos(a) * 14, Math.sin(a) * 14); o.pathT = 0; } o.stuckT = 0; o.sx = o.x; o.sy = o.y; }
@@ -2110,14 +2195,14 @@ function pickup(it) {
     case 'b': P.ammo.smg += 60; break;
     case 'a': P.ammo.rifle += 60; break;
     case 's': P.ammo.shells += 8; break;
-    case 'n': P.ammo.sniper += 6; break;
+    case 'n': if (P.ammo.sniper >= SNIPER_MAX) return false; P.ammo.sniper = Math.min(SNIPER_MAX, P.ammo.sniper + 2); break;
     case 'p': P.ammo.rockets += 2; break;
     case 'q': P.gadgets.frag++; break;
     case 'k': P.gadgets.smoke++; break;
     case 'f': P.gadgets.flash++; break;
     case 'R': P.weapons.rifle = true; P.ammo.rifle += 90; P.weapon = 'rifle'; msg('M4 RIFLE — press 3. Loud: the whole base will hear it', '#f0b030'); break;
     case 'S': P.weapons.shotgun = true; P.ammo.shells += 12; P.weapon = 'shotgun'; msg('SHOTGUN — press 4', '#ff8a3d'); break;
-    case 'N': P.weapons.sniper = true; P.ammo.sniper += 10; P.weapon = 'sniper'; msg('SILENCED SNIPER RIFLE — press 5. Hold right-click to scope', '#e0e0a0'); break;
+    case 'N': P.weapons.sniper = true; P.ammo.sniper = SNIPER_MAX; P.weapon = 'sniper'; msg('SILENCED SNIPER RIFLE — press 5. Hold right-click to scope', '#e0e0a0'); break;
     case 'G': P.weapons.lmg = true; P.ammo.rifle += 150; P.weapon = 'lmg'; msg('LMG — press 6', '#f0b030'); break;
     case 'P': P.weapons.rpg = true; P.ammo.rockets += 3; P.weapon = 'rpg'; msg('RPG — press 7. Rockets explode on impact', '#ff6b3d'); break;
     default:
@@ -2485,12 +2570,13 @@ function render() {
   }
   for (const p of particles) { ctx.globalAlpha = clamp(p.life / p.max, 0, 1); ctx.fillStyle = p.color; ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size); }
   ctx.globalAlpha = 1;
-  for (const sm of smokes) {
-    const al = clamp(sm.life / 2, 0, 1) * .85;
-    for (let k = 0; k < 7; k++) { const a = k * 0.9 + now * .2, rr = sm.r * (.45 + .2 * Math.sin(k * 2.1 + now)); ctx.fillStyle = `rgba(170,175,180,${al * .45})`; ctx.beginPath(); ctx.arc(sm.x + Math.cos(a) * sm.r * .35, sm.y + Math.sin(a) * sm.r * .35, rr, 0, TAU); ctx.fill(); }
-  }
   drawDarkness(cam, now);
   ctx.setTransform(s, 0, 0, s, -cam.x * s, -cam.y * s);
+  for (const sm of smokes) {
+    const al = clamp(sm.life / 2, 0, 1) * clamp(sm.r / 60, .4, 1);
+    for (let k = 0; k < 9; k++) { const a = k * 0.7 + now * .15, rr = sm.r * (.42 + .16 * Math.sin(k * 2.1 + now * .8)); ctx.fillStyle = `rgba(${150 + k * 4},${155 + k * 4},${160 + k * 4},${al * .38})`; ctx.beginPath(); ctx.arc(sm.x + Math.cos(a) * sm.r * .38, sm.y + Math.sin(a) * sm.r * .38, rr, 0, TAU); ctx.fill(); }
+    ctx.fillStyle = `rgba(165,170,175,${al * .5})`; ctx.beginPath(); ctx.arc(sm.x, sm.y, sm.r * .6, 0, TAU); ctx.fill();
+  }
   drawCones(cam, now);
   drawMarks(now, inView);
   ctx.font = 'bold 11px monospace'; ctx.textAlign = 'center';
@@ -2691,7 +2777,7 @@ function drawCones(cam, now) {
     const pts = [], n = 18;
     for (let i = 0; i <= n; i++) {
       const a = e.angle - cone + 2 * cone * i / n, ca = Math.cos(a), sa = Math.sin(a);
-      let r = 0; while (r < range && !solidAt(e.x + ca * r, e.y + sa * r)) r += 12;
+      let r = 0; while (r < range && !solidAt(e.x + ca * r, e.y + sa * r) && !(r > 16 && inSmoke(e.x + ca * r, e.y + sa * r))) r += 12;
       pts.push([e.x + ca * Math.min(r, range), e.y + sa * Math.min(r, range), Math.min(r, range)]);
     }
     ctx.fillStyle = `rgba(${col},${.07 + s * .14})`; ctx.beginPath(); ctx.moveTo(e.x, e.y); for (const p of pts) ctx.lineTo(p[0], p[1]); ctx.closePath(); ctx.fill();
@@ -3105,7 +3191,7 @@ function sectorCarry(i) { // a fair kit when you start a later sector from the m
   const c = defaultCarry();
   if (i >= 1) { c.weapons.rifle = true; c.ammo.rifle = 120; c.armor = 50; c.gadgets.frag = 2; }
   if (i >= 2) { c.weapons.shotgun = true; c.ammo.shells = 16; c.gadgets.smoke = 2; }
-  if (i >= 3) { c.weapons.sniper = true; c.ammo.sniper = 12; c.armor = 100; c.gadgets.flash = 2; }
+  if (i >= 3) { c.weapons.sniper = true; c.ammo.sniper = SNIPER_MAX; c.armor = 100; c.gadgets.flash = 2; }
   if (i >= 4) { c.weapons.lmg = true; c.ammo.rifle = 300; c.weapons.rpg = true; c.ammo.rockets = 3; c.armor = 130; c.gadgets.frag = 3; }
   return c;
 }
