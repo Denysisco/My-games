@@ -147,8 +147,8 @@ const DOORKEY = { G: 'green', Y: 'yellow', R: 'red' };
 const BOTDIFF = [null,
   { name: 'EASY',  stars: 1, hp: 170, speed: 120, spread: .26, react: .75, rate: .24, dmg: 7,  lead: false, nades: 0, regen: 0, strafe: 0,  sight: 380, time: 150, color: '#3ddc84' },
   { name: 'MID',   stars: 2, hp: 250, speed: 140, spread: .15, react: .42, rate: .17, dmg: 8,  lead: false, nades: 1, regen: 1, strafe: .5, sight: 440, time: 180, color: '#ffd23f' },
-  { name: 'HARD',  stars: 3, hp: 350, speed: 155, spread: .08, react: .24, rate: .13, dmg: 9,  lead: true,  nades: 2, regen: 2, strafe: .8, sight: 500, time: 210, color: '#ff8a3d' },
-  { name: 'ELITE', stars: 4, hp: 480, speed: 170, spread: .04, react: .12, rate: .1,  dmg: 10, lead: true,  nades: 4, regen: 4, strafe: 1,  sight: 560, time: 240, color: '#ff3b3b' },
+  { name: 'HARD',  stars: 3, hp: 430, speed: 155, spread: .08, react: .24, rate: .13, dmg: 9,  lead: true,  nades: 2, regen: 2, strafe: .8, sight: 500, time: 210, color: '#ff8a3d' },
+  { name: 'ELITE', stars: 4, hp: 800, speed: 175, spread: .035, react: .1, rate: .09, dmg: 11, lead: true,  nades: 4, regen: 6, strafe: 1,  sight: 560, time: 240, color: '#ff3b3b' },
 ];
 const MONSTER = { hp: 320, speed: 200, claw: 30, clawRate: .38, pounce: 40, pounceCd: 3.5, roarCd: 14, hordeCd: 18, regen: 8 };
 
@@ -1132,9 +1132,30 @@ function hurtMonster(d) {
     msg('You were killed. Crawling back out of the vents in 6s', '#b6ff3d');
   }
 }
+// tiles the monster can walk to from the intruder (through any door that isn't locked)
+function monsterReach() {
+  const f = new Uint16Array(L.w * L.h);
+  bfs(tileIdx(BOT), i => L.t[i] === 1 || (L.t[i] === 2 && !L.doors.get(i).locked), f);
+  return f;
+}
+// open floor (no walls, doors or coolant around it) that connects to the intruder, as close to the exit as possible
+function monsterSpot(minBot) {
+  const reach = monsterReach(), w = L.w; let best = null, bestS = 1e9;
+  for (let y = 1; y < L.h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    const i = y * w + x; if (reach[i] === 65535 || L.t[i] !== 1 || L.toxic[i]) continue;
+    let open = true;
+    for (let oy = -1; oy <= 1 && open; oy++) for (let ox = -1; ox <= 1; ox++) { const n = i + oy * w + ox; if (L.t[n] !== 1 || L.toxic[n]) { open = false; break; } }
+    if (!open) continue;
+    const px = (x + .5) * TS, py = (y + .5) * TS, bd = Math.hypot(px - BOT.x, py - BOT.y);
+    const sc = (L.exitField[i] === 65535 ? 5000 : L.exitField[i]) + (bd < minBot ? 10000 : 0);
+    if (sc < bestS) { bestS = sc; best = { x: px, y: py }; }
+  }
+  return best || { x: BOT.x + 200, y: BOT.y };
+}
 function respawnMonster() {
-  const vs = L.vents.map(v => ({ v, d: Math.hypot(v.x - BOT.x, v.y - BOT.y) })).filter(o => o.d > 260).sort((a, b) => a.d - b.d);
-  const spot = vs.length ? vs[0].v : L.exit;
+  const reach = monsterReach();
+  const vs = L.vents.filter(v => reach[tileIdx(v)] !== 65535).map(v => ({ v, d: Math.hypot(v.x - BOT.x, v.y - BOT.y) })).filter(o => o.d > 260).sort((a, b) => a.d - b.d);
+  const spot = vs.length ? vs[0].v : monsterSpot(260);
   P.x = spot.x; P.y = spot.y; collide(P); P.hp = P.maxhp; P.dead = false; P.lastHit = 9;
   burst(P.x, P.y, '#666', 16, 140, .6, 4); sfx('door'); msg('You are back. Hunt it down!', '#b6ff3d');
 }
@@ -1159,14 +1180,21 @@ function monsterRoar() {
 }
 function monsterHorde() {
   if (P.dead || P.hordeCd > 0) return;
-  if (L.enemies.filter(e => !ETYPES[e.type].stat).length > 32) { msg('The vents are full. Too many monsters already', '#7d8a96'); return; }
+  if (L.enemies.filter(e => !ETYPES[e.type].stat).length > 32) { msg('Too many monsters already', '#7d8a96'); return; }
   P.hordeCd = MONSTER.hordeCd;
-  const vs = L.vents.map(v => ({ v, d: Math.hypot(v.x - BOT.x, v.y - BOT.y) })).filter(o => o.d > 200).sort((a, b) => a.d - b.d);
-  const spot = vs.length ? vs[0].v : P;
   const types = G.level >= 2 ? ['grunt', 'brute', 'grunt'] : ['grunt', 'grunt', 'drone'];
-  for (const t of types) { const e = makeEnemy(t, spot.x + rand(-14, 14), spot.y + rand(-14, 14)); e.aware = true; e.frenzy = 3; collide(e); L.enemies.push(e); }
-  burst(spot.x, spot.y, '#666', 20, 160, .7, 5); sfx('door');
-  msg('The horde answers: 3 monsters crawl out of a vent', '#b6ff3d');
+  types.forEach((t, k) => { // they burst out of the floor right around you
+    let x = P.x, y = P.y;
+    for (let tries = 0; tries < 12; tries++) {
+      const a = P.angle + Math.PI + (k - 1) * 1.2 + rand(-.4, .4) + tries * .55, r = 34 + tries * 3;
+      const nx = P.x + Math.cos(a) * r, ny = P.y + Math.sin(a) * r;
+      if (!solidAt(nx, ny) && !solidAt(nx + 12, ny) && !solidAt(nx - 12, ny) && !solidAt(nx, ny + 12) && !solidAt(nx, ny - 12)) { x = nx; y = ny; break; }
+    }
+    const e = makeEnemy(t, x, y); e.aware = true; e.frenzy = 3; collide(e); L.enemies.push(e);
+    burst(x, y, '#666', 10, 140, .6, 4);
+  });
+  sfx('door');
+  msg('The horde answers: 3 monsters burst out beside you', '#b6ff3d');
 }
 function updateBot(dt) {
   const B = BOT, D = BOTDIFF[G.mdiff];
@@ -1298,11 +1326,12 @@ function startMonster(i, diff) {
   TGT = BOT; G.alert = 'YELLOW'; G.mtime = D.time;
   L.exitField = new Uint16Array(L.w * L.h); bfs(tileIdx(L.exit), i2 => L.t[i2] !== 0, L.exitField);
   L.exitStart = L.exitField[tileIdx(BOT)] || 1;
+  const sp = monsterSpot(420); P.x = sp.x; P.y = sp.y; // never start shut behind a keycard door
   prerender(); computeFlow(); botPlan();
   setTouchLabels();
   G.state = 'play';
   banner('MONSTER MODE', 'STOP THE INTRUDER · BOT ' + D.name + ' ' + '★'.repeat(D.stars), '#b6ff3d', 3.5);
-  setTimeout(() => G.mode === 'monster' && G.state === 'play' && msg('LMB claw · SPACE/RMB pounce · Q roar · E call the horde', '#b6ff3d'), 3600);
+  const run = L; setTimeout(() => L === run && G.mode === 'monster' && G.state === 'play' && msg('LMB claw · SPACE/RMB pounce · Q roar · E call the horde', '#b6ff3d'), 3600);
   last = performance.now();
 }
 function monsterEnd(win, reason) {
@@ -1327,7 +1356,7 @@ function monsterMenu() {
       <b>LEFT CLICK</b><span>claw (30 dmg)</span>
       <b>SPACE / RIGHT-CLICK</b><span>pounce: leap, hit and stun</span>
       <b>Q</b><span>roar: stun the bot, frenzy nearby monsters</span>
-      <b>E</b><span>call the horde: 3 monsters from a vent</span>
+      <b>E</b><span>call the horde: 3 monsters burst out right next to you</span>
       <b>NIGHT VISION</b><span>you see much more in the dark</span>
     </div>
     <button class="btn" data-act="mstart">☣ Start</button><button class="btn alt" data-act="menu">Back</button></div>`, ACTIONS.mstart);
