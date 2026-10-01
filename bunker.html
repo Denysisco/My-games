@@ -475,7 +475,7 @@ function updateSiren() {
 
 /* ---------------- INPUT ---------------- */
 const keys = {};
-const mouse = { x: 0, y: 0, down: false, wx: 0, wy: 0 };
+const mouse = { x: 0, y: 0, down: false, aim: false, wx: 0, wy: 0 };
 const touch = { on: false, move: null, aim: null, mx: 0, my: 0, ax: 0, ay: 0, fire: false };
 addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
@@ -499,11 +499,11 @@ addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 let lastTouch = -1e9;
 const fromTouch = () => performance.now() - lastTouch < 800;
 cv.addEventListener('mousemove', e => { if (fromTouch()) return; mouse.x = e.clientX; mouse.y = e.clientY; touch.on = false; });
-cv.addEventListener('mousedown', e => { if (fromTouch()) return; audioInit(); if (e.button === 0) mouse.down = true; if (e.button === 2 && G.state === 'play') throwGrenade(); });
-function releaseInputs() { for (const k in keys) keys[k] = false; mouse.down = false; touch.move = touch.aim = null; }
+cv.addEventListener('mousedown', e => { if (fromTouch()) return; audioInit(); if (e.button === 0) mouse.down = true; if (e.button === 2) mouse.aim = true; });
+function releaseInputs() { for (const k in keys) keys[k] = false; mouse.down = false; mouse.aim = false; touch.move = touch.aim = null; }
 addEventListener('blur', releaseInputs);
 document.addEventListener('visibilitychange', () => { if (document.hidden) { releaseInputs(); if (G.state === 'play') pause(); } });
-addEventListener('mouseup', e => { if (e.button === 0) mouse.down = false; });
+addEventListener('mouseup', e => { if (e.button === 0) mouse.down = false; if (e.button === 2) mouse.aim = false; });
 cv.addEventListener('contextmenu', e => e.preventDefault());
 let wheelAcc = 0, wheelLock = 0;
 cv.addEventListener('wheel', e => {
@@ -605,14 +605,50 @@ function shoot() {
   if (W.ammo) P.ammo[W.ammo]--;
   P.cd = W.rate; G.stats.shots += W.pellets;
   const bx = P.x + Math.cos(P.angle) * (P.r + W.len), by = P.y + Math.sin(P.angle) * (P.r + W.len);
+  // Spread: 40% tighter than before, much tighter while aiming. The shotgun keeps some spread so it still sprays.
+  const spreadMul = W.pellets > 1 ? (P.aiming ? .55 : .8) : (P.aiming ? .25 : .6);
+  const base = assistAngle(P.aiming ? .14 : .08, W.speed);
   for (let i = 0; i < W.pellets; i++) {
-    const a = P.angle + rand(-W.spread, W.spread), sp = W.speed * rand(.9, 1.05);
-    bullets.push({ x: P.x, y: P.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, dmg: W.dmg, team: 'p', r: 3, life: .9, counted: false, sx: bx, sy: by, pierce: W.pierce || 0, hit: null, pulse: P.weapon === 'pulse' });
+    const a = base + rand(-W.spread, W.spread) * spreadMul, sp = W.speed * rand(.95, 1.05);
+    bullets.push({ x: P.x, y: P.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, dmg: W.dmg, team: 'p', r: 5, life: .9, counted: false, sx: bx, sy: by, pierce: W.pierce || 0, hit: null, pulse: P.weapon === 'pulse' });
   }
   P.kick = W.kick; P.muzzle = .05;
   flashLight(bx, by, 170, .9); burst(bx, by, '#ffd76a', 3, 90, .12, 2);
   shake(W.kick * .5); sfx(P.weapon);
   for (const e of L.enemies) if (!e.aware && Math.hypot(e.x - P.x, e.y - P.y) < W.noise) alertEnemy(e);
+}
+// Light aim assist: if a visible enemy is within `cone` radians of where you're aiming, shoot straight at it.
+function assistAngle(cone, bulletSpeed) {
+  let best = null, bd = cone;
+  for (const e of L.enemies) {
+    const d = Math.hypot(e.x - P.x, e.y - P.y); if (!e.los || d > 650) continue;
+    const ad = Math.abs(angDiff(P.angle, Math.atan2(e.y - P.y, e.x - P.x))) - Math.atan2(e.r, d) * .5;
+    if (ad < bd) { bd = ad; best = e; }
+  }
+  if (!best) return P.angle;
+  // lead the target: aim where it will be when the bullet arrives
+  const t = Math.hypot(best.x - P.x, best.y - P.y) / bulletSpeed;
+  return Math.atan2(best.y + (best.vy || 0) * t - P.y, best.x + (best.vx || 0) * t - P.x);
+}
+// Laser sight from the gun to the first wall or enemy it touches.
+function drawLaser(now) {
+  if (G.state !== 'play') return;
+  if (touch.on && !touch.aim) return;
+  const W = WEAPONS[P.weapon], ca = Math.cos(P.angle), sa = Math.sin(P.angle);
+  const sx = P.x + ca * (P.r + W.len), sy = P.y + sa * (P.r + W.len);
+  let ex = sx, ey = sy, hitE = null;
+  for (let t = 0; t < 700; t += 6) {
+    const x = sx + ca * t, y = sy + sa * t;
+    if (solidAt(x, y)) break;
+    ex = x; ey = y;
+    for (const e of L.enemies) if (Math.hypot(e.x - x, e.y - y) < e.r) { hitE = e; break; }
+    if (hitE) break;
+  }
+  const g = ctx.createLinearGradient(sx, sy, ex, ey), al = P.aiming ? .75 : .28;
+  g.addColorStop(0, `rgba(255,59,59,${al})`); g.addColorStop(1, `rgba(255,59,59,${al * .25})`);
+  ctx.strokeStyle = g; ctx.lineWidth = P.aiming ? 1.6 : 1; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+  ctx.fillStyle = hitE ? '#ff3b3b' : `rgba(255,59,59,${al})`;
+  ctx.beginPath(); ctx.arc(ex, ey, hitE ? 3.5 + Math.sin(now * 20) : 2, 0, TAU); ctx.fill();
 }
 function throwGrenade() {
   if (P.grenades <= 0) { msg('No grenades', '#7d8a96'); sfx('deny'); return; }
@@ -863,9 +899,10 @@ function update(dt) {
   let firing = mouse.down;
   if (touch.move) { const dx = touch.move.x - touch.move.ox, dy = touch.move.y - touch.move.oy; mx = dx / 60; my = dy / 60; if (Math.hypot(mx, my) < .15) mx = my = 0; }
   const ml = Math.hypot(mx, my); if (ml > 1) { mx /= ml; my /= ml; }
-  const sprint = (keys['shift'] || (touch.move && ml > .95)) && P.stamina > .05 && ml > 0;
+  P.aiming = mouse.aim && !touch.on;
+  const sprint = !P.aiming && (keys['shift'] || (touch.move && ml > .95)) && P.stamina > .05 && ml > 0;
   P.stamina = clamp(P.stamina + (sprint ? -dt * .45 : dt * .25), 0, 1);
-  let spd = 175 * (sprint ? 1.55 : 1);
+  let spd = 175 * (sprint ? 1.55 : 1) * (P.aiming ? .6 : 1);
   if (L.toxic[Math.floor(P.y / TS) * L.w + Math.floor(P.x / TS)] && !P.hazmat) spd *= .7;
   moveCircle(P, mx * spd * dt, my * spd * dt);
   if (ml > 0) P.walk += dt * (sprint ? 16 : 11);
@@ -911,6 +948,7 @@ function update(dt) {
   updateDoors(dt);
   L.flowT -= dt; if (L.flowT <= 0) { L.flowT = .25; computeFlow(); }
   for (let i = L.enemies.length - 1; i >= 0; i--) { const e = L.enemies[i]; if (e) updateEnemy(e, dt); }
+  for (const e of L.enemies) { if (e.ox !== undefined && dt > 0) { e.vx = (e.x - e.ox) / dt; e.vy = (e.y - e.oy) / dt; } e.ox = e.x; e.oy = e.y; }
 
   // bullets
   for (let i = bullets.length - 1; i >= 0; i--) {
@@ -1102,11 +1140,12 @@ function render() {
   const ip = G.state === 'play' && nearInteractable();
   if (ip) { ctx.font = 'bold 11px monospace'; ctx.fillStyle = '#000'; ctx.fillRect(P.x - 52, P.y - 42, 104, 16); ctx.fillStyle = '#3ddc84'; ctx.fillText((touch.on ? '[USE] ' : '[E] ') + ip, P.x, P.y - 30); }
 
+  drawLaser(now);
   drawThreatArrows(cam);
   // crosshair
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   if (!touch.on && G.state === 'play') {
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; const m = mouse, g = 5 + P.kick * 1.5;
+    ctx.strokeStyle = P.aiming ? '#ff6b6b' : '#fff'; ctx.lineWidth = 1.5; const m = mouse, g = (P.aiming ? 2 : 5) + P.kick * (P.aiming ? .6 : 1.5);
     ctx.beginPath(); ctx.moveTo(m.x - g - 7, m.y); ctx.lineTo(m.x - g, m.y); ctx.moveTo(m.x + g, m.y); ctx.lineTo(m.x + g + 7, m.y);
     ctx.moveTo(m.x, m.y - g - 7); ctx.lineTo(m.x, m.y - g); ctx.moveTo(m.x, m.y + g); ctx.lineTo(m.x, m.y + g + 7); ctx.stroke();
     ctx.fillStyle = '#ff3b3b'; ctx.fillRect(m.x - 1, m.y - 1, 2, 2);
@@ -1577,7 +1616,8 @@ function menu() {
       <b>WASD</b><span>move · SHIFT sprint</span>
       <b>MOUSE</b><span>aim · click to shoot</span>
       <b>1 2 3 4 / WHEEL</b><span>switch weapon</span>
-      <b>Q / RIGHT-CLICK</b><span>throw grenade</span>
+      <b>HOLD RIGHT-CLICK</b><span>aim (tighter shots, laser sight)</span>
+      <b>Q / G</b><span>throw grenade</span>
       <b>E</b><span>use keypad / read note</span>
       <b>TAB</b><span>datapad (codes you found)</span>
       <b>ESC</b><span>pause · M mute</span>
@@ -1602,6 +1642,7 @@ function startLevel(i) {
   L = buildLevel(def);
   const c = JSON.parse(JSON.stringify(G.carry || defaultCarry()));
   c.ammo.cells = c.ammo.cells || 0; c.weapons.pulse = !!c.weapons.pulse;
+  c.weapons.smg = true; c.ammo.bullets = Math.max(600, c.ammo.bullets || 0); // you always spawn with the SMG and 600+ rounds
   P = { x: (def.player[0] + .5) * TS, y: (def.player[1] + .5) * TS, r: 11, maxhp: 100, angle: 0, cd: 0, kick: 0, hurt: 0, muzzle: 0, walk: 0, stamina: 1, keys: {}, ...c };
   G.alert = def.base;
   if (ALERTS[G.alert].lvl >= 2) applyLockdown(true);
