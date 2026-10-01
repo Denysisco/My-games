@@ -125,10 +125,11 @@ const WEAPONS = {
   smgsd:    { name: 'MP5-SD',     short: 'MP5', rate: .08, dmg: 13, spread: .08,  pellets: 1, speed: 880,  ammo: 'smg',     noise: 150, kick: 2.2, len: 19, silenced: true },
   rifle:    { name: 'M4 RIFLE',   short: 'M4',  rate: .11, dmg: 21, spread: .05,  pellets: 1, speed: 980,  ammo: 'rifle',   noise: 560, kick: 3,   len: 23 },
   shotgun:  { name: 'SHOTGUN',    short: 'SG',  rate: .75, dmg: 14, spread: .28,  pellets: 8, speed: 740,  ammo: 'shells',  noise: 600, kick: 7,   len: 20 },
-  sniper:   { name: 'SNIPER',     short: 'SNP', rate: 1.2, dmg: 140, spread: .004, pellets: 1, speed: 1700, ammo: 'sniper', noise: 720, kick: 9,   len: 31, pierce: 1, scope: true },
+  sniper:   { name: 'SNIPER',     short: 'SNP', rate: 1.2, dmg: 140, spread: .004, pellets: 1, speed: 1700, ammo: 'sniper', noise: 90,  kick: 9,   len: 31, pierce: 1, scope: true, silenced: true }, // suppressed: guards barely hear it
   lmg:      { name: 'LMG',        short: 'LMG', rate: .07, dmg: 17, spread: .1,   pellets: 1, speed: 940,  ammo: 'rifle',   noise: 620, kick: 3,   len: 27, heavy: true },
   rpg:      { name: 'RPG',        short: 'RPG', rate: 1.5, dmg: 0,  spread: .01,  pellets: 1, speed: 560,  ammo: 'rockets', noise: 820, kick: 10,  len: 27, rocket: true },
 };
+const SNIPER_TOUGH = new Set(['heavy', 'turret', 'boss']); // everything else drops to one sniper round
 const WEAPON_ORDER = ['sdpistol', 'smgsd', 'rifle', 'shotgun', 'sniper', 'lmg', 'rpg'];
 const AMMO_NAME = { smg: 'SMG AMMO', rifle: 'RIFLE AMMO', shells: 'SHELLS', sniper: 'SNIPER ROUNDS', rockets: 'ROCKETS' };
 const GADGETS = ['frag', 'smoke', 'flash'];
@@ -208,7 +209,7 @@ const LEVELS = [
   fence: [[0,24,64,1]],
   carve: [[59,24,1,1]],
   walls: [[4,10,10,7],[46,10,12,7],[24,27,6,5],[12,34,6,5]],
-  carve2: [[5,11,8,5],[47,11,10,5],[25,28,4,3],[13,35,4,3]],
+  carve2: [[5,11,8,5],[47,11,10,5],[25,28,4,3],[13,35,3,3]],
   deco: [[20,12,4,2,'truck'],[40,9,4,2,'truck'],[28,15,2,2,'crate'],[36,11,2,2,'crate'],[26,20,4,1,'sandbag'],[34,20,4,1,'sandbag'],[5,19,5,2,'container'],
          [10,28,2,2,'tree'],[47,35,3,2,'tree'],[52,30,2,2,'tree'],[18,34,2,2,'tree'],[3,31,2,2,'tree'],[38,35,2,2,'tree'],[36,27,3,1,'barrier'],[48,12,3,2,'jeep'],
          [9,20,2,2,'tower'],[53,20,2,2,'tower'],[16,35,1,3,'gunrack'],[30,25,4,13,'road'],[30,8,4,16,'road']],
@@ -346,6 +347,7 @@ function buildLevel(def, codes, gd) {
   }
   for (const r of def.carve || []) fill(r, 1);
   for (const r of def.carve2 || []) fill(r, 1);
+  for (const d of decos) if (SOLID_DECO.has(d.kind)) fill([d.x, d.y, d.w, d.h], 0, decoMask); // props inside carved huts stay solid
   const doors = new Map(), doorList = [];
   for (const [x, y, type, arg] of def.doors) {
     const d = { x, y, type, open: 0, locked: type !== 'D', gate: type === 'B' ? arg : null, sealable: arg === 'lock', sealed: false, perm: false, horiz: true, warnT: 0 };
@@ -692,6 +694,7 @@ function sfx(n, vol = 1) {
     case 'rifle': noise(.1, .22 * vol, 2600); tone(150, .07, 'square', .05 * vol, -80); break;
     case 'lmg': noise(.08, .2 * vol, 2200); tone(120, .06, 'square', .05 * vol, -60); break;
     case 'shotgun': noise(.3, .45 * vol, 1400); tone(90, .2, 'sawtooth', .1 * vol, -50); break;
+    case 'sdsniper': noise(.12, .12 * vol, 1500); tone(110, .1, 'sine', .05 * vol, -50); break;
     case 'sniper': noise(.45, .5 * vol, 3200); tone(70, .35, 'sawtooth', .15 * vol, -40); break;
     case 'rpg': noise(.5, .3 * vol, 900); tone(200, .4, 'sawtooth', .08 * vol, -150); break;
     case 'eshot': tone(520, .09, 'square', .04 * vol, -300); break;
@@ -951,7 +954,7 @@ function shoot() {
   P.kick = W.kick; P.muzzle = W.silenced ? .02 : .05;
   if (!W.silenced) flashLight(bx, by, 170, .9);
   burst(bx, by, W.silenced ? '#9aa7b3' : '#ffd76a', W.silenced ? 1 : 3, 90, .12, 2);
-  shake(W.kick * .5); sfx(P.weapon);
+  shake(W.kick * .5); sfx(P.weapon === 'sniper' ? 'sdsniper' : P.weapon);
   noiseEvent(P.x, P.y, W.noise, P.team, !W.silenced);
 }
 // light aim assist toward a visible hostile near the crosshair, leading moving targets
@@ -1029,7 +1032,7 @@ function nearInteractable() {
   if (dn) return P.revive ? 'REVIVING…' : 'REVIVE ' + dn.name;
   for (const c of L.consoles) if (Math.hypot(c.x - P.x, c.y - P.y) < 48) return c.used ? null : c.kind === 'armoury' ? 'ARMOURY — PICK ONE WEAPON' : 'CAMERAS OFF';
   if (G.mode === 'op') for (const t of L.terminals) if (Math.hypot(t.x - P.x, t.y - P.y) < 48) return t.solved ? null : 'USE KEYPAD';
-  for (const n of L.notes) if (n.read && Math.hypot(n.x - P.x, n.y - P.y) < 48) return 'READ NOTE';
+  for (const n of L.notes) if ((n.read || G.mode === 'def') && Math.hypot(n.x - P.x, n.y - P.y) < 48) return 'READ NOTE';
   return null;
 }
 // a guard that isn't fighting (or is blinded) can be knifed silently from up close
@@ -1059,7 +1062,7 @@ function useConsole(c) {
   msg('SECURITY CONSOLE: every camera on this floor is OFFLINE', '#3ddc84'); sfx('ok');
 }
 /* ---------------- ARMOURY: take any ONE weapon (your SD pistol stays as a sidearm) ---------------- */
-const ARMOURY = [['smgsd', 'silenced, quiet', 300], ['rifle', 'loud, all-round', 210], ['shotgun', 'loud, close range', 28], ['sniper', 'one-shot, scope', 16], ['lmg', 'loud, huge mag', 320]];
+const ARMOURY = [['smgsd', 'silenced, quiet', 300], ['rifle', 'loud, all-round', 210], ['shotgun', 'loud, close range', 28], ['sniper', 'silenced, one-shot, scope', 16], ['lmg', 'loud, huge mag', 320]];
 function openArmoury(c) {
   if (c.used) { msg('The armoury is empty — you already took your weapon', '#86907a'); return; }
   if (G.cmdOpen) closeCmd();
@@ -1800,6 +1803,7 @@ function updateOp(o, dt) {
   if (o.claim && !L.enemies.includes(o.claim) && o.cmdClaim) { o.claim = null; o.cmdClaim = false; if (friendly && G.cmd.kind === 'kill') G.cmd = { kind: 'follow' }; }
   if (o.claim && !o.cmdClaim && (!L.enemies.includes(o.claim) || o.claim.state === 'combat' || o.claim.sus > .5 || spotted || Math.hypot(o.claim.x - o.x, o.claim.y - o.y) > 260)) o.claim = null;
   if (!o.claim && !spotted && o.team === 'A' && !t && !(friendly && (G.cmd.kind === 'hold' || G.cmd.kind === 'move')) && Math.random() < dt * 3) o.claim = takedownChance(o);
+  if (o.claim !== o.lastClaim) { o.lastClaim = o.claim; o.waitT = 0; o.sKey = -1; }
   const downed = friendly ? OPS.find(x => x !== o && x.team === o.team && x.state === 'down' && Math.hypot(x.x - o.x, x.y - o.y) < 360) : null;
   if (o.claim) {
     gx = o.claim.x; gy = o.claim.y; mode = 'sneak';
@@ -2113,7 +2117,7 @@ function pickup(it) {
     case 'f': P.gadgets.flash++; break;
     case 'R': P.weapons.rifle = true; P.ammo.rifle += 90; P.weapon = 'rifle'; msg('M4 RIFLE — press 3. Loud: the whole base will hear it', '#f0b030'); break;
     case 'S': P.weapons.shotgun = true; P.ammo.shells += 12; P.weapon = 'shotgun'; msg('SHOTGUN — press 4', '#ff8a3d'); break;
-    case 'N': P.weapons.sniper = true; P.ammo.sniper += 10; P.weapon = 'sniper'; msg('SNIPER RIFLE — press 5. Hold right-click to scope', '#e0e0a0'); break;
+    case 'N': P.weapons.sniper = true; P.ammo.sniper += 10; P.weapon = 'sniper'; msg('SILENCED SNIPER RIFLE — press 5. Hold right-click to scope', '#e0e0a0'); break;
     case 'G': P.weapons.lmg = true; P.ammo.rifle += 150; P.weapon = 'lmg'; msg('LMG — press 6', '#f0b030'); break;
     case 'P': P.weapons.rpg = true; P.ammo.rockets += 3; P.weapon = 'rpg'; msg('RPG — press 7. Rockets explode on impact', '#ff6b3d'); break;
     default:
@@ -2231,11 +2235,11 @@ function updateBullets(dt) {
       if (b.who === P && !b.counted) { G.stats.hits++; b.counted = true; }
       if (b.who === P) { P.focus = hitU; P.focusT = G.time; INTEL[P.team] = { x: hitU.x, y: hitU.y, time: G.time }; }
       let dmg = b.dmg;
-      if (b.kind === 'sniper' && hitU.type !== 'boss') dmg = Math.max(dmg, (hitU.hp || 0) + (hitU.maxhp || 100) * 3); // the sniper rifle is a one-shot kill (IRONCLAD aside)
+      if (b.kind === 'sniper' && !SNIPER_TOUGH.has(hitU.type)) dmg = Math.max(dmg, (hitU.hp || 0) + (hitU.maxhp || 100) * 3); // the sniper rifle is a one-shot kill (not on heavies, sentry guns or IRONCLAD)
       const src = { team: b.team, who: b.who, x: b.x - b.vx * .05, y: b.y - b.vy * .05 };
       if (isGuard(hitU)) {
         // silent shots on someone who never saw it coming hit much harder
-        if (b.silenced && hitU.state !== 'combat' && !ETYPES[hitU.type].stat) { dmg *= 2.3; floater(hitU.x, hitU.y - 26, 'SILENT', '#9fe8ff'); }
+        if (b.silenced && b.kind !== 'sniper' && hitU.state !== 'combat' && !ETYPES[hitU.type].stat) { dmg *= 2.3; floater(hitU.x, hitU.y - 26, 'SILENT', '#9fe8ff'); }
         burst(b.x, b.y, NOBODY.has(hitU.type) || hitU.type === 'boss' ? '#ffd76a' : '#b3122e', 4, 110, .25, 2);
         if (b.pierce > 0) { b.pierce--; (b.hit || (b.hit = [])).push(hitU); } else dead = true;
         damageEnemy(hitU, dmg, src, b.silenced);
@@ -3023,13 +3027,13 @@ function codeKey(k) {
       c.busy = true; disp.className = 'disp ok'; stat.textContent = 'ACCESS GRANTED'; sfx('ok');
       c.t.solved = true;
       for (const d of L.doorList) if (d.type === 'B' && d.gate === c.t.gate) { d.locked = false; d.perm = true; }
-      setTimeout(() => { closePanel(); msg('GATE OPEN', '#3ddc84'); shake(5); }, 700);
+      setTimeout(() => { if (panelCtx === c) closePanel(); msg('GATE OPEN', '#3ddc84'); shake(5); }, 700);
     } else {
       c.t.tries++; sfx('err'); disp.className = 'disp err'; c.busy = true;
       if (c.t.tries >= 3) {
         stat.textContent = 'SECURITY VIOLATION — ALARM TRIGGERED';
         const lvl = L;
-        setTimeout(() => { c.t.tries = 0; if (L !== lvl) return; closePanel(); if (ALERTS[G.alert].lvl < 2) setAlert('RED', 'SECURITY VIOLATION AT A KEYPAD', P.x, P.y); else { msg('SECURITY VIOLATION — REINFORCEMENTS INBOUND', '#ff3b3b'); G.spawnT = 0; } }, 800);
+        setTimeout(() => { c.t.tries = 0; if (L !== lvl) return; if (panelCtx === c) closePanel(); if (ALERTS[G.alert].lvl < 2) setAlert('RED', 'SECURITY VIOLATION AT A KEYPAD', P.x, P.y); else { msg('SECURITY VIOLATION — REINFORCEMENTS INBOUND', '#ff3b3b'); G.spawnT = 0; } }, 800);
       } else {
         stat.textContent = `INVALID CODE · ${3 - c.t.tries} TRIES BEFORE ALARM`;
         setTimeout(() => { c.busy = false; c.input = ''; disp.className = 'disp'; disp.textContent = '____'; }, 700);
@@ -3086,9 +3090,9 @@ function setSaved(v) { try { if (v > getSaved()) localStorage.setItem('irongate_
 
 const ACTIONS = {
   opmenu: () => opMenu(),
-  odiff: a => { G.diff = +a; opMenu(); },
-  newop: () => { G.carry = defaultCarry(); G.totalStats = newStats(); startOp(0, G.diff || 2); },
-  osector: a => { const i = +a; G.carry = sectorCarry(i); G.totalStats = newStats(); startOp(i, G.diff || 2); },
+  odiff: a => { G.odiff = +a; opMenu(); },
+  newop: () => { G.carry = defaultCarry(); G.totalStats = newStats(); startOp(0, G.odiff || 2); },
+  osector: a => { const i = +a; G.carry = sectorCarry(i); G.totalStats = newStats(); startOp(i, G.odiff || 2); },
   defmenu: () => defMenu(),
   ddiff: a => { G.ddiff = +a; defMenu(); },
   dstart: () => startDef(0, G.ddiff || 2),
@@ -3133,7 +3137,7 @@ function menu() {
 }
 function opMenu() {
   G.state = 'menu'; stopSiren();
-  const d = G.diff || 2, un = getSaved(), sq = TIERS[Math.max(0, d - 1)];
+  const d = G.odiff || 2, un = getSaved(), sq = TIERS[Math.max(0, d - 1)];
   const secs = LEVELS.map((l, i) => `<button class="btn alt" data-act="osector" data-arg="${i}" ${i > un ? 'disabled' : ''} style="font-size:11px;padding:8px 10px">${l.name}<br>${l.sub}</button>`).join('');
   showScreen(`<div class="card"><h2 style="color:#4fd8ff">INFILTRATE</h2>
     <p class="sub">Start outside the fence. Get into Fort Irongate, go down through all five sectors and take out IRONCLAD in the missile silo. Your squad — <b style="color:#7fe0d0">VIPER</b> and <b style="color:#7fe0d0">GHOST</b> — moves when you move, freezes when a guard looks their way, knifes guards who are alone, and only opens fire when the squad is spotted (or when you say weapons free).</p>
@@ -3177,7 +3181,7 @@ function frame(t) {
   render();
   requestAnimationFrame(frame);
 }
-window.IRON = { G, LEVELS, ETYPES, TIERS, GDIFF, buildLevel, get L() { return L; }, get P() { return P; }, get OPS() { return OPS; }, get SQ() { return SQ; }, startOp, startDef, update, camera, keys, mouse, touch, solidAt, setAlert, ACTIONS, interact, giveOrder, los, coneMap, takedownTarget, throwGadget, flowDir, bfs, unitPass, tileIdx, hostilesOf, get ZOOM() { return ZOOM; } };
+window.IRON = { G, LEVELS, render, ETYPES, TIERS, GDIFF, buildLevel, get L() { return L; }, get P() { return P; }, get OPS() { return OPS; }, get SQ() { return SQ; }, startOp, startDef, update, camera, keys, mouse, touch, solidAt, setAlert, ACTIONS, interact, giveOrder, los, coneMap, takedownTarget, throwGadget, flowDir, bfs, unitPass, tileIdx, hostilesOf, get ZOOM() { return ZOOM; } };
 menu();
 requestAnimationFrame(frame);
 </script>
