@@ -1268,6 +1268,15 @@ function enemyFire(e, a, spd, dmg, color = '#ff6b3d', r = 4, extra) {
   bullets.push(Object.assign({ x: e.x + Math.cos(a) * e.r, y: e.y + Math.sin(a) * e.r, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, dmg, team: 'D', who: e, r, life: 2.2, color }, extra || {}));
 }
 function shotVol(x, y) { return clamp(1 - Math.hypot(x - P.x, y - P.y) / 900, .08, 1); }
+function guardLineBlocked(e, t) {
+  const dx = t.x - e.x, dy = t.y - e.y, l2 = dx * dx + dy * dy || 1;
+  for (const o of L.enemies) {
+    if (o === e || o.hp <= 0) continue;
+    const k = ((o.x - e.x) * dx + (o.y - e.y) * dy) / l2; if (k <= .05 || k >= .95) continue;
+    if (Math.hypot(e.x + dx * k - o.x, e.y + dy * k - o.y) < o.r + 5) return true;
+  }
+  return false;
+}
 function guardFire(e, t) {
   const T = ETYPES[e.type], D = gd();
   const d = Math.hypot(t.x - e.x, t.y - e.y), tt = d / T.bspeed;
@@ -1334,7 +1343,7 @@ function updateGuard(e, dt) {
   }
   const h = e.seen && alive(e.seen) ? e.seen : null;
   if (h) {
-    e.lastX = h.x; e.lastY = h.y;
+    e.lastX = h.x; e.lastY = h.y; e.lastVX = h.vx || 0; e.lastVY = h.vy || 0; e.predicted = false;
     if (e.state !== 'combat') {
       const near = 1 - clamp(e.seenD / e.range, 0, 1);
       e.sus += dt * (.5 + 2.4 * near * near) * D.detect * (G.alert !== 'GREEN' ? 1.6 : 1) * (e.state === 'search' ? 1.4 : 1);
@@ -1347,6 +1356,11 @@ function updateGuard(e, dt) {
     e.susOn = null;
     if (e.state === 'combat') {
       e.lostT += dt;
+      if (!e.predicted && e.lostT > .3) { // they ran — guess where, a second ahead along their heading
+        e.predicted = true;
+        const sp = Math.hypot(e.lastVX || 0, e.lastVY || 0);
+        if (sp > 30) { const k = Math.min(1, 140 / sp), px = e.lastX + e.lastVX * k, py = e.lastY + e.lastVY * k; if (!solidAt(px, py) && los(e.lastX, e.lastY, px, py)) { e.lastX = px; e.lastY = py; } }
+      }
       if (e.target && !alive(e.target)) { e.target = null; e.lostT = Math.max(e.lostT, 4); }
       if (e.lostT > (A.lvl >= 2 ? 12 : 7)) { e.state = 'search'; e.searchT = 0; e.invX = e.lastX; e.invY = e.lastY; guardPathTo(e, e.invX, e.invY); }
     } else if (e.state === 'suspicious') { e.susT = (e.susT || 0) + dt; if (e.susT > 1.2) e.sus -= dt * .16; if (e.sus <= .02) { e.sus = 0; e.state = 'patrol'; } }
@@ -1403,7 +1417,7 @@ function updateGuard(e, dt) {
       e.lookT -= dt;
       if (e.lookT <= 0) {
         e.lookT = rand(1.2, 2.4);
-        for (let k = 0; k < 6; k++) { const a = rand(0, TAU), r = rand(70, 170), x = e.x + Math.cos(a) * r, y = e.y + Math.sin(a) * r; if (!solidAt(x, y) && los(e.x, e.y, x, y)) { e.invX = x; e.invY = y; break; } }
+        for (let k = 0; k < 8; k++) { const a = rand(0, TAU), r = rand(70, 190), x = e.x + Math.cos(a) * r, y = e.y + Math.sin(a) * r; if (!solidAt(x, y) && los(e.x, e.y, x, y) && !L.enemies.some(o => o !== e && o.state === 'search' && Math.hypot(o.invX - x, o.invY - y) < 90)) { e.invX = x; e.invY = y; break; } }
       }
     }
   } else if (e.state === 'combat') {
@@ -1435,6 +1449,8 @@ function updateGuard(e, dt) {
           if (e.cov.t <= 0) { if (e.cov.phase === 'hide') { e.cov.phase = 'peek'; e.cov.t = 1.1 + Math.random() * .8; } else { e.cov = null; e.covCd = 2.5; } }
         }
         e.angle = turnTo(e.angle, toA, 8 * dt);
+        const blocked = e.cd <= 0 && guardLineBlocked(e, t);
+        if (blocked) { mvx += -dy / dist * e.strafe * 1.2; mvy += dx / dist * e.strafe * 1.2; e.cd = .15; }
         if (e.cd <= 0 && dist < T.range && Math.abs(angDiff(e.angle, toA)) < .35) {
           guardFire(e, t);
           if (T.burst) { e.burstN++; e.cd = e.burstN >= T.burst ? (e.burstN = 0, 1.4) : T.rate; }
@@ -1462,6 +1478,7 @@ function updateGuard(e, dt) {
   }
   if (T.post && e.state !== 'combat') { mvx = 0; mvy = 0; }
   if (T.post && Math.hypot(e.hx - e.x, e.hy - e.y) > 6) { const d = Math.hypot(e.hx - e.x, e.hy - e.y); mvx = (e.hx - e.x) / d * .5; mvy = (e.hy - e.y) / d * .5; }
+  { const gdg = !T.stat && !T.post && grenadeDodge(e); if (gdg) { mvx = gdg.x * 1.5; mvy = gdg.y * 1.5; spd = Math.max(spd, T.speed * 1.2); } }
   // separation
   for (const o of L.enemies) if (o !== e) {
     const ox = e.x - o.x, oy = e.y - o.y, d = Math.hypot(ox, oy), m = e.r + o.r + 2;
@@ -1647,6 +1664,7 @@ function opScan(o, stealth) {
       const threat = (h.state === 'combat' && h.target && h.target.team === o.team) || (h.susOn && h.susOn.team === o.team && h.sus > .45);
       if (stealth && !threat) continue;           // in stealth we only shoot someone who is about to blow our cover
       if (threat) w *= .5;
+      if (h.state === 'combat' && ETYPES[h.type].alarm && h.alarmT > .3 && ALERTS[G.alert].lvl < 2) w *= .3; // stop him before he gets on the radio
     }
     if (h === P || (h.op && h.target && h.target.team === o.team)) w *= .8;
     if (o.team === P.team && h === P.focus && G.time - (P.focusT || -9) < 3) w *= .4;   // focus fire on your target
@@ -1681,6 +1699,16 @@ function findCover(o, t) {
     const sc = r - Math.hypot(x - t.x, y - t.y) * .15; if (sc < bd) { bd = sc; best = { x, y }; }
   }
   return best;
+}
+// a live frag grenade close by? run from it
+function grenadeDodge(u) {
+  let dx = 0, dy = 0;
+  for (const g of grenades) {
+    if (g.kind !== 'frag' || g.fuse > 1.15) continue;
+    const ox = u.x - g.x, oy = u.y - g.y, d = Math.hypot(ox, oy);
+    if (d < 120) { dx += ox / (d || 1); dy += oy / (d || 1); }
+  }
+  const l = Math.hypot(dx, dy); return l ? { x: dx / l, y: dy / l } : null;
 }
 function updateOp(o, dt) {
   o.cd -= dt; o.scanT -= dt; o.lastHit += dt; o.muzzle -= dt; o.hurt -= dt; o.knife -= dt; o.nadeCd -= dt; o.freezeT -= dt;
@@ -1795,6 +1823,9 @@ function updateOp(o, dt) {
   if (o.reviveT > 0 && mode !== 'hold') o.reviveT = 0;
   // ---- stay hidden: freeze while a guard is looking our way
   o.crouch = stealthy && (o.role !== 'escort' || P.crouch || L.enemies.some(e => e.state !== 'combat' && !e.sleep && Math.hypot(e.x - o.x, e.y - o.y) < 450));
+  const quiet = friendly && G.mode === 'op' && !P.dead && P.crouch; // you're crouched: so is the squad, and nobody fires
+  const holdFire = quiet && G.cmd.kind !== 'attack';
+  if (quiet) o.crouch = true;
   if (stealthy && mode !== 'sneak') { const ex = exposedTo(o); if (ex) o.freezeT = Math.max(o.freezeT, .5); }
   const toGoal = Math.hypot(gx - o.x, gy - o.y);
   let mvx = 0, mvy = 0;
@@ -1839,14 +1870,14 @@ function updateOp(o, dt) {
   if (t && o.seenT >= T.react * (stealthy ? .6 : 1) * (preAimed ? .4 : 1)) {
     const dist = Math.hypot(t.x - o.x, t.y - o.y) || 1;
     o.angle = Math.atan2(t.y - o.y, t.x - o.x);
-    if (o.cd <= 0) opFire(o, t);
+    if (o.cd <= 0 && !holdFire) opFire(o, t);
     if (o.blockedT > 0) { const k = (o.seed > 5 ? 1 : -1); mvx += -(t.y - o.y) / dist * k * 1.2; mvy += (t.x - o.x) / dist * k * 1.2; }
     if (!o.claim && !o.cov) {
       spd *= .7;
       if (dist < 100) { mvx = mvx * .3 - (t.x - o.x) / dist; mvy = mvy * .3 - (t.y - o.y) / dist; }
       const k = Math.sin(G.time * 2.6 + o.seed) * .6; mvx += -(t.y - o.y) / dist * k; mvy += (t.x - o.x) / dist * k;
     }
-    if (o.nadesUsed < T.nades && o.nadeCd <= 0 && dist < 330 && dist > 120 && !stealthy) {
+    if (o.nadesUsed < T.nades && o.nadeCd <= 0 && dist < 330 && dist > 120 && !stealthy && !holdFire) {
       const pack = hostilesOf(o.team).filter(e => Math.hypot(e.x - t.x, e.y - t.y) < 110).length;
       if (pack >= (o.team === 'D' ? 2 : 3) && !(friendly && Math.hypot(P.x - t.x, P.y - t.y) < 130)) {
         o.nadesUsed++; o.nadeCd = 8; sfx('throw');
@@ -1858,7 +1889,7 @@ function updateOp(o, dt) {
   } else if (!stealthy && o.lastTgt && alive(o.lastTgt) && G.time - (o.lastVisT || -9) < 1.2 && !o.cov) {
     // suppressive fire: they just ducked behind something — keep their head down
     o.angle = turnTo(o.angle, Math.atan2(o.lastTY - o.y, o.lastTX - o.x), 10 * dt);
-    if (o.cd <= 0) opFire(o, o.lastTgt, o.lastTX + rand(-14, 14), o.lastTY + rand(-14, 14), 1.6);
+    if (o.cd <= 0 && !holdFire) opFire(o, o.lastTgt, o.lastTX + rand(-14, 14), o.lastTY + rand(-14, 14), 1.6);
   } else if (fresh && !stealthy) o.angle = turnTo(o.angle, Math.atan2(intel.y - o.y, intel.x - o.x), 6 * dt); // eyes on the reported contact
   else if (o.overwatch) o.angle = turnTo(o.angle, Math.atan2(gy - o.y, gx - o.x), 6 * dt);
   else if (mvx || mvy) o.angle = turnTo(o.angle, Math.atan2(mvy, mvx), 8 * dt);
@@ -1868,6 +1899,7 @@ function updateOp(o, dt) {
     const base = anchor === P ? (P.heading || 0) : anchor.angle, arcs = [-1.1, 1.1, Math.PI];
     o.angle = turnTo(o.angle, base + arcs[k % 3], 3 * dt);
   }
+  { const gdg = grenadeDodge(o); if (gdg) { mvx = gdg.x * 1.5; mvy = gdg.y * 1.5; spd = Math.max(spd, T.speed * 1.3); o.cov = null; } }
   // separation from teammates and you
   for (const u of [P, ...OPS]) {
     if (!u || u === o || (u === P ? P.dead : u.state !== 'ok')) continue;
@@ -2760,7 +2792,7 @@ function drawHUD(now) {
   if (mine.length) {
     ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(12, py, 220, 16 + mine.length * 16);
     ctx.fillStyle = '#7fe0d0'; ctx.font = 'bold 10px "Share Tech Mono",monospace';
-    ctx.fillText(fitText((G.mode === 'op' ? 'SQUAD · ' + (G.stance === 'stealth' ? 'STEALTH' : 'WEAPONS FREE') : 'ROOKIES') + ' · ' + CMD_NAME[G.cmd.kind] + (touch.on ? '' : ' [R]'), 208), 18, py + 12);
+    ctx.fillText(fitText((G.mode === 'op' ? 'SQUAD · ' + (P.crouch && G.cmd.kind !== 'attack' ? 'HOLDING FIRE' : G.stance === 'stealth' ? 'STEALTH' : 'WEAPONS FREE') : 'ROOKIES') + ' · ' + CMD_NAME[G.cmd.kind] + (touch.on ? '' : ' [R]'), 208), 18, py + 12);
     mine.forEach((o, k) => {
       const y = py + 18 + k * 16;
       ctx.fillStyle = o.state === 'dead' ? '#555' : o.state === 'down' ? '#ff8a3d' : '#dfe5d6'; ctx.font = '10px "Share Tech Mono",monospace';
