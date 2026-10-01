@@ -146,14 +146,14 @@ const DOORKEY = { G: 'green', Y: 'yellow', R: 'red' };
 
 /* ---------------- MONSTER MODE: bot difficulty ---------------- */
 const BOTDIFF = [null,
-  { name: 'EASY',  stars: 1, hp: 170, speed: 120, spread: .26, react: .75, rate: .24, dmg: 7,  lead: false, nades: 0, regen: 0, strafe: 0,  sight: 380, time: 150, armor: 0,   dodge: 0,   stims: 1, heal: .15, color: '#3ddc84',
-    skills: 'Slow, shaky aim, no grenades, 1 auto-heal per sector' },
-  { name: 'MID',   stars: 2, hp: 340, speed: 145, spread: .14, react: .4,  rate: .16, dmg: 8,  lead: false, nades: 1, regen: 2, strafe: .5, sight: 440, time: 180, armor: .1,  dodge: 0,   stims: 1, heal: .25, color: '#ffd23f',
-    skills: '+ grenades, light armor (-10% dmg), slow regen' },
-  { name: 'HARD',  stars: 3, hp: 1100, speed: 165, spread: .06, react: .2,  rate: .1,  dmg: 13, lead: true,  nades: 2, regen: 3, strafe: .8, sight: 500, time: 210, armor: .2,  dodge: .4,  stims: 2, heal: .35, color: '#ff8a3d',
-    skills: '+ leads its shots, dodges 40% of pounces, 2 auto-heals per sector, armor -20%' },
-  { name: 'ELITE', stars: 4, hp: 1350, speed: 180, spread: .03, react: .1, rate: .09, dmg: 11, lead: true,  nades: 4, regen: 4, strafe: 1,  sight: 560, time: 240, armor: .25, dodge: .6,  stims: 3, heal: .3,   color: '#ff3b3b',
-    skills: '+ dodges 60% of pounces, 3 auto-heals per sector, heavy armor -25%, fast regen, sharp aim' },
+  { name: 'EASY',  stars: 1, hp: 170, speed: 120, spread: .26, react: .75, rate: .24, dmg: 7,  lead: false, nades: 0, regen: 0, strafe: 0,  sight: 380, time: 150, armor: 0,   dodge: 0,   stims: 0, heal: 0, color: '#3ddc84',
+    skills: 'Slow, shaky aim, no grenades' },
+  { name: 'MID',   stars: 2, hp: 340, speed: 145, spread: .14, react: .4,  rate: .16, dmg: 8,  lead: false, nades: 1, regen: 0, strafe: .5, sight: 440, time: 180, armor: .1,  dodge: 0,   stims: 0, heal: 0, color: '#ffd23f',
+    skills: '+ grenades, light armor (-10% dmg)' },
+  { name: 'HARD',  stars: 3, hp: 1100, speed: 165, spread: .06, react: .2,  rate: .1,  dmg: 10, lead: true,  nades: 2, regen: 0, strafe: .8, sight: 500, time: 210, armor: .2,  dodge: .4,  stims: 0, heal: 0, color: '#ff8a3d',
+    skills: '+ leads its shots, dodges 40% of pounces, armor -20%' },
+  { name: 'ELITE', stars: 4, hp: 1350, speed: 180, spread: .03, react: .1, rate: .09, dmg: 11, lead: true,  nades: 4, regen: 0, strafe: 1,  sight: 560, time: 240, armor: .25, dodge: .6,  stims: 0, heal: 0, color: '#ff3b3b',
+    skills: '+ dodges 60% of pounces, heavy armor -25%, sharp aim' },
 ];
 const MONSTER = { hp: 320, speed: 200, claw: 30, clawRate: .38, pounce: 40, pounceCd: 3.5, roarCd: 14, hordeCd: 22, regen: 8 };
 
@@ -1277,7 +1277,7 @@ function updateBot(dt) {
     const it = L.items[i]; if (Math.hypot(it.x - B.x, it.y - B.y) > B.r + 12) continue;
     const I = ITEMS[it.k];
     if (I.key) { B.keys[I.key] = true; L.items.splice(i, 1); sfx('key'); banner(I.name, 'TAKEN BY THE INTRUDER', I.color, 2); B.planT = 0; }
-    else if (it.k === 'H' && B.hp < B.maxhp) { B.hp = Math.min(B.maxhp, B.hp + 40); L.items.splice(i, 1); floater(B.x, B.y - 20, '+40', '#ff4d6d'); }
+    else if (it.k === 'H' && B.hp < B.maxhp) { B.hp = Math.min(B.maxhp, B.hp + 40); L.items.splice(i, 1); floater(B.x, B.y - 20, '+40', '#ff4d6d'); msg('The intruder grabbed a MEDKIT (+40 HP)', '#ff4d6d'); }
   }
 }
 function updateMonster(dt) {
@@ -1404,7 +1404,7 @@ function startMonster(i, diff, carry) {
   BOT = { x: (def.player[0] + .5) * TS, y: (def.player[1] + .5) * TS, r: 11, hp: D.hp, maxhp: D.hp, angle: 0, cd: 0, keys: {}, dist: new Uint16Array(L.w * L.h),
           planT: 0, scanT: 0, seen: 0, stun: 0, nadeCd: 4, nadesUsed: 0, lastHit: 9, seed: Math.random() * 10, stuckT: 0, sx: 0, sy: 0, hurt: 0, muzzle: 0, target: null, goal: L.exit,
           stims: D.stims, dodgeT: 0, stimFx: 0, read: new Set(), know: {}, typing: 0 };
-  if (carry) { BOT.hp = Math.min(D.hp, carry.hp + D.hp * D.heal); P.hp = carry.php; } // the intruder patches up a bit on the way up
+  if (carry) { BOT.hp = Math.min(D.hp, carry.hp + D.hp * D.heal); P.hp = carry.php; } // it carries its wounds up to the next sector
   TGT = BOT; G.alert = 'YELLOW'; G.mtime = D.time;
   L.exitField = new Uint16Array(L.w * L.h); bfs(tileIdx(L.exit), i2 => L.t[i2] !== 0, L.exitField);
   L.exitStart = L.exitField[tileIdx(BOT)] || 1;
