@@ -121,6 +121,7 @@ const ETYPES = {
   drone:   { name: 'SEC-DRONE',  hp: 28,   r: 9,  speed: 165, dmg: 6,  ranged: true, rate: 0.7,  range: 240, bspeed: 390, color: '#5cc8ff', score: 15 },
   brute:   { name: 'BRUTE',      hp: 190,  r: 16, speed: 62,  dmg: 18, melee: true, charger: true, color: '#9c4a8a', score: 30 },
   turret:  { name: 'TURRET',     hp: 140,  r: 14, speed: 0,   dmg: 8,  ranged: true, rate: 0.32, range: 430, bspeed: 500, color: '#ff8a3d', stat: true, score: 25 },
+  hound:   { name: 'HELLHOUND',  hp: 170,  r: 19, speed: 210, dmg: 13, melee: true, color: '#eeeeee', score: 40 }, // monster mode horde (elite)
   boss:    { name: 'JUGGERNAUT', hp: 1300, r: 26, speed: 66,  dmg: 11, ranged: true, rate: 0.9,  range: 700, bspeed: 380, color: '#ff3b3b', boss: true, score: 500 },
 };
 
@@ -145,16 +146,16 @@ const DOORKEY = { G: 'green', Y: 'yellow', R: 'red' };
 
 /* ---------------- MONSTER MODE: bot difficulty ---------------- */
 const BOTDIFF = [null,
-  { name: 'EASY',  stars: 1, hp: 170, speed: 120, spread: .26, react: .75, rate: .24, dmg: 7,  lead: false, nades: 0, regen: 0, strafe: 0,  sight: 380, time: 150, armor: 0,   dodge: 0,   stims: 0, heal: .15, color: '#3ddc84',
-    skills: 'Slow, shaky aim, no grenades' },
-  { name: 'MID',   stars: 2, hp: 340, speed: 145, spread: .14, react: .4,  rate: .16, dmg: 8,  lead: false, nades: 1, regen: 2, strafe: .5, sight: 440, time: 180, armor: .1,  dodge: 0,   stims: 0, heal: .25, color: '#ffd23f',
+  { name: 'EASY',  stars: 1, hp: 170, speed: 120, spread: .26, react: .75, rate: .24, dmg: 7,  lead: false, nades: 0, regen: 0, strafe: 0,  sight: 380, time: 150, armor: 0,   dodge: 0,   stims: 1, heal: .15, color: '#3ddc84',
+    skills: 'Slow, shaky aim, no grenades, 1 auto-heal per sector' },
+  { name: 'MID',   stars: 2, hp: 340, speed: 145, spread: .14, react: .4,  rate: .16, dmg: 8,  lead: false, nades: 1, regen: 2, strafe: .5, sight: 440, time: 180, armor: .1,  dodge: 0,   stims: 1, heal: .25, color: '#ffd23f',
     skills: '+ grenades, light armor (-10% dmg), slow regen' },
-  { name: 'HARD',  stars: 3, hp: 540, speed: 160, spread: .07, react: .22, rate: .12, dmg: 9,  lead: true,  nades: 2, regen: 3, strafe: .8, sight: 500, time: 210, armor: .2,  dodge: .4,  stims: 1, heal: .35, color: '#ff8a3d',
-    skills: '+ leads its shots, dodges 40% of pounces, 1 stim per sector, armor -20%' },
-  { name: 'ELITE', stars: 4, hp: 600, speed: 175, spread: .035, react: .1, rate: .09, dmg: 11, lead: true,  nades: 4, regen: 4, strafe: 1,  sight: 560, time: 240, armor: .25, dodge: .6,  stims: 2, heal: .3,   color: '#ff3b3b',
-    skills: '+ dodges 60% of pounces, 2 stims per sector, heavy armor -25%, fast regen, deadly aim' },
+  { name: 'HARD',  stars: 3, hp: 880, speed: 165, spread: .06, react: .2,  rate: .11, dmg: 12, lead: true,  nades: 2, regen: 3, strafe: .8, sight: 500, time: 210, armor: .2,  dodge: .4,  stims: 2, heal: .35, color: '#ff8a3d',
+    skills: '+ leads its shots, dodges 40% of pounces, 2 auto-heals per sector, armor -20%' },
+  { name: 'ELITE', stars: 4, hp: 900, speed: 175, spread: .035, react: .1, rate: .085, dmg: 13, lead: true,  nades: 4, regen: 4, strafe: 1,  sight: 560, time: 240, armor: .25, dodge: .6,  stims: 3, heal: .3,   color: '#ff3b3b',
+    skills: '+ dodges 60% of pounces, 3 auto-heals per sector, heavy armor -25%, fast regen, deadly aim' },
 ];
-const MONSTER = { hp: 320, speed: 200, claw: 30, clawRate: .38, pounce: 40, pounceCd: 3.5, roarCd: 14, hordeCd: 18, regen: 8 };
+const MONSTER = { hp: 320, speed: 200, claw: 30, clawRate: .38, pounce: 40, pounceCd: 3.5, roarCd: 14, hordeCd: 22, regen: 8 };
 
 /* ---------------- LEVELS ----------------
    rooms: [x,y,w,h] carved floor. walls: [x,y,w,h] re-filled.
@@ -804,7 +805,7 @@ function updateEnemy(e, dt) {
       if (f) { mvx = f.x; mvy = f.y; e.angle = Math.atan2(f.y, f.x); }
       else if (e.los) { mvx = dx / dist; mvy = dy / dist; e.angle = toA; }
     }
-    if (T.melee && dist < e.r + TGT.r + 8 && e.cd <= 0) { hurtTgt(T.dmg * agg); e.cd = .75; sfx('melee'); e.lunge = .15; }
+    if (T.melee && dist < e.r + TGT.r + 8 && e.cd <= 0) { hurtTgt(T.dmg * agg); e.cd = e.type === 'hound' ? .65 : .75; sfx('melee'); e.lunge = .15; }
     if (T.ranged && e.los && dist < T.range && e.cd <= 0 && (!T.stat || Math.abs(angDiff(e.angle, toA)) < .3)) {
       const inacc = e.type === 'drone' ? .12 : .07;
       enemyFire(e, (T.stat ? e.angle : toA) + rand(-inacc, inacc), T.bspeed, T.dmg, e.type === 'drone' ? '#5cc8ff' : '#ff6b3d', e.type === 'drone' ? 3 : 4);
@@ -1096,13 +1097,19 @@ const tileIdx = o => Math.floor(o.y / TS) * L.w + Math.floor(o.x / TS);
 function botPassable(i) {
   const v = L.t[i]; if (v === 1) return true; if (v !== 2) return false;
   const d = L.doors.get(i); if (d.sealed) return false;
-  return !(DOORKEY[d.type] && d.locked && !BOT.keys[DOORKEY[d.type]]);
+  if (!d.locked) return true;
+  return !!(DOORKEY[d.type] && BOT.keys[DOORKEY[d.type]]); // locked gates/hatches need a code or an alarm
 }
-function botPlan() { // pick the nearest reachable keycard the bot doesn't have yet, else head for the exit
+const botKnows = g => { const k = BOT.know[g]; return k && (k.full || (k.a && k.b)); };
+function botPlan() { // keycards first; then the exit if it's open; otherwise hunt for code notes and crack keypads
   const reach = L.tmp; bfs(tileIdx(BOT), botPassable, reach);
   let goal = null, gd = 65535;
-  for (const it of L.items) if (ITEMS[it.k].key && !BOT.keys[ITEMS[it.k].key]) { const d = reach[tileIdx(it)]; if (d < gd) { gd = d; goal = it; } }
-  BOT.goal = goal ? { x: goal.x, y: goal.y, key: true } : { x: L.exit.x, y: L.exit.y, key: false };
+  for (const it of L.items) if (ITEMS[it.k].key && !BOT.keys[ITEMS[it.k].key]) { const d = reach[tileIdx(it)]; if (d < gd) { gd = d; goal = { x: it.x, y: it.y, key: true }; } }
+  if (!goal && (reach[tileIdx(L.exit)] === 65535 || (L.liftTerm && !L.liftTerm.solved))) {
+    for (const t of L.terminals) if (!t.solved && botKnows(t.gate)) { const d = reach[tileIdx(t)]; if (d < gd) { gd = d; goal = { x: t.x, y: t.y, term: t }; } }
+    if (!goal) for (const n of L.notes) if (!BOT.read.has(n) && n.gives.some(([g]) => !L.terminals.find(t => t.gate === g).solved && !botKnows(g))) { const d = reach[tileIdx(n)]; if (d < gd) { gd = d; goal = { x: n.x, y: n.y, note: n }; } }
+  }
+  BOT.goal = goal || { x: L.exit.x, y: L.exit.y, key: false };
   bfs(tileIdx(BOT.goal), botPassable, BOT.dist);
 }
 function botScan(D) {
@@ -1194,7 +1201,7 @@ function monsterHorde() {
   if (P.dead || P.hordeCd > 0) return;
   if (L.enemies.filter(e => !ETYPES[e.type].stat).length > 32) { msg('Too many monsters already', '#7d8a96'); return; }
   P.hordeCd = MONSTER.hordeCd;
-  const types = G.level >= 2 ? ['grunt', 'brute', 'grunt'] : ['grunt', 'grunt', 'drone'];
+  const types = ['hound', 'hound', 'hound'];
   types.forEach((t, k) => { // they burst out of the floor right around you
     let x = P.x, y = P.y;
     for (let tries = 0; tries < 12; tries++) {
@@ -1206,7 +1213,7 @@ function monsterHorde() {
     burst(x, y, '#666', 10, 140, .6, 4);
   });
   sfx('door');
-  msg('The horde answers: 3 monsters burst out beside you', '#b6ff3d');
+  msg('3 HELLHOUNDS answer your call', '#b6ff3d'); sfx('bosswake');
 }
 function updateBot(dt) {
   const B = BOT, D = BOTDIFF[G.mdiff];
@@ -1214,9 +1221,25 @@ function updateBot(dt) {
   if (B.lastHit > 3 && D.regen) B.hp = Math.min(B.maxhp, B.hp + D.regen * dt);
   if (B.stun > 0) { B.stun -= dt; return; }
   if (B.dodgeT > 0) { B.dodgeT -= dt; moveCircle(B, B.ddx * 560 * dt, B.ddy * 560 * dt); burst(B.x, B.y, '#9aa7b3', 1, 30, .25, 2); return; }
+  if (B.typing > 0) { // punching the code into the keypad: can't move or shoot
+    B.typing -= dt; const t = B.goal.term;
+    if (B.typing <= 0 && t && !t.solved) {
+      t.solved = true; for (const d of L.doorList) if (d.type === 'B' && d.gate === t.gate) { d.locked = false; d.perm = true; }
+      msg(t.lift ? 'The intruder unlocked the ' + L.def.exitName + '!' : 'The intruder cracked the keypad. BLAST GATE OPEN', t.lift ? '#ff3b3b' : D.color); sfx('ok'); shake(5); B.planT = 0;
+    }
+    return;
+  }
+  if (B.goal.note && Math.hypot(B.goal.note.x - B.x, B.goal.note.y - B.y) < 26) {
+    const n = B.goal.note; B.read.add(n);
+    for (const [g, part] of n.gives) { B.know[g] = B.know[g] || {}; B.know[g][part] = true; }
+    msg('The intruder found a note: "' + n.title + '"' + (n.gives.some(([g]) => botKnows(g)) ? ' and has the code!' : ''), D.color); B.planT = 0;
+  }
+  if (B.goal.term && !B.goal.term.solved && Math.hypot(B.goal.term.x - B.x, B.goal.term.y - B.y) < 30) {
+    B.typing = [0, 4, 3, 2, 1.2][G.mdiff]; msg('The intruder is typing the code into the keypad. STOP IT!', '#ff3b3b'); sfx('beep'); return;
+  }
   if (B.stims > 0 && B.hp < B.maxhp * .35) {
     B.stims--; B.hp = Math.min(B.maxhp, B.hp + B.maxhp * .4); B.stimFx = .6;
-    burst(B.x, B.y, '#4fd8ff', 18, 140, .5, 3); sfx('pickup'); msg('The intruder injected a STIM (+40% HP)', D.color);
+    burst(B.x, B.y, '#4fd8ff', 18, 140, .5, 3); sfx('pickup'); msg('The intruder is low and HEALS itself (+40% HP)', D.color);
   }
   if (B.planT <= 0) { B.planT = .5; botPlan(); }
   if (B.scanT <= 0) { B.scanT = .12; B.target = botScan(D); }
@@ -1317,8 +1340,9 @@ function updateMonster(dt) {
   }
   // --- win / lose
   if (BOT.hp <= 0) { monsterEnd(true, 'You tore the intruder apart.'); return; }
-  if (Math.hypot(L.exit.x - BOT.x, L.exit.y - BOT.y) < 26 && G.level < LEVELS.length - 1) { sfx('alarm'); startMonster(G.level + 1, G.mdiff, { hp: BOT.hp, php: P.dead ? P.maxhp : P.hp }); return; }
-  if (Math.hypot(L.exit.x - BOT.x, L.exit.y - BOT.y) < 26) { monsterEnd(false, 'The intruder fought its way up through every sector and escaped at the ' + L.def.exitName.toLowerCase() + '.'); return; }
+  const atExit = Math.hypot(L.exit.x - BOT.x, L.exit.y - BOT.y) < 26 && (!L.liftTerm || L.liftTerm.solved);
+  if (atExit && G.level < LEVELS.length - 1) { sfx('alarm'); startMonster(G.level + 1, G.mdiff, { hp: BOT.hp, php: P.dead ? P.maxhp : P.hp }); return; }
+  if (atExit) { monsterEnd(false, 'The intruder fought its way up through every sector and escaped at the ' + L.def.exitName.toLowerCase() + '.'); return; }
   if (G.mtime <= 0) { monsterEnd(true, 'You held the line until the clock ran out. The intruder is trapped down here with you.'); return; }
   for (let i = particles.length - 1; i >= 0; i--) { const q = particles[i]; q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= .92; q.vy *= .92; if (q.life <= 0) particles.splice(i, 1); }
   for (let i = floaters.length - 1; i >= 0; i--) { const f = floaters[i]; f.life -= dt; f.y -= 30 * dt; if (f.life <= 0) floaters.splice(i, 1); }
@@ -1335,14 +1359,37 @@ function startMonster(i, diff, carry) {
   bullets = []; particles = []; grenades = []; floaters = []; lights = [];
   const def = LEVELS[i], D = BOTDIFF[diff];
   L = buildLevel(def); L.tmp = new Uint16Array(L.w * L.h);
-  for (const d of L.doorList) if (d.type === 'B' || d.type === 'h') { d.locked = false; d.perm = true; } // gates and hatches are wide open
+  // hatches and gates with no keypad are open; keypad gates stay shut until someone types the code
+  for (const d of L.doorList) if (d.type === 'h' || (d.type === 'B' && !L.terminals.some(t => t.gate === d.gate))) { d.locked = false; d.perm = true; }
+  L.notes.forEach((n, k) => { n.gives = [...def.notes[k][3].matchAll(/\{c(\d)(a|b)?\}/g)].map(m => [+m[1], m[2] || 'full']); });
+  if (def.core) { // the reactor's CODE BLACK gate becomes a RED keycard door, and the red keycard is down in Storage
+    for (const d of L.doorList) if (d.type === 'B' && d.gate === 1) { d.type = 'R'; d.locked = true; d.perm = false; }
+    L.items.push({ x: 16.5 * TS, y: 30.5 * TS, k: 'r', bob: 0 });
+  }
+  // every elevator is locked: a keypad next to it, and its code on a note hidden somewhere in the sector
+  { const gid = L.terminals.length, code = genCode(), ex = Math.floor(L.exit.x / TS), ey = Math.floor(L.exit.y / TS);
+    let tx = ex, ty = ey;
+    for (const [ox, oy] of [[-2, 0], [2, 0], [0, -2], [0, 2], [-1, -1], [1, -1], [-1, 1], [1, 1]]) if (L.t[(ey + oy) * L.w + ex + ox] === 1) { tx = ex + ox; ty = ey + oy; break; }
+    L.liftTerm = { x: (tx + .5) * TS, y: (ty + .5) * TS, gate: gid, code, solved: false, tries: 0, lift: true };
+    L.terminals.push(L.liftTerm); L.codes.push(code);
+    // hide the note on open floor the intruder can reach without any keycard, well away from the exit
+    const reach = new Uint16Array(L.w * L.h), st = Math.floor(def.player[1]) * L.w + def.player[0];
+    bfs(st, i => L.t[i] === 1 || (L.t[i] === 2 && !L.doors.get(i).locked), reach);
+    const ef = new Uint16Array(L.w * L.h); bfs(ey * L.w + ex, i => L.t[i] !== 0, ef);
+    const spots = []; let far = 0;
+    for (let i = 0; i < reach.length; i++) if (reach[i] !== 65535 && L.t[i] === 1 && !L.toxic[i] && ef[i] !== 65535) far = Math.max(far, ef[i]);
+    for (let i = 0; i < reach.length; i++) if (reach[i] > 3 && reach[i] !== 65535 && L.t[i] === 1 && !L.toxic[i] && ef[i] > far * .45
+      && ![...L.notes, ...L.items, ...L.terminals].some(o => Math.abs(o.x - (i % L.w + .5) * TS) < 40 && Math.abs(o.y - ((i / L.w | 0) + .5) * TS) < 40)) spots.push(i);
+    const i = spots.length ? spots[Math.floor(Math.random() * spots.length)] : st;
+    L.notes.push({ x: (i % L.w + .5) * TS, y: ((i / L.w | 0) + .5) * TS, title: 'ELEVATOR OVERRIDE', text: L.def.exitName + ' lock code: ⟦' + code + '⟧', read: false, gives: [[gid, 'full']] });
+  }
   L.items = L.items.filter(it => ITEMS[it.k].key || it.k === 'H');
   L.explored.fill(1); // it's your home: you know the whole map
   P = { x: L.exit.x, y: L.exit.y, r: 14, hp: MONSTER.hp, maxhp: MONSTER.hp, angle: Math.PI, clawCd: 0, pounceCd: 0, roarCd: 3, hordeCd: 5, pounce: 0, slash: 0, roarFx: 0,
         dead: false, respawn: 0, hurt: 0, lastHit: 9, kick: 0, muzzle: 0, walk: 0, stamina: 1, keys: {}, armor: 0, weapon: 'pistol', weapons: {}, ammo: {}, grenades: 0 };
   BOT = { x: (def.player[0] + .5) * TS, y: (def.player[1] + .5) * TS, r: 11, hp: D.hp, maxhp: D.hp, angle: 0, cd: 0, keys: {}, dist: new Uint16Array(L.w * L.h),
           planT: 0, scanT: 0, seen: 0, stun: 0, nadeCd: 4, nadesUsed: 0, lastHit: 9, seed: Math.random() * 10, stuckT: 0, sx: 0, sy: 0, hurt: 0, muzzle: 0, target: null, goal: L.exit,
-          stims: D.stims, dodgeT: 0, stimFx: 0 };
+          stims: D.stims, dodgeT: 0, stimFx: 0, read: new Set(), know: {}, typing: 0 };
   if (carry) { BOT.hp = Math.min(D.hp, carry.hp + D.hp * D.heal); P.hp = carry.php; } // the intruder patches up a bit on the way up
   TGT = BOT; G.alert = 'YELLOW'; G.mtime = D.time;
   L.exitField = new Uint16Array(L.w * L.h); bfs(tileIdx(L.exit), i2 => L.t[i2] !== 0, L.exitField);
@@ -1379,7 +1426,7 @@ function monsterMenu() {
       <b>LEFT CLICK</b><span>claw (30 dmg)</span>
       <b>SPACE / RIGHT-CLICK</b><span>pounce: leap, hit and stun</span>
       <b>Q</b><span>roar: stun the bot, frenzy nearby monsters</span>
-      <b>E</b><span>call the horde: 3 monsters burst out right next to you</span>
+      <b>E</b><span>call the horde: 3 elite black-and-white HELLHOUNDS burst out next to you</span>
       <b>NIGHT VISION</b><span>you see much more in the dark</span>
     </div>
     <button class="btn" data-act="mstart">☣ Start</button><button class="btn alt" data-act="menu">Back</button></div>`, ACTIONS.mstart);
@@ -1584,6 +1631,19 @@ function drawEnemy(e, now) {
     ctx.fillStyle = '#1c1f23'; ctx.fillRect(4, -3, 20, 6);
     ctx.fillStyle = fl ? '#fff' : T.color; ctx.beginPath(); ctx.arc(0, 0, 9, 0, TAU); ctx.fill();
     ctx.fillStyle = e.aware ? '#ff3b3b' : '#3ddc84'; ctx.beginPath(); ctx.arc(3, 0, 2.5, 0, TAU); ctx.fill();
+  } else if (e.type === 'hound') { // big black-and-white hellhound
+    ctx.rotate(e.angle); ctx.scale(1.4, 1.4);
+    const run = Math.sin(e.anim * 16) * 5, W = fl ? '#fff' : '#ececec', K = fl ? '#fff' : '#141414';
+    ctx.fillStyle = K; // legs
+    ctx.fillRect(6 + run, -11, 6, 4); ctx.fillRect(6 - run, 7, 6, 4); ctx.fillRect(-12 - run, -11, 6, 4); ctx.fillRect(-12 + run, 7, 6, 4);
+    ctx.strokeStyle = K; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-17, 0); ctx.lineTo(-25, Math.sin(e.anim * 9) * 5); ctx.stroke(); // tail
+    ctx.fillStyle = W; ctx.beginPath(); ctx.ellipse(-2, 0, 17, 10, 0, 0, TAU); ctx.fill(); // body
+    ctx.fillStyle = K; ctx.beginPath(); ctx.ellipse(-7, -3, 6, 5, .4, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.ellipse(4, 4, 5, 4, -.3, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.ellipse(-13, 3, 3.5, 3, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = W; ctx.beginPath(); ctx.ellipse(16, 0, 8, 7, 0, 0, TAU); ctx.fill(); // head
+    ctx.fillStyle = K; ctx.beginPath(); ctx.ellipse(15, -2, 5, 4, 0, 0, TAU); ctx.fill(); // eye patch
+    ctx.beginPath(); ctx.moveTo(11, -6); ctx.lineTo(9, -13); ctx.lineTo(15, -7); ctx.fill(); ctx.beginPath(); ctx.moveTo(11, 6); ctx.lineTo(9, 13); ctx.lineTo(15, 7); ctx.fill(); // ears
+    ctx.fillStyle = '#1a1a1a'; ctx.fillRect(22, -2, 3, 4); // nose
+    ctx.fillStyle = '#ff2a2a'; ctx.fillRect(17, -4, 2.5, 2.5); ctx.fillRect(17, 2, 2.5, 2.5); // eyes
   } else if (e.type === 'brute') {
     ctx.rotate(e.angle);
     if (e.windup > 0) { ctx.strokeStyle = `rgba(255,59,59,${.5 + .5 * Math.sin(now * 40)})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, e.r + 7, 0, TAU); ctx.stroke(); }
@@ -1850,7 +1910,7 @@ function drawMonsterHUD(now, W, H, small) {
   ctx.fillStyle = prog > .75 ? '#ff3b3b' : '#4fd8ff'; ctx.fillRect(bx, by + 30, bw * prog, 6);
   ctx.fillStyle = '#9aa7b3'; ctx.font = '10px "Share Tech Mono",monospace';
   const ks = ['green', 'yellow', 'red'].filter(k => BOT.keys[k]).map(k => k.toUpperCase()).join(' ');
-  ctx.fillText('ROUTE TO EXIT ' + Math.round(prog * 100) + '%' + (ks ? '   ·   HAS ' + ks + ' KEY' : '') + (BOT.stims ? '   ·   STIMS ' + BOT.stims : '') + (BOT.stun > 0 ? '   ·   STUNNED' : ''), W / 2, by + 48);
+  ctx.fillText('ROUTE TO EXIT ' + Math.round(prog * 100) + '%' + (ks ? '   ·   HAS ' + ks + ' KEY' : '') + (BOT.stims ? '   ·   HEALS ' + BOT.stims : '') + (L.liftTerm ? (L.liftTerm.solved ? '   ·   LIFT UNLOCKED' : botKnows(L.liftTerm.gate) ? '   ·   HAS LIFT CODE' : '   ·   LIFT LOCKED') : '') + (BOT.stun > 0 ? '   ·   STUNNED' : ''), W / 2, by + 48);
   if (P.dead) {
     ctx.font = 'bold 30px "Black Ops One",Impact,sans-serif'; ctx.fillStyle = col;
     ctx.fillText('RESPAWNING ' + Math.ceil(P.respawn), W / 2, H * .55);
