@@ -1059,7 +1059,7 @@ function useConsole(c) {
   msg('SECURITY CONSOLE: every camera on this floor is OFFLINE', '#3ddc84'); sfx('ok');
 }
 /* ---------------- ARMOURY: take any ONE weapon (your SD pistol stays as a sidearm) ---------------- */
-const ARMOURY = [['smgsd', 'silenced, quiet', 300], ['rifle', 'loud, all-round', 210], ['shotgun', 'loud, close range', 28], ['sniper', 'one-shot, scope', 16], ['lmg', 'loud, huge mag', 320], ['rpg', 'rockets, boom', 5]];
+const ARMOURY = [['smgsd', 'silenced, quiet', 300], ['rifle', 'loud, all-round', 210], ['shotgun', 'loud, close range', 28], ['sniper', 'one-shot, scope', 16], ['lmg', 'loud, huge mag', 320]];
 function openArmoury(c) {
   if (c.used) { msg('The armoury is empty — you already took your weapon', '#86907a'); return; }
   if (G.cmdOpen) closeCmd();
@@ -1081,7 +1081,7 @@ function takeArmoury(i) {
   P.weapons = { sdpistol: true, [w]: true }; // only ONE weapon out of the armoury
   P.ammo[W.ammo] = Math.max(P.ammo[W.ammo], n); P.weapon = w;
   const k = WEAPON_ORDER.indexOf(w) + 1;
-  msg(W.name + ' — press ' + k + (W.scope ? '. Hold right-click to scope' : W.silenced ? '. Silenced: guards barely hear it' : W.rocket ? '. Rockets explode on impact' : '. Loud: the whole base will hear it'), '#ffd23f'); sfx('ok');
+  msg(W.name + ' — press ' + k + (W.scope ? '. Hold right-click to scope' : W.silenced ? '. Silenced: guards barely hear it' : '. Loud: the whole base will hear it'), '#ffd23f'); sfx('ok');
 }
 function squadHold() {
   const mine = OPS.filter(o => o.team === P.team && o.state !== 'dead');
@@ -2967,7 +2967,7 @@ function drawThreatArrows(cam) {
 function objective() {
   if (G.mode === 'def') return 'Stop the intruders! Kill all 3 or hold out ' + fmtT(G.htime);
   const k = P.keys, sub = L.def.sub;
-  if (sub === 'THE PERIMETER' && G.mode === 'op' && L.consoles.some(c => c.kind === 'armoury' && !c.used)) return 'Grab ONE weapon from the ARMOURY shed (just east of you) — sniper, RPG, anything';
+  if (sub === 'THE PERIMETER' && G.mode === 'op' && L.consoles.some(c => c.kind === 'armoury' && !c.used)) return 'Grab ONE weapon from the ARMOURY shed (just east of you) — sniper, LMG, anything';
   if (sub === 'THE PERIMETER') return !k.green ? 'Get the GREEN keycard from the motor shed (east yard). The east fence is broken.' : 'Enter the BASE ENTRANCE behind the GREEN door (north)';
   if (sub === 'BARRACKS & MOTOR POOL') return !k.yellow ? 'Find the YELLOW keycard in the officers\' quarters (north-east)' : 'Take the FREIGHT ELEVATOR (south-east, behind the YELLOW door)';
   if (sub === 'SECURITY HQ') {
