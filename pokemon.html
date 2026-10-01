@@ -1,0 +1,2028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Pokémon Kanto Quest</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; }
+body { background:#101820; color:#e8e8e8; font-family:'Press Start 2P',monospace; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden; user-select:none; -webkit-user-select:none; touch-action:none; }
+canvas { display:block; image-rendering:pixelated; image-rendering:crisp-edges; background:#000; border:4px solid #2a3a4a; border-radius:8px; box-shadow:0 0 40px rgba(0,0,0,.6); width:min(96vw, calc((100vh - 60px) * 4 / 3)); height:auto; }
+#hint { margin-top:10px; font-size:9px; color:#7a8a9a; text-align:center; line-height:1.9; padding:0 16px; }
+#hint b { color:#f8d030; font-weight:normal; }
+#pad { display:none; width:min(98vw,520px); justify-content:space-between; align-items:center; margin-top:10px; padding:0 16px; }
+#pad button { font-family:inherit; color:#fff; background:#34495e; border:2px solid #1c2833; border-radius:10px; -webkit-tap-highlight-color:transparent; touch-action:none; }
+#pad button:active, #pad button.on { background:#5d7b99; }
+.dpad { display:grid; grid-template-columns:52px 52px 52px; grid-template-rows:52px 52px 52px; }
+.dpad button { font-size:16px; }
+.dpad .u { grid-column:2; grid-row:1; } .dpad .l { grid-column:1; grid-row:2; }
+.dpad .r { grid-column:3; grid-row:2; } .dpad .d { grid-column:2; grid-row:3; }
+.st { font-size:9px; padding:10px 12px; border-radius:16px!important; }
+.ab { display:flex; gap:14px; align-items:center; }
+.ab button { width:62px; height:62px; border-radius:50%!important; font-size:18px; background:#b03a48!important; }
+.ab .b { margin-top:34px; }
+@media (hover:none), (max-width:700px) {
+  #pad { display:flex; } #hint { display:none; }
+  canvas { width:min(98vw, calc((100vh - 230px) * 4 / 3)); }
+}
+</style>
+</head>
+<body>
+<canvas id="c" width="640" height="480"></canvas>
+<div id="hint"><b>Arrows/WASD</b> move &nbsp; <b>Z/Space</b> A (confirm/talk) &nbsp; <b>X/Esc</b> B (back) &nbsp; <b>Enter</b> menu &nbsp; hold <b>Shift</b> run &nbsp; <b>N</b> mute</div>
+<div id="pad">
+  <div class="dpad">
+    <button data-k="up" class="u">▲</button><button data-k="left" class="l">◀</button>
+    <button data-k="right" class="r">▶</button><button data-k="down" class="d">▼</button>
+  </div>
+  <button data-k="start" class="st">START</button>
+  <div class="ab"><button data-k="b" class="b">B</button><button data-k="a" class="a">A</button></div>
+</div>
+<script>
+'use strict';
+// ============================================================
+//  CORE
+// ============================================================
+const W = 640, H = 480, TS = 32;
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+const FONT = "'Press Start 2P', monospace";
+const font = (px, g = ctx) => { g.font = px + 'px ' + FONT; };
+const rnd = n => Math.floor(Math.random() * n);
+const pick = a => a[rnd(a.length)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+const OPP = { up: 'down', down: 'up', left: 'right', right: 'left' };
+
+// ---------- tweens / timing (driven by the main loop) ----------
+const tweens = [];
+function animate(ms, fn) {
+  return new Promise(res => tweens.push({ t: 0, ms: Math.max(1, ms), fn: fn || (() => {}), res }));
+}
+const wait = ms => animate(ms);
+function updateTweens(dt) {
+  for (let i = tweens.length - 1; i >= 0; i--) {
+    const tw = tweens[i];
+    tw.t += dt * 1000;
+    const p = Math.min(1, tw.t / tw.ms);
+    tw.fn(p);
+    if (p >= 1) { tweens.splice(i, 1); tw.res(); }
+  }
+}
+
+// ---------- input ----------
+const Input = {
+  held: {}, pressed: {},
+  down(k) { if (!this.held[k]) this.pressed[k] = true; this.held[k] = true; audioUnlock(); },
+  up(k) { this.held[k] = false; },
+  hit(k) { if (this.pressed[k]) { this.pressed[k] = false; return true; } return false; },
+  clear() { this.pressed = {}; },
+};
+const KEYMAP = {
+  ArrowUp: ['up'], w: ['up'], W: ['up'], ArrowDown: ['down'], s: ['down'], S: ['down'],
+  ArrowLeft: ['left'], a: ['left'], A: ['left'], ArrowRight: ['right'], d: ['right'], D: ['right'],
+  z: ['a'], Z: ['a'], ' ': ['a'], Enter: ['a', 'start'],
+  x: ['b'], X: ['b'], Escape: ['b', 'start'], Backspace: ['b'],
+  Shift: ['run'], m: ['start'], M: ['start'],
+};
+addEventListener('keydown', e => {
+  if (e.key === 'n' || e.key === 'N') { toggleMute(); return; }
+  const acts = KEYMAP[e.key];
+  if (!acts) return;
+  e.preventDefault();
+  if (!e.repeat) acts.forEach(k => Input.down(k));
+});
+addEventListener('keyup', e => { const acts = KEYMAP[e.key]; if (acts) acts.forEach(k => Input.up(k)); });
+addEventListener('blur', () => { Input.held = {}; });
+document.querySelectorAll('#pad button').forEach(b => {
+  const k = b.dataset.k;
+  b.addEventListener('pointerdown', e => { e.preventDefault(); b.classList.add('on'); Input.down(k); });
+  const rel = e => { e.preventDefault(); b.classList.remove('on'); Input.up(k); };
+  b.addEventListener('pointerup', rel); b.addEventListener('pointerleave', rel); b.addEventListener('pointercancel', rel);
+});
+
+// ---------- audio ----------
+let AC = null, muted = false;
+function audioUnlock() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; } setTimeout(() => Music.want && Music.play(Music.want), 0); }
+  if (AC.state === 'suspended') AC.resume();
+}
+function toggleMute() { muted = !muted; if (muted) Music.stop(); else Music.play(Music.want); }
+function tone(freq, dur, type = 'square', vol = 0.06, when = 0, slide = 0) {
+  if (!AC || muted) return;
+  const t = AC.currentTime + when;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (slide) o.frequency.linearRampToValueAtTime(Math.max(20, freq + slide), t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(AC.destination); o.start(t); o.stop(t + dur + 0.05);
+}
+function noise(dur, vol = 0.15, when = 0) {
+  if (!AC || muted) return;
+  const len = Math.floor(AC.sampleRate * dur), buf = AC.createBuffer(1, len, AC.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const s = AC.createBufferSource(), g = AC.createGain();
+  s.buffer = buf; g.gain.value = vol; s.connect(g).connect(AC.destination); s.start(AC.currentTime + when);
+}
+const arp = (notes, step, dur = 0.12, type = 'square', vol = 0.06) => notes.forEach((f, i) => tone(f, dur, type, vol, i * step));
+const SFX = {
+  blip: () => tone(1046, 0.04, 'square', 0.04),
+  select: () => { tone(784, 0.05, 'square', 0.05); tone(1175, 0.07, 'square', 0.05, 0.05); },
+  back: () => tone(392, 0.07, 'square', 0.05),
+  bump: () => tone(90, 0.09, 'square', 0.07),
+  hit: () => noise(0.16, 0.22),
+  superHit: () => { noise(0.28, 0.28); tone(220, 0.25, 'sawtooth', 0.07, 0, -160); },
+  weakHit: () => noise(0.1, 0.1),
+  faint: () => tone(700, 0.7, 'square', 0.06, 0, -620),
+  heal: () => arp([523, 659, 784, 1047, 784, 1047], 0.13, 0.14),
+  levelUp: () => arp([523, 659, 784, 1047, 1319], 0.08, 0.12),
+  statUp: () => arp([400, 500, 600, 800], 0.05, 0.08, 'triangle', 0.08),
+  statDown: () => arp([800, 600, 500, 400], 0.05, 0.08, 'triangle', 0.08),
+  ball: () => tone(260, 0.35, 'triangle', 0.1, 0, 600),
+  shake: () => { tone(160, 0.06, 'square', 0.07); tone(120, 0.06, 'square', 0.07, 0.07); },
+  caught: () => arp([784, 988, 1175, 1568], 0.15, 0.18),
+  money: () => arp([1319, 1568], 0.07, 0.1),
+  encounter: () => arp([330, 311, 330, 311, 330, 392, 440, 523], 0.06, 0.07, 'sawtooth', 0.05),
+  status: () => arp([300, 250, 300, 250], 0.06, 0.07, 'sawtooth', 0.05),
+  door: () => { noise(0.08, 0.1); tone(200, 0.1, 'square', 0.05, 0.05); },
+  evolve: () => arp([392, 523, 659, 784, 1047, 1319, 1568], 0.12, 0.2, 'triangle', 0.09),
+};
+
+// ---------- tiny chiptune sequencer (original tunes) ----------
+const NOTE = n => 440 * Math.pow(2, (n - 69) / 12);
+const Music = {
+  want: null, cur: null, timer: null, step: 0,
+  songs: {
+    town: { bpm: 132, lead: [72,0,76,79, 77,76,74,0, 71,0,74,77, 76,74,72,0, 72,74,76,72, 79,0,77,76, 74,76,77,74, 72,0,0,0],
+            bass: [48,55,52,55, 50,57,53,57, 47,55,50,55, 48,55,52,55] },
+    route: { bpm: 150, lead: [67,69,71,74, 0,71,74,76, 79,0,76,74, 71,0,69,0, 67,69,71,67, 64,0,67,69, 71,74,72,71, 69,0,0,0],
+             bass: [43,50,43,50, 40,47,40,47, 45,52,45,52, 38,45,38,45] },
+    battle: { bpm: 176, lead: [69,72,76,72, 81,76,72,76, 68,71,76,71, 80,76,71,76, 65,69,72,69, 77,72,69,72, 64,68,71,74, 76,0,74,71],
+              bass: [45,45,57,45, 44,44,56,44, 41,41,53,41, 40,40,52,40] },
+    victory: { bpm: 140, lead: [72,76,79,84, 0,83,84,0, 81,79,77,79, 76,0,0,0], bass: [48,48,52,52, 53,53,55,55] },
+  },
+  play(name) {
+    this.want = name;
+    if (muted || !AC || this.cur === name) return;
+    this.stop(); this.cur = name; this.step = 0;
+    const s = this.songs[name]; if (!s) return;
+    const dt = 60 / s.bpm / 2;
+    this.timer = setInterval(() => {
+      if (muted || !AC) return;
+      const l = s.lead[this.step % s.lead.length];
+      if (l) tone(NOTE(l), dt * 0.9, 'square', 0.025);
+      if (this.step % 2 === 0) { const b = s.bass[(this.step / 2) % s.bass.length]; if (b) tone(NOTE(b), dt * 1.8, 'triangle', 0.05); }
+      this.step++;
+    }, dt * 1000);
+  },
+  stop() { clearInterval(this.timer); this.timer = null; this.cur = null; },
+};
+
+// ============================================================
+//  DATA: TYPES & MOVES
+// ============================================================
+const TYPE_CHART = {
+  Normal: { Rock: .5 },
+  Fire: { Fire: .5, Water: .5, Grass: 2, Bug: 2, Rock: .5 },
+  Water: { Fire: 2, Water: .5, Grass: .5, Ground: 2, Rock: 2 },
+  Grass: { Fire: .5, Water: 2, Grass: .5, Poison: .5, Ground: 2, Flying: .5, Bug: .5, Rock: 2 },
+  Electric: { Water: 2, Electric: .5, Grass: .5, Ground: 0, Flying: 2 },
+  Poison: { Grass: 2, Poison: .5, Ground: .5, Rock: .5 },
+  Ground: { Fire: 2, Electric: 2, Grass: .5, Poison: 2, Flying: 0, Bug: .5, Rock: 2 },
+  Flying: { Electric: .5, Grass: 2, Bug: 2, Rock: .5 },
+  Psychic: { Poison: 2, Psychic: .5, Dark: 0 },
+  Bug: { Fire: .5, Grass: 2, Poison: .5, Flying: .5, Psychic: 2, Dark: 2 },
+  Rock: { Fire: 2, Ground: .5, Flying: 2, Bug: 2 },
+  Dark: { Psychic: 2, Dark: .5 },
+};
+const TYPE_COLOR = { Normal: '#a8a878', Fire: '#f08030', Water: '#6890f0', Grass: '#78c850', Electric: '#f8d030', Poison: '#a040a0',
+  Ground: '#e0c068', Flying: '#a890f0', Psychic: '#f85888', Bug: '#a8b820', Rock: '#b8a038', Dark: '#705848', None: '#888' };
+function effectiveness(mtype, defTypes) {
+  const row = TYPE_CHART[mtype] || {};
+  return defTypes.reduce((m, t) => m * (row[t] ?? 1), 1);
+}
+// c: p=physical s=special st=status | p: power | a: accuracy (null = never misses)
+// fx: primary effect of status moves | sec: secondary effect chance on damaging moves
+const MOVES = {
+  tackle: { n: 'TACKLE', t: 'Normal', c: 'p', p: 40, a: 100, pp: 35 },
+  scratch: { n: 'SCRATCH', t: 'Normal', c: 'p', p: 40, a: 100, pp: 35 },
+  quickattack: { n: 'QUICK ATTACK', t: 'Normal', c: 'p', p: 40, a: 100, pp: 30, pri: 1 },
+  hyperfang: { n: 'HYPER FANG', t: 'Normal', c: 'p', p: 80, a: 90, pp: 15 },
+  slam: { n: 'SLAM', t: 'Normal', c: 'p', p: 80, a: 75, pp: 20 },
+  growl: { n: 'GROWL', t: 'Normal', c: 'st', a: 100, pp: 40, fx: { stat: 'atk', n: -1 } },
+  tailwhip: { n: 'TAIL WHIP', t: 'Normal', c: 'st', a: 100, pp: 30, fx: { stat: 'def', n: -1 } },
+  leer: { n: 'LEER', t: 'Normal', c: 'st', a: 100, pp: 30, fx: { stat: 'def', n: -1 } },
+  harden: { n: 'HARDEN', t: 'Normal', c: 'st', a: null, pp: 30, fx: { stat: 'def', n: 1, self: 1 } },
+  defensecurl: { n: 'DEFENSE CURL', t: 'Normal', c: 'st', a: null, pp: 40, fx: { stat: 'def', n: 1, self: 1 } },
+  withdraw: { n: 'WITHDRAW', t: 'Water', c: 'st', a: null, pp: 40, fx: { stat: 'def', n: 1, self: 1 } },
+  growth: { n: 'GROWTH', t: 'Normal', c: 'st', a: null, pp: 20, fx: { stat: 'spa', n: 1, self: 1 } },
+  vinewhip: { n: 'VINE WHIP', t: 'Grass', c: 'p', p: 45, a: 100, pp: 25 },
+  razorleaf: { n: 'RAZOR LEAF', t: 'Grass', c: 'p', p: 55, a: 95, pp: 25, crit: 1 },
+  absorb: { n: 'ABSORB', t: 'Grass', c: 's', p: 20, a: 100, pp: 25, drain: .5 },
+  megadrain: { n: 'MEGA DRAIN', t: 'Grass', c: 's', p: 40, a: 100, pp: 15, drain: .5 },
+  sleeppowder: { n: 'SLEEP POWDER', t: 'Grass', c: 'st', a: 75, pp: 15, fx: { status: 'slp' }, powder: 1 },
+  stunspore: { n: 'STUN SPORE', t: 'Grass', c: 'st', a: 75, pp: 30, fx: { status: 'par' }, powder: 1 },
+  poisonpowder: { n: 'POISONPOWDER', t: 'Poison', c: 'st', a: 75, pp: 35, fx: { status: 'psn' }, powder: 1 },
+  ember: { n: 'EMBER', t: 'Fire', c: 's', p: 40, a: 100, pp: 25, sec: { ch: 10, status: 'brn' } },
+  flamewheel: { n: 'FLAME WHEEL', t: 'Fire', c: 'p', p: 60, a: 100, pp: 25, sec: { ch: 10, status: 'brn' } },
+  firefang: { n: 'FIRE FANG', t: 'Fire', c: 'p', p: 65, a: 95, pp: 15, sec: { ch: 10, status: 'brn' } },
+  watergun: { n: 'WATER GUN', t: 'Water', c: 's', p: 40, a: 100, pp: 25 },
+  bubble: { n: 'BUBBLE', t: 'Water', c: 's', p: 40, a: 100, pp: 30, sec: { ch: 10, stat: 'spe', n: -1 } },
+  waterpulse: { n: 'WATER PULSE', t: 'Water', c: 's', p: 60, a: 100, pp: 20 },
+  bite: { n: 'BITE', t: 'Dark', c: 'p', p: 60, a: 100, pp: 25 },
+  thundershock: { n: 'THUNDERSHOCK', t: 'Electric', c: 's', p: 40, a: 100, pp: 30, sec: { ch: 10, status: 'par' } },
+  thunderwave: { n: 'THUNDER WAVE', t: 'Electric', c: 'st', a: 90, pp: 20, fx: { status: 'par' } },
+  spark: { n: 'SPARK', t: 'Electric', c: 'p', p: 65, a: 100, pp: 20, sec: { ch: 30, status: 'par' } },
+  gust: { n: 'GUST', t: 'Flying', c: 's', p: 40, a: 100, pp: 35 },
+  wingattack: { n: 'WING ATTACK', t: 'Flying', c: 'p', p: 60, a: 100, pp: 35 },
+  stringshot: { n: 'STRING SHOT', t: 'Bug', c: 'st', a: 95, pp: 40, fx: { stat: 'spe', n: -2 } },
+  bugbite: { n: 'BUG BITE', t: 'Bug', c: 'p', p: 60, a: 100, pp: 20 },
+  leechlife: { n: 'LEECH LIFE', t: 'Bug', c: 'p', p: 20, a: 100, pp: 15, drain: .5 },
+  poisonsting: { n: 'POISON STING', t: 'Poison', c: 'p', p: 15, a: 100, pp: 35, sec: { ch: 30, status: 'psn' } },
+  poisonjab: { n: 'POISON JAB', t: 'Poison', c: 'p', p: 80, a: 100, pp: 20, sec: { ch: 30, status: 'psn' } },
+  confusion: { n: 'CONFUSION', t: 'Psychic', c: 's', p: 50, a: 100, pp: 25 },
+  psybeam: { n: 'PSYBEAM', t: 'Psychic', c: 's', p: 65, a: 100, pp: 20 },
+  rockthrow: { n: 'ROCK THROW', t: 'Rock', c: 'p', p: 50, a: 90, pp: 15 },
+  rocktomb: { n: 'ROCK TOMB', t: 'Rock', c: 'p', p: 60, a: 95, pp: 15, sec: { ch: 100, stat: 'spe', n: -1 } },
+  bulldoze: { n: 'BULLDOZE', t: 'Ground', c: 'p', p: 60, a: 100, pp: 20, sec: { ch: 100, stat: 'spe', n: -1 } },
+  struggle: { n: 'STRUGGLE', t: 'None', c: 'p', p: 50, a: null, pp: 1, recoil: .25 },
+};
+const STAT_NAME = { atk: 'ATTACK', def: 'DEFENSE', spa: 'SP. ATK', spd: 'SP. DEF', spe: 'SPEED' };
+const STATUS_TAG = { psn: ['PSN', '#a040a0'], par: ['PAR', '#c8a000'], slp: ['SLP', '#888'], brn: ['BRN', '#e05020'] };
+
+// ============================================================
+//  SPRITES (drawn procedurally into a 56x56 pixel canvas)
+// ============================================================
+const mk = (w, h = w) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+function E(g, x, y, rx, ry, c, rot = 0) { g.fillStyle = c; g.beginPath(); g.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); g.fill(); }
+function P(g, c, ...p) { g.fillStyle = c; g.beginPath(); g.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) g.lineTo(p[i], p[i + 1]); g.closePath(); g.fill(); }
+function L(g, c, w, ...p) { g.strokeStyle = c; g.lineWidth = w; g.lineCap = 'round'; g.beginPath(); g.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) g.lineTo(p[i], p[i + 1]); g.stroke(); }
+function EYE(g, x, y, r = 3, iris = '#222') { E(g, x, y, r, r * 1.2, '#fff'); E(g, x + .5, y + .4, r * .72, r * .95, iris); E(g, x + .6, y + .6, r * .38, r * .5, '#000'); E(g, x - .5, y - .8, r * .32, r * .32, '#fff'); }
+
+const DRAW = {
+  bulbasaur: g => bulba(g, 0), ivysaur: g => bulba(g, 1),
+  charmander: g => charm(g, 0), charmeleon: g => charm(g, 1),
+  squirtle: g => squirt(g, 0), wartortle: g => squirt(g, 1),
+  pidgey: g => bird(g, 0), pidgeotto: g => bird(g, 1),
+  rattata: g => rat(g, 0), raticate: g => rat(g, 1),
+  caterpie: g => worm(g, '#88c848', '#f0e060', 0), weedle: g => worm(g, '#d8a050', '#f0d8a0', 1),
+  metapod: g => cocoon(g, '#70b040', '#4a8a2a'), kakuna: g => cocoon(g, '#e8c840', '#b89820'),
+  butterfree: g => {
+    E(g, 15, 20, 13, 11, '#f4f4f4', -.5); E(g, 41, 20, 13, 11, '#f4f4f4', .5);
+    E(g, 17, 37, 9, 7, '#f4f4f4', .4); E(g, 39, 37, 9, 7, '#f4f4f4', -.4);
+    L(g, '#333', 1.6, 26, 28, 8, 14); L(g, '#333', 1.6, 30, 28, 48, 14); L(g, '#333', 1.4, 26, 32, 12, 38); L(g, '#333', 1.4, 30, 32, 44, 38);
+    E(g, 28, 32, 6, 12, '#5a58b0'); E(g, 28, 18, 8, 7, '#5a58b0');
+    E(g, 24, 18, 3.6, 4.2, '#e83a58'); E(g, 32, 18, 3.6, 4.2, '#e83a58'); E(g, 23, 17, 1.2, 1.2, '#fff'); E(g, 31, 17, 1.2, 1.2, '#fff');
+    L(g, '#333', 1.5, 25, 12, 20, 3); L(g, '#333', 1.5, 31, 12, 36, 3); L(g, '#f0f0f0', 1.6, 24, 44, 22, 50); L(g, '#f0f0f0', 1.6, 32, 44, 34, 50);
+  },
+  beedrill: g => {
+    E(g, 14, 16, 11, 6, '#d0eef8', -.3); E(g, 42, 16, 11, 6, '#d0eef8', .3);
+    E(g, 34, 40, 8, 10, '#f0c830', -.3); L(g, '#222', 2.5, 28, 37, 40, 34); L(g, '#222', 2.5, 29, 43, 41, 41); P(g, '#eee', 36, 49, 40, 55, 41, 47);
+    E(g, 28, 28, 6, 6, '#222'); E(g, 24, 18, 8, 7, '#f0c830');
+    E(g, 20, 17, 3.2, 3.8, '#e03030'); E(g, 28, 16, 3.2, 3.8, '#e03030');
+    P(g, '#ddd', 18, 26, 4, 40, 20, 31); P(g, '#ddd', 34, 26, 50, 40, 36, 31);
+    L(g, '#222', 1.5, 22, 12, 16, 4); L(g, '#222', 1.5, 27, 11, 30, 3);
+  },
+  pikachu: g => {
+    const c = '#f8d030';
+    P(g, '#b07830', 38, 46, 42, 40, 44, 42); P(g, c, 40, 42, 46, 34, 42, 32, 50, 18, 55, 21, 48, 32, 52, 34, 44, 44);
+    E(g, 22, 50, 5, 3, c); E(g, 34, 50, 5, 3, c); E(g, 28, 40, 11, 11, c);
+    E(g, 19, 38, 3, 4, c, .5); E(g, 37, 38, 3, 4, c, -.5);
+    P(g, c, 17, 17, 6, 0, 22, 13); P(g, '#222', 9, 4, 6, 0, 11, 7); P(g, c, 32, 14, 46, 1, 36, 15); P(g, '#222', 43, 3, 46, 1, 44, 6);
+    E(g, 26, 22, 12, 10, c); E(g, 16, 27, 3, 2.6, '#e83030'); E(g, 36, 27, 3, 2.6, '#e83030');
+    EYE(g, 21, 20, 2.8); EYE(g, 31, 20, 2.8); L(g, '#422', 1.2, 24, 26, 26, 27, 28, 26);
+  },
+  oddish: g => {
+    E(g, 20, 12, 4, 11, '#4a9a40', -.6); E(g, 36, 12, 4, 11, '#4a9a40', .6); E(g, 28, 8, 4, 12, '#5cb84c');
+    E(g, 15, 18, 3, 9, '#3a8a34', -1.1); E(g, 41, 18, 3, 9, '#3a8a34', 1.1);
+    E(g, 22, 48, 5, 3, '#4a68c0'); E(g, 34, 48, 5, 3, '#4a68c0'); E(g, 28, 36, 13, 12, '#5878d0');
+    EYE(g, 23, 34, 2.6, '#c02030'); EYE(g, 33, 34, 2.6, '#c02030'); L(g, '#223', 1.2, 26, 40, 28, 41, 30, 40);
+  },
+  geodude: g => {
+    const c = '#a89e88', d = '#7e7664';
+    E(g, 10, 22, 4, 7, c, .3); E(g, 46, 22, 4, 7, c, -.3); E(g, 7, 32, 6, 6, c); E(g, 49, 32, 6, 6, c);
+    L(g, d, 1.5, 4, 32, 10, 30); L(g, d, 1.5, 52, 32, 46, 30);
+    E(g, 28, 32, 15, 14, c); E(g, 20, 40, 3, 2, d); E(g, 38, 24, 2.5, 2, d); E(g, 36, 42, 3, 2, d);
+    P(g, '#5a5244', 17, 25, 26, 27, 26, 25); P(g, '#5a5244', 39, 25, 30, 27, 30, 25);
+    EYE(g, 22, 29, 2.4); EYE(g, 34, 29, 2.4); L(g, '#3a3428', 1.6, 22, 37, 34, 37);
+  },
+  zubat: g => {
+    const c = '#6888d8';
+    P(g, c, 22, 26, 2, 8, 5, 22, 1, 28, 8, 30, 9, 40, 22, 34); P(g, '#c868b0', 20, 28, 6, 16, 8, 28, 12, 36, 20, 33);
+    P(g, c, 34, 26, 54, 8, 51, 22, 55, 28, 48, 30, 47, 40, 34, 34); P(g, '#c868b0', 36, 28, 50, 16, 48, 28, 44, 36, 36, 33);
+    L(g, '#9050a0', 2, 25, 38, 22, 50); L(g, '#9050a0', 2, 31, 38, 34, 50);
+    P(g, c, 22, 24, 20, 8, 27, 20); P(g, c, 34, 24, 36, 8, 29, 20);
+    E(g, 28, 30, 9, 10, c); E(g, 28, 33, 4.5, 4.5, '#401838');
+    P(g, '#fff', 25, 29.5, 26.5, 29.5, 26, 32); P(g, '#fff', 29.5, 29.5, 31, 29.5, 30.5, 32);
+  },
+  psyduck: g => {
+    const c = '#f8d860';
+    E(g, 21, 50, 5, 2.5, '#f0a040'); E(g, 35, 50, 5, 2.5, '#f0a040'); E(g, 28, 40, 12, 10, c);
+    E(g, 15, 30, 3, 7, c, .5); E(g, 41, 30, 3, 7, c, -.5); E(g, 28, 20, 12, 11, c);
+    E(g, 22, 25, 8, 4, '#f8ecc8'); E(g, 24, 16, 3.2, 3.2, '#fff'); E(g, 33, 16, 3.2, 3.2, '#fff'); E(g, 24, 16, 1, 1, '#000'); E(g, 33, 16, 1, 1, '#000');
+    L(g, '#333', 1.4, 27, 9, 26, 2); L(g, '#333', 1.4, 29, 9, 30, 2); L(g, '#333', 1.4, 31, 10, 34, 4);
+  },
+  onix: g => {
+    const c = '#a0a0a8', d = '#70707a';
+    [[44, 48, 7], [36, 46, 7], [44, 38, 7], [50, 30, 6], [44, 22, 6], [36, 26, 6]].forEach(([x, y, r]) => { E(g, x, y, r, r * .85, c); E(g, x + 2, y + 2, r * .4, r * .3, d); });
+    P(g, c, 28, 12, 38, 1, 33, 14); E(g, 22, 18, 13, 8, c); E(g, 26, 22, 4, 2, d);
+    EYE(g, 15, 16, 2.4); L(g, '#333', 1.5, 10, 22, 22, 22);
+  },
+};
+function bulba(g, e) {
+  const c = '#78d0b0', d = '#3e9a80';
+  E(g, 14, 47, 4, 5, d); E(g, 24, 48, 4, 5, c); E(g, 38, 47, 4, 5, d); E(g, 46, 48, 4, 5, c);
+  E(g, 32, 40, 15, 10, c);
+  if (!e) { P(g, '#4caa5a', 34, 13, 29, 22, 39, 22); E(g, 34, 28, 11, 10, '#4caa5a'); E(g, 30, 25, 3, 6, '#6ccc76'); E(g, 39, 27, 2.5, 5, '#3a8a48'); }
+  else { P(g, '#3f9a4f', 34, 28, 8, 20, 22, 32); P(g, '#3f9a4f', 34, 28, 55, 18, 46, 33); E(g, 34, 22, 7, 9, '#e888a8'); E(g, 34, 15, 3, 4, '#f4b0c8'); }
+  P(g, c, 8, 30, 9, 21, 15, 27); P(g, c, 22, 26, 27, 20, 27, 29);
+  E(g, 18, 35, 12, 10, c); E(g, 27, 41, 2.5, 2, d); E(g, 40, 43, 3, 2, d); E(g, 15, 29, 2, 1.5, d);
+  EYE(g, 13, 35, 3, '#c03040'); EYE(g, 23, 35, 3, '#c03040'); L(g, '#234', 1.3, 13, 41, 21, 41);
+}
+function charm(g, e) {
+  const c = e ? '#e05838' : '#f09048', b = '#f8dc98';
+  L(g, c, 4, 34, 46, 44, 42, 49, 32); E(g, 49, 25, 4, 7, '#f8a020'); E(g, 49, 28, 2, 3, '#f8f060');
+  E(g, 21, 50, 5, 3.5, c); E(g, 34, 50, 5, 3.5, c); E(g, 28, 40, 10, 11, c); E(g, 26, 42, 6, 8, b);
+  E(g, 18, 37, 3, 5, c, .6); E(g, 38, 37, 3, 5, c, -.6);
+  if (e) P(g, c, 30, 14, 40, 5, 35, 16);
+  E(g, 26, 22, 11, 10, c); E(g, 18, 25, 6, 5, c);
+  EYE(g, 21, 20, 2.8, '#2a3a8a'); EYE(g, 30, 20, 2.8, '#2a3a8a'); L(g, '#622', 1.3, 13, 27, 21, 28);
+}
+function squirt(g, e) {
+  const c = e ? '#7aa0e8' : '#88c8f0', b = '#f0e0a0', d = '#a87040';
+  if (e) { E(g, 46, 34, 7, 9, '#eef4ff', .4); L(g, '#9ab', 1.4, 42, 30, 48, 38); } else E(g, 45, 42, 5, 6, c);
+  E(g, 21, 50, 5, 3.5, c); E(g, 34, 50, 5, 3.5, c);
+  E(g, 32, 38, 12, 13, d); E(g, 26, 40, 8, 10, b); L(g, '#c8a860', 1.2, 20, 37, 32, 37); L(g, '#c8a860', 1.2, 20, 43, 32, 43);
+  E(g, 17, 36, 3, 5, c, .6); E(g, 37, 36, 3, 5, c, -.6);
+  if (e) { E(g, 13, 12, 3, 7, '#eef4ff', -.4); E(g, 34, 11, 3, 7, '#eef4ff', .4); }
+  E(g, 24, 21, 11, 10, c);
+  EYE(g, 20, 20, 2.8, '#a02028'); EYE(g, 29, 20, 2.8, '#a02028'); L(g, '#334', 1.3, 17, 26, 21, 27, 26, 26);
+}
+function bird(g, e) {
+  const c = e ? '#c49050' : '#b08858', b = '#f2deb4';
+  P(g, '#7a5a38', 38, 40, 54, 48, 54, 34); if (e) P(g, '#d05030', 42, 40, 54, 44, 52, 38);
+  L(g, '#e09040', 1.6, 26, 46, 24, 51); L(g, '#e09040', 1.6, 32, 46, 33, 51);
+  E(g, 30, 36, 14, 11, c); E(g, 23, 40, 8, 7, b); E(g, 35, 34, 10, 7, '#86603a', -.3);
+  E(g, 20, 22, 10, 9, c); E(g, 17, 25, 5, 4, b);
+  P(g, '#555', 11, 22, 4, 25, 11, 27); EYE(g, 18, 20, 2.6);
+  if (e) { P(g, '#e04a30', 22, 14, 34, 2, 28, 16); P(g, '#f4c040', 24, 15, 38, 8, 30, 17); }
+  else P(g, c, 22, 14, 28, 8, 26, 16);
+}
+function rat(g, e) {
+  const c = e ? '#c49464' : '#a874c0', b = '#f2e2c4';
+  L(g, c, 2.5, 44, 40, 52, 36, 52, 28, 48, 26);
+  E(g, 22, 48, 4, 3, c); E(g, 42, 48, 4, 3, c); E(g, 33, 39, 14, 10, c); E(g, 30, 42, 8, 6, b);
+  E(g, 12, 20, 4, 6, c); E(g, 24, 19, 4, 6, c); E(g, 12, 20, 2, 3.5, '#e8a0b0'); E(g, 24, 19, 2, 3.5, '#e8a0b0');
+  E(g, 18, 30, 10, 9, c); if (e) E(g, 14, 34, 7, 5, b);
+  L(g, '#333', 1, 6, 33, 0, 31); L(g, '#333', 1, 6, 35, 0, 36); L(g, '#333', 1, 26, 33, 32, 31);
+  EYE(g, 15, 28, 3.2, '#c02040'); EYE(g, 23, 28, 2.4, '#c02040');
+  P(g, '#fff', 11, 35, 15, 35, 13, e ? 42 : 39); P(g, '#fff', 16, 35, 20, 35, 18, e ? 42 : 39);
+}
+function worm(g, c, s, horn) {
+  E(g, 46, 46, 6, 6, c); E(g, 38, 45, 7, 7, c); E(g, 30, 42, 7, 8, c);
+  E(g, 46, 49, 3, 2, s); E(g, 38, 49, 3, 2, s); E(g, 30, 47, 3, 2, s);
+  if (horn) P(g, '#aaa', 52, 44, 56, 38, 52, 41);
+  E(g, 18, 32, 11, 11, c);
+  if (horn) { P(g, '#bbb', 16, 22, 18, 10, 22, 22); E(g, 12, 36, 4, 3, '#e888a0'); }
+  else { P(g, '#e03030', 17, 22, 13, 13, 19, 20, 24, 13, 21, 22); E(g, 12, 36, 4, 3, s); }
+  EYE(g, 14, 30, 3, '#222'); EYE(g, 23, 30, 3, '#222');
+}
+function cocoon(g, c, d) {
+  E(g, 28, 34, 13, 18, c); P(g, c, 24, 18, 38, 20, 34, 6); E(g, 22, 40, 4, 8, d, .2); E(g, 36, 30, 3, 6, d, -.2);
+  P(g, '#fff', 21, 27, 27, 27, 26, 30, 22, 30); P(g, '#fff', 30, 27, 36, 27, 35, 30, 31, 30);
+  E(g, 24, 28.5, 1.4, 1.3, '#000'); E(g, 33, 28.5, 1.4, 1.3, '#000'); L(g, '#222', 1.4, 20, 26, 27, 27); L(g, '#222', 1.4, 30, 27, 37, 26);
+}
+
+// ---------- species ----------
+// b: base stats [hp, atk, def, spa, spd, spe] | cr: catch rate | xp: base exp | ls: learnset (level 0 = learned on evolution)
+const SPECIES = {
+  bulbasaur: { n: 'BULBASAUR', dex: 1, t: ['Grass', 'Poison'], b: [45, 49, 49, 65, 65, 45], cr: 45, xp: 64, evo: { lv: 14, to: 'ivysaur' },
+    ls: [[1, 'tackle'], [1, 'growl'], [3, 'vinewhip'], [7, 'poisonpowder'], [10, 'sleeppowder'], [13, 'razorleaf'], [17, 'megadrain'], [20, 'growth']],
+    txt: 'A strange seed was planted on its back at birth. It sprouts and grows with this POKéMON.' },
+  ivysaur: { n: 'IVYSAUR', dex: 2, t: ['Grass', 'Poison'], b: [60, 62, 63, 80, 80, 60], cr: 45, xp: 142,
+    ls: [[1, 'tackle'], [1, 'growl'], [3, 'vinewhip'], [7, 'poisonpowder'], [10, 'sleeppowder'], [13, 'razorleaf'], [17, 'megadrain'], [20, 'growth']],
+    txt: 'When the bud on its back starts swelling, a sweet aroma wafts to indicate the flower\'s coming bloom.' },
+  charmander: { n: 'CHARMANDER', dex: 4, t: ['Fire'], b: [39, 52, 43, 60, 50, 65], cr: 45, xp: 62, evo: { lv: 14, to: 'charmeleon' },
+    ls: [[1, 'scratch'], [1, 'growl'], [4, 'ember'], [8, 'leer'], [11, 'bite'], [15, 'flamewheel'], [19, 'firefang']],
+    txt: 'The flame on its tail shows the strength of its life force. If it is weak, the flame also burns weakly.' },
+  charmeleon: { n: 'CHARMELEON', dex: 5, t: ['Fire'], b: [58, 64, 58, 80, 65, 80], cr: 45, xp: 142,
+    ls: [[1, 'scratch'], [1, 'growl'], [4, 'ember'], [8, 'leer'], [11, 'bite'], [15, 'flamewheel'], [19, 'firefang']],
+    txt: 'In the rocky mountains where it lives, it can be seen swinging its fiery tail at night.' },
+  squirtle: { n: 'SQUIRTLE', dex: 7, t: ['Water'], b: [44, 48, 65, 50, 64, 43], cr: 45, xp: 63, evo: { lv: 14, to: 'wartortle' },
+    ls: [[1, 'tackle'], [1, 'tailwhip'], [4, 'watergun'], [7, 'withdraw'], [10, 'bubble'], [13, 'bite'], [16, 'waterpulse']],
+    txt: 'It shelters itself in its shell, then strikes back with spouts of water at every opportunity.' },
+  wartortle: { n: 'WARTORTLE', dex: 8, t: ['Water'], b: [59, 63, 80, 65, 80, 58], cr: 45, xp: 142,
+    ls: [[1, 'tackle'], [1, 'tailwhip'], [4, 'watergun'], [7, 'withdraw'], [10, 'bubble'], [13, 'bite'], [16, 'waterpulse']],
+    txt: 'Its furry tail is a symbol of long life. Some are said to live for over a century.' },
+  caterpie: { n: 'CATERPIE', dex: 10, t: ['Bug'], b: [45, 30, 35, 20, 20, 45], cr: 255, xp: 39, evo: { lv: 7, to: 'metapod' },
+    ls: [[1, 'tackle'], [1, 'stringshot'], [9, 'bugbite']], txt: 'Its short feet are tipped with suction pads that let it climb walls and trees.' },
+  metapod: { n: 'METAPOD', dex: 11, t: ['Bug'], b: [50, 20, 55, 25, 25, 30], cr: 120, xp: 72, evo: { lv: 10, to: 'butterfree' },
+    ls: [[0, 'harden'], [1, 'tackle'], [1, 'stringshot']], txt: 'Its hard shell protects its tender body while it prepares to evolve.' },
+  butterfree: { n: 'BUTTERFREE', dex: 12, t: ['Bug', 'Flying'], b: [60, 45, 50, 90, 80, 70], cr: 45, xp: 178,
+    ls: [[0, 'confusion'], [1, 'tackle'], [11, 'poisonpowder'], [12, 'stunspore'], [13, 'sleeppowder'], [15, 'gust'], [18, 'psybeam']],
+    txt: 'Its wings are covered with toxic scales. It flaps them to scatter powder over its foes.' },
+  weedle: { n: 'WEEDLE', dex: 13, t: ['Bug', 'Poison'], b: [40, 35, 30, 20, 20, 50], cr: 255, xp: 39, evo: { lv: 7, to: 'kakuna' },
+    ls: [[1, 'poisonsting'], [1, 'stringshot'], [9, 'bugbite']], txt: 'The sharp stinger on its head is very poisonous. Bright colors warn foes away.' },
+  kakuna: { n: 'KAKUNA', dex: 14, t: ['Bug', 'Poison'], b: [45, 25, 50, 25, 25, 35], cr: 120, xp: 72, evo: { lv: 10, to: 'beedrill' },
+    ls: [[0, 'harden'], [1, 'poisonsting'], [1, 'stringshot']], txt: 'Almost unable to move, it can only harden its shell to protect itself.' },
+  beedrill: { n: 'BEEDRILL', dex: 15, t: ['Bug', 'Poison'], b: [65, 90, 40, 45, 80, 75], cr: 45, xp: 178,
+    ls: [[0, 'poisonjab'], [1, 'poisonsting'], [1, 'bugbite'], [14, 'quickattack']], txt: 'It flies at high speed and attacks using the large venomous stingers on its forelegs.' },
+  pidgey: { n: 'PIDGEY', dex: 16, t: ['Normal', 'Flying'], b: [40, 45, 40, 35, 35, 56], cr: 255, xp: 50, evo: { lv: 18, to: 'pidgeotto' },
+    ls: [[1, 'tackle'], [5, 'gust'], [9, 'quickattack'], [15, 'wingattack']], txt: 'A common sight in forests and woods. It flaps its wings at ground level to kick up sand.' },
+  pidgeotto: { n: 'PIDGEOTTO', dex: 17, t: ['Normal', 'Flying'], b: [63, 60, 55, 50, 50, 71], cr: 120, xp: 122,
+    ls: [[1, 'tackle'], [5, 'gust'], [9, 'quickattack'], [15, 'wingattack']], txt: 'Very protective of its territory, it flaps its wings to drive away intruders.' },
+  rattata: { n: 'RATTATA', dex: 19, t: ['Normal'], b: [30, 56, 35, 25, 35, 72], cr: 255, xp: 51, evo: { lv: 20, to: 'raticate' },
+    ls: [[1, 'tackle'], [1, 'tailwhip'], [4, 'quickattack'], [10, 'bite'], [14, 'hyperfang']], txt: 'Bites anything when it attacks. Small and very quick, it is a common sight in many places.' },
+  raticate: { n: 'RATICATE', dex: 20, t: ['Normal'], b: [55, 81, 60, 50, 70, 97], cr: 127, xp: 145,
+    ls: [[1, 'tackle'], [1, 'tailwhip'], [4, 'quickattack'], [10, 'bite'], [14, 'hyperfang']], txt: 'Its hind feet are webbed. They act as flippers, so it can swim in rivers.' },
+  pikachu: { n: 'PIKACHU', dex: 25, t: ['Electric'], b: [35, 55, 40, 50, 50, 90], cr: 190, xp: 112,
+    ls: [[1, 'thundershock'], [1, 'growl'], [5, 'tailwhip'], [8, 'thunderwave'], [11, 'quickattack'], [15, 'spark']],
+    txt: 'When several of these POKéMON gather, their electricity can build and cause lightning storms.' },
+  zubat: { n: 'ZUBAT', dex: 41, t: ['Poison', 'Flying'], b: [40, 45, 35, 30, 40, 55], cr: 255, xp: 49,
+    ls: [[1, 'leechlife'], [6, 'poisonsting'], [10, 'bite'], [14, 'wingattack']], txt: 'It has no eyes. Instead, it emits ultrasonic waves to check its surroundings.' },
+  oddish: { n: 'ODDISH', dex: 43, t: ['Grass', 'Poison'], b: [45, 50, 55, 75, 65, 30], cr: 255, xp: 64,
+    ls: [[1, 'absorb'], [5, 'poisonpowder'], [8, 'stunspore'], [10, 'sleeppowder'], [14, 'megadrain']], txt: 'During the day, it buries itself in soil. At night, it wanders around sowing its seeds.' },
+  psyduck: { n: 'PSYDUCK', dex: 54, t: ['Water'], b: [50, 52, 48, 65, 50, 55], cr: 190, xp: 64,
+    ls: [[1, 'scratch'], [1, 'tailwhip'], [4, 'watergun'], [8, 'confusion'], [12, 'waterpulse']], txt: 'Always tormented by headaches. When they get too strong, it unleashes strange powers.' },
+  geodude: { n: 'GEODUDE', dex: 74, t: ['Rock', 'Ground'], b: [40, 80, 100, 30, 30, 20], cr: 255, xp: 60,
+    ls: [[1, 'tackle'], [1, 'defensecurl'], [8, 'rockthrow'], [12, 'bulldoze'], [16, 'rocktomb']], txt: 'Found in fields and mountains. Mistaking them for boulders, people often step on them.' },
+  onix: { n: 'ONIX', dex: 95, t: ['Rock', 'Ground'], b: [35, 45, 160, 30, 45, 70], cr: 45, xp: 77,
+    ls: [[1, 'tackle'], [1, 'harden'], [6, 'rockthrow'], [10, 'rocktomb'], [13, 'bulldoze'], [16, 'slam']], txt: 'As it grows, the stone portions of its body harden to become like black diamonds.' },
+};
+const DEX_ORDER = Object.keys(SPECIES).sort((a, b) => SPECIES[a].dex - SPECIES[b].dex);
+
+const SPR = {};
+function buildSprite(sp) {
+  const S = 56, base = mk(S), g = base.getContext('2d');
+  DRAW[sp](g);
+  const id = g.getImageData(0, 0, S, S), d = id.data;
+  for (let i = 3; i < d.length; i += 4) d[i] = d[i] > 110 ? 255 : 0;
+  g.putImageData(id, 0, 0);
+  const tint = (src, c) => { const s = mk(S), sg = s.getContext('2d'); sg.drawImage(src, 0, 0); sg.globalCompositeOperation = 'source-in'; sg.fillStyle = c; sg.fillRect(0, 0, S, S); return s; };
+  const dark = tint(base, '#181818'), out = mk(S), og = out.getContext('2d');
+  [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([x, y]) => og.drawImage(dark, x, y));
+  og.drawImage(base, 0, 0);
+  return { n: out, w: tint(out, '#ffffff'), k: tint(out, '#283038') };
+}
+// draws a POKéMON sprite with (x, y) at its bottom-centre
+function drawMon(g, sp, x, y, scale, o = {}) {
+  if (!SPR[sp]) SPR[sp] = buildSprite(sp);
+  const img = SPR[sp][o.kind || 'n'], s = 56 * scale;
+  g.save(); g.imageSmoothingEnabled = false;
+  if (o.alpha != null) g.globalAlpha = o.alpha;
+  g.translate(Math.round(x), Math.round(y));
+  if (o.flip) g.scale(-1, 1);
+  const sy = o.squash ?? 1;
+  g.drawImage(img, -s / 2, -s * sy, s, s * sy);
+  g.restore();
+}
+
+// ============================================================
+//  POKéMON INSTANCES
+// ============================================================
+const xpFor = lv => lv <= 1 ? 0 : lv * lv * lv;
+const mname = m => m.nick || SPECIES[m.sp].n;
+const alive = m => m.hp > 0;
+function calcStats(m) {
+  const b = SPECIES[m.sp].b, f = i => Math.floor((2 * b[i] + m.iv[i]) * m.lv / 100);
+  m.st = { hp: f(0) + m.lv + 10, atk: f(1) + 5, def: f(2) + 5, spa: f(3) + 5, spd: f(4) + 5, spe: f(5) + 5 };
+}
+function makeMon(sp, lv) {
+  const m = { sp, lv, xp: xpFor(lv), iv: Array.from({ length: 6 }, () => rnd(32)), moves: [], status: null, slp: 0 };
+  calcStats(m); m.hp = m.st.hp;
+  const known = [];
+  SPECIES[sp].ls.filter(([l]) => l <= lv).forEach(([, id]) => { if (!known.includes(id)) known.push(id); });
+  m.moves = known.slice(-4).map(id => ({ id, pp: MOVES[id].pp }));
+  return m;
+}
+function healMon(m) { m.hp = m.st.hp; m.status = null; m.slp = 0; m.moves.forEach(mv => mv.pp = MOVES[mv.id].pp); }
+
+// ============================================================
+//  UI PRIMITIVES
+// ============================================================
+function rr(g, x, y, w, h, r) { g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, r) : g.rect(x, y, w, h); }
+function box(g, x, y, w, h) {
+  g.fillStyle = '#2c3440'; rr(g, x, y, w, h, 10); g.fill();
+  g.fillStyle = '#f8f8f8'; rr(g, x + 4, y + 4, w - 8, h - 8, 7); g.fill();
+  g.strokeStyle = '#88a8c8'; g.lineWidth = 2; rr(g, x + 8, y + 8, w - 16, h - 16, 4); g.stroke();
+}
+function text(g, s, x, y, size = 16, color = '#303030', align = 'left', shadow = '#d0d0c8') {
+  font(size, g); g.textAlign = align; g.textBaseline = 'top';
+  if (shadow) { g.fillStyle = shadow; g.fillText(s, x + Math.max(1, size / 8), y + Math.max(1, size / 8)); }
+  g.fillStyle = color; g.fillText(s, x, y);
+}
+function tri(g, x, y, s, c = '#303030', dir = 'right') {
+  g.fillStyle = c; g.beginPath();
+  if (dir === 'right') { g.moveTo(x, y); g.lineTo(x + s, y + s); g.lineTo(x, y + 2 * s); }
+  else if (dir === 'up') { g.moveTo(x, y + s); g.lineTo(x + 2 * s, y + s); g.lineTo(x + s, y); }
+  else { g.moveTo(x, y); g.lineTo(x + 2 * s, y); g.lineTo(x + s, y + s); }
+  g.fill();
+}
+function wrap(s, maxChars) {
+  const out = [];
+  String(s).split('\n').forEach(par => {
+    let line = '';
+    par.split(' ').forEach(w => {
+      if (line && (line + ' ' + w).length > maxChars) { out.push(line); line = w; }
+      else line = line ? line + ' ' + w : w;
+    });
+    out.push(line);
+  });
+  return out;
+}
+function hpBar(g, x, y, w, hp, max, h = 8) {
+  const p = clamp(hp / max, 0, 1);
+  g.fillStyle = '#404848'; rr(g, x - 2, y - 2, w + 4, h + 4, 4); g.fill();
+  g.fillStyle = '#e8f0e8'; g.fillRect(x, y, w, h);
+  g.fillStyle = p > .5 ? '#48d070' : p > .2 ? '#f8c030' : '#f04838';
+  g.fillRect(x, y, Math.ceil(w * p), h);
+  g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(x, y, Math.ceil(w * p), h / 3);
+}
+function typeBadge(g, t, x, y, w = 92) {
+  g.fillStyle = TYPE_COLOR[t] || '#888'; rr(g, x, y, w, 20, 5); g.fill();
+  text(g, t.toUpperCase(), x + w / 2, y + 6, 8, '#fff', 'center', 'rgba(0,0,0,.35)');
+}
+function statusBadge(g, st, x, y) {
+  if (!st) return;
+  const [lab, c] = STATUS_TAG[st];
+  g.fillStyle = c; rr(g, x, y, 40, 16, 4); g.fill();
+  text(g, lab, x + 20, y + 4, 8, '#fff', 'center', null);
+}
+
+// ---------- scene stack ----------
+const scenes = [];
+const push = s => { scenes.push(s); return s; };
+const remove = s => { const i = scenes.indexOf(s); if (i >= 0) scenes.splice(i, 1); };
+let fadeAlpha = 0, fadeColor = '#000';
+function fadeTo(a, ms = 300, c = '#000') { fadeColor = c; const s = fadeAlpha; return animate(ms, p => { fadeAlpha = s + (a - s) * p; }); }
+
+// ---------- dialog ----------
+const TEXT_CPS = 55, LINE_CHARS = 35;
+function paginate(t) {
+  const pages = [];
+  [].concat(t).forEach(s => { const ls = wrap(s, LINE_CHARS); for (let i = 0; i < ls.length; i += 2) pages.push(ls.slice(i, i + 2)); });
+  return pages;
+}
+class Dialog {
+  constructor(t, res, o = {}) { this.transparent = true; this.res = res; this.o = o; this.pages = paginate(t); this.page = 0; this.chars = 0; this.t = 0; this.done = false; }
+  update(dt, top) {
+    const total = this.pages[this.page].join('').length;
+    if (this.chars < total) {
+      this.chars = Math.min(total, this.chars + dt * TEXT_CPS);
+      if (top && (Input.hit('a') || Input.hit('b'))) this.chars = total;
+      return;
+    }
+    const last = this.page === this.pages.length - 1;
+    if (last && this.o.hold) { if (!this.done) { this.done = true; this.res && this.res(); } return; }
+    this.t += dt;
+    if (!top) return;
+    if (Input.hit('a') || Input.hit('b') || (this.o.auto && this.t > this.o.auto)) {
+      SFX.blip();
+      if (last) { remove(this); this.res && this.res(); }
+      else { this.page++; this.chars = 0; this.t = 0; }
+    }
+  }
+  draw(g) {
+    box(g, 8, H - 120, W - 16, 112);
+    let n = Math.floor(this.chars);
+    this.pages[this.page].forEach((ln, i) => { const s = ln.slice(0, Math.max(0, n)); n -= ln.length; text(g, s, 36, H - 90 + i * 36, 16); });
+    const total = this.pages[this.page].join('').length;
+    if (this.chars >= total && !this.o.hold && !this.o.auto && Math.floor(performance.now() / 300) % 2) tri(g, W - 52, H - 36, 8, '#e04040', 'down');
+  }
+}
+const say = (t, o) => new Promise(r => push(new Dialog(t, r, o)));
+
+// ---------- menus ----------
+class Menu {
+  constructor(items, res, o = {}) {
+    this.transparent = true; this.items = items.map(it => typeof it === 'string' ? { label: it } : it);
+    this.res = res; this.o = o; this.i = clamp(o.start || 0, 0, items.length - 1); this.cols = o.cols || 1;
+  }
+  update(dt, top) {
+    if (!top) return;
+    const n = this.items.length, c = this.cols, old = this.i;
+    if (Input.hit('up') && this.i - c >= 0) this.i -= c;
+    if (Input.hit('down') && this.i + c < n) this.i += c;
+    if (c > 1 && Input.hit('left') && this.i % c > 0) this.i--;
+    if (c > 1 && Input.hit('right') && this.i % c < c - 1 && this.i + 1 < n) this.i++;
+    if (old !== this.i) SFX.blip();
+    if (Input.hit('a')) {
+      if (this.items[this.i].disabled) { SFX.bump(); return; }
+      SFX.select(); remove(this); this.res(this.i);
+    } else if (Input.hit('b') && this.o.cancel !== false) { SFX.back(); remove(this); this.res(-1); }
+  }
+  draw(g) {
+    const o = this.o, c = this.cols, n = this.items.length, lh = o.lh || 36, cw = o.cw || 0;
+    const vis = o.rows && c === 1 && n > o.rows ? o.rows : 0;
+    if (vis) this.top = clamp(this.top || 0, this.i - vis + 1, this.i);
+    const rows = vis || Math.ceil(n / c), top = vis ? this.top : 0;
+    const w = o.w || (Math.max(...this.items.map(it => it.label.length)) * 16 + 76);
+    const h = rows * lh + 32, x = o.x ?? W - w - 8, y = o.y ?? H - 128 - h;
+    if (!o.nobox) box(g, x, y, w, h);
+    this.items.forEach((it, k) => {
+      if (vis && (k < top || k >= top + vis)) return;
+      const col = k % c, row = Math.floor((k - top) / c), tx = x + 44 + col * (cw || (w - 40) / c), ty = y + 20 + row * lh;
+      text(g, it.label, tx, ty, o.size || 16, it.disabled ? '#a0a0a0' : '#303030');
+      if (it.right) text(g, it.right, x + w - 28, ty, o.size || 16, '#303030', 'right');
+      if (k === this.i) tri(g, tx - 22, ty, 7);
+    });
+    if (vis && top > 0) tri(g, x + w / 2 - 7, y + 6, 6, '#e04040', 'up');
+    if (vis && top + vis < n) tri(g, x + w / 2 - 7, y + h - 14, 6, '#e04040', 'down');
+    if (o.extra) o.extra(g, this.i, this);
+  }
+}
+const choose = (items, o) => new Promise(r => push(new Menu(items, r, o)));
+async function ask(t, items, o = {}) {
+  const d = new Dialog(t, null, { hold: true });
+  await new Promise(r => { d.res = r; push(d); });
+  const i = await choose(items, { y: H - 128 - (items.length * 36 + 32), ...o });
+  remove(d);
+  return i;
+}
+const yesNo = async t => (await ask(t, ['YES', 'NO'])) === 0;
+
+// ============================================================
+//  WORLD MAP
+// ============================================================
+const MW = 32, MH = 96;
+const map = Array.from({ length: MH }, () => Array(MW).fill('.'));
+function fill(x, y, w, h, ch) { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (map[j] && map[j][i] !== undefined) map[j][i] = ch; }
+const BUILDINGS = [
+  { x: 11, y: 3, w: 9, h: 6, type: 'gym' }, { x: 3, y: 11, w: 6, h: 4, type: 'center' }, { x: 22, y: 11, w: 5, h: 4, type: 'house2' },
+  { x: 5, y: 50, w: 6, h: 4, type: 'center' }, { x: 21, y: 50, w: 5, h: 4, type: 'mart' }, { x: 20, y: 56, w: 5, h: 4, type: 'house2' },
+  { x: 5, y: 83, w: 5, h: 4, type: 'home' }, { x: 20, y: 84, w: 7, h: 5, type: 'lab' },
+];
+(function buildMap() {
+  fill(15, 1, 2, 94, '=');
+  // --- Pewter City (y 1-20)
+  fill(3, 3, 5, 4, '~'); fill(3, 7, 7, 2, '"'); fill(22, 3, 6, 6, '"');
+  fill(6, 15, 10, 1, '='); fill(16, 15, 9, 1, '='); fill(20, 17, 6, 2, ','); fill(3, 17, 4, 2, ',');
+  [[10, 17], [11, 18], [27, 16], [4, 19]].forEach(([x, y]) => fill(x, y, 1, 1, 'R'));
+  fill(2, 21, 28, 1, 'T');
+  // --- Viridian Forest (y 22-45)
+  fill(2, 22, 28, 24, 'T');
+  fill(15, 41, 2, 5, '='); fill(4, 39, 22, 3, '"'); fill(4, 28, 3, 11, '"'); fill(7, 33, 6, 4, '.');
+  fill(4, 27, 23, 3, '"'); fill(10, 28, 5, 1, '='); fill(24, 23, 3, 7, '"'); fill(15, 23, 12, 2, '"');
+  fill(15, 22, 2, 1, '='); fill(19, 31, 7, 8, '"'); fill(21, 33, 3, 2, '.');
+  [[12, 40], [20, 28], [5, 34]].forEach(([x, y]) => fill(x, y, 1, 1, 'T'));
+  fill(2, 46, 28, 1, 'T');
+  // --- Viridian City (y 47-61)
+  fill(8, 54, 16, 1, '='); fill(22, 60, 1, 1, '='); fill(3, 57, 6, 3, ','); fill(26, 48, 3, 2, ',');
+  fill(2, 47, 2, 2, 'T'); fill(27, 58, 3, 3, 'T'); fill(11, 58, 3, 1, 'F'); fill(3, 61, 9, 1, 'F');
+  fill(2, 62, 28, 1, 'T');
+  // --- Route 1 (y 63-79)
+  fill(5, 65, 8, 4, '"'); fill(19, 68, 9, 5, '"'); fill(13, 71, 6, 2, '"'); fill(4, 74, 9, 4, '"'); fill(18, 76, 6, 3, '"');
+  fill(2, 70, 6, 2, 'T'); fill(24, 64, 6, 2, 'T'); fill(9, 63, 2, 1, 'T'); fill(26, 74, 4, 3, 'T'); fill(20, 65, 2, 1, 'T');
+  fill(2, 80, 28, 1, 'T');
+  // --- Pallet Town (y 81-94)
+  fill(7, 87, 1, 2, '='); fill(7, 89, 17, 1, '='); fill(23, 88, 1, 2, '=');
+  fill(11, 91, 10, 3, '~'); fill(3, 90, 5, 3, ','); fill(24, 91, 4, 2, ','); fill(3, 82, 2, 1, 'F'); fill(26, 82, 4, 1, 'F');
+  // borders & gaps
+  fill(0, 0, 2, MH, 'T'); fill(30, 0, 2, MH, 'T'); fill(0, 0, MW, 1, 'T'); fill(0, MH - 1, MW, 1, 'T');
+  [21, 46, 62, 80].forEach(y => fill(15, y, 2, 1, '='));
+  BUILDINGS.forEach(b => {
+    fill(b.x, b.y, b.w, b.h, 'B');
+    b.door = { x: b.x + Math.floor(b.w / 2), y: b.y + b.h - 1 };
+    map[b.door.y][b.door.x] = 'D';
+  });
+})();
+const SOLID = new Set(['T', '~', 'F', 'R', 'B']);
+const zoneAt = y => y <= 21 ? 'pewter' : y <= 46 ? 'forest' : y <= 62 ? 'viridian' : y <= 80 ? 'route1' : 'pallet';
+const ZONE = {
+  pewter: { name: 'PEWTER CITY', music: 'town', enc: [['geodude', 35, 7, 10], ['zubat', 30, 7, 9], ['psyduck', 20, 8, 10], ['rattata', 15, 8, 10]] },
+  forest: { name: 'VIRIDIAN FOREST', music: 'route', enc: [['caterpie', 22, 3, 5], ['weedle', 22, 3, 5], ['metapod', 10, 5, 7], ['kakuna', 10, 5, 7], ['pidgey', 16, 4, 6], ['oddish', 14, 4, 6], ['pikachu', 6, 4, 6]] },
+  viridian: { name: 'VIRIDIAN CITY', music: 'town', enc: [] },
+  route1: { name: 'ROUTE 1', music: 'route', enc: [['pidgey', 50, 2, 5], ['rattata', 45, 2, 4], ['pikachu', 5, 3, 4]] },
+  pallet: { name: 'PALLET TOWN', music: 'town', enc: [] },
+};
+
+// ---------- tile rendering ----------
+const hash = (x, y) => ((x * 73856093) ^ (y * 19349663)) >>> 0;
+function grass(g, sx, sy, tx, ty) {
+  g.fillStyle = '#80d060'; g.fillRect(sx, sy, TS, TS);
+  const h = hash(tx, ty); g.fillStyle = '#68b850';
+  for (let k = 0; k < 3; k++) { const px = (h >> (k * 5)) % 26 + 2, py = (h >> (k * 5 + 3)) % 24 + 4; g.fillRect(sx + px, sy + py, 2, 4); g.fillRect(sx + px + 2, sy + py - 2, 2, 4); }
+}
+function tallGrass(g, sx, sy, tx, ty, t, top) {
+  const sway = Math.sin(t * 2 + tx * .7 + ty) * 1.5;
+  if (!top) { g.fillStyle = '#50a040'; g.fillRect(sx, sy, TS, TS); }
+  for (let k = 0; k < 4; k++) {
+    const bx = sx + (k % 2) * 16, by = sy + Math.floor(k / 2) * 16;
+    if (top && k < 2) continue;
+    g.fillStyle = '#307828'; P(g, '#307828', bx + 1, by + 16, bx + 4 + sway, by + 2, bx + 8, by + 16);
+    P(g, '#68c048', bx + 6, by + 16, bx + 10 + sway, by + 1, bx + 15, by + 16);
+    P(g, '#3c9030', bx + 3, by + 16, bx + 7 + sway, by + 6, bx + 11, by + 16);
+  }
+}
+function drawTile(g, ch, sx, sy, tx, ty, t) {
+  switch (ch) {
+    case '"': tallGrass(g, sx, sy, tx, ty, t); break;
+    case '=': case 'D': {
+      g.fillStyle = '#e8d098'; g.fillRect(sx, sy, TS, TS);
+      const h = hash(tx, ty); g.fillStyle = '#d0b478';
+      g.fillRect(sx + h % 24 + 2, sy + (h >> 4) % 24 + 2, 4, 2); g.fillRect(sx + (h >> 8) % 24 + 2, sy + (h >> 12) % 24 + 2, 2, 2);
+      break;
+    }
+    case '~': {
+      g.fillStyle = '#4890e8'; g.fillRect(sx, sy, TS, TS);
+      g.fillStyle = '#88c0f8'; const o = Math.floor((t * 8 + tx * 5 + ty * 3) % 32);
+      g.fillRect(sx + (o % 24), sy + 8, 8, 2); g.fillRect(sx + ((o + 14) % 24), sy + 22, 8, 2);
+      const up = map[ty - 1] && map[ty - 1][tx]; if (up && up !== '~') { g.fillStyle = '#e8d8a0'; g.fillRect(sx, sy, TS, 4); }
+      break;
+    }
+    case ',': {
+      grass(g, sx, sy, tx, ty);
+      const b = Math.floor(t * 2 + tx + ty) % 2;
+      [[6, 6, '#f85858'], [20, 18, '#f8e050'], [22, 4, '#ffffff'], [6, 22, '#f8a0d0']].forEach(([fx, fy, c]) => {
+        g.fillStyle = c; g.fillRect(sx + fx, sy + fy + b, 6, 6); g.fillStyle = '#f8d030'; g.fillRect(sx + fx + 2, sy + fy + 2 + b, 2, 2);
+      });
+      break;
+    }
+    case 'T': {
+      grass(g, sx, sy, tx, ty);
+      g.fillStyle = '#704828'; g.fillRect(sx + 12, sy + 20, 8, 10);
+      E(g, sx + 16, sy + 14, 15, 13, '#206838'); E(g, sx + 14, sy + 11, 11, 9, '#2f8848'); E(g, sx + 11, sy + 8, 5, 4, '#48a860');
+      break;
+    }
+    case 'R': grass(g, sx, sy, tx, ty); E(g, sx + 16, sy + 20, 14, 11, '#787068'); E(g, sx + 14, sy + 17, 11, 8, '#a09888'); E(g, sx + 10, sy + 14, 4, 3, '#c8c0b0'); break;
+    case 'F':
+      grass(g, sx, sy, tx, ty);
+      g.fillStyle = '#f8f8f0'; g.fillRect(sx, sy + 10, TS, 4); g.fillRect(sx, sy + 20, TS, 4);
+      g.fillStyle = '#c8c0b0'; g.fillRect(sx + 4, sy + 6, 6, 22); g.fillRect(sx + 22, sy + 6, 6, 22);
+      break;
+    default: grass(g, sx, sy, tx, ty);
+  }
+}
+const ROOF = { home: ['#c85848', '#983828'], house2: ['#5888c8', '#3060a0'], lab: ['#a8b0b8', '#788088'], center: ['#e85050', '#b02c2c'], mart: ['#5080e0', '#2c50a8'], gym: ['#a88860', '#786040'] };
+const LABEL = { center: 'P.C', mart: 'MART', gym: 'GYM', lab: 'LAB' };
+function drawBuilding(g, b, sx, sy) {
+  const w = b.w * TS, h = b.h * TS, roofH = Math.floor(b.h / 2) * TS, [rc, rd] = ROOF[b.type];
+  g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(sx + 6, sy + h - 4, w - 4, 6);
+  g.fillStyle = '#f0e8d0'; g.fillRect(sx + 4, sy + roofH - 6, w - 8, h - roofH + 6);
+  g.fillStyle = '#c8b898'; g.fillRect(sx + 4, sy + h - 6, w - 8, 6);
+  P(g, rd, sx - 2, sy + roofH, sx + 6, sy + 4, sx + w - 6, sy + 4, sx + w + 2, sy + roofH);
+  P(g, rc, sx + 2, sy + roofH - 4, sx + 9, sy + 8, sx + w - 9, sy + 8, sx + w - 2, sy + roofH - 4);
+  g.fillStyle = rd; for (let k = sy + 16; k < sy + roofH - 6; k += 10) g.fillRect(sx + 8, k, w - 16, 2);
+  const dx = sx + (b.door.x - b.x) * TS, dy = sy + h - TS;
+  for (let i = 0; i < b.w; i++) {
+    const wx = sx + i * TS;
+    if (wx === dx || i === 0 || i === b.w - 1) continue;
+    g.fillStyle = '#5878a0'; g.fillRect(wx + 7, sy + roofH + 8, 18, 14); g.fillStyle = '#a8d0f0'; g.fillRect(wx + 9, sy + roofH + 10, 14, 10);
+    g.fillStyle = '#e8f4ff'; g.fillRect(wx + 10, sy + roofH + 11, 4, 4);
+  }
+  g.fillStyle = '#583820'; g.fillRect(dx + 5, dy + 2, 22, 30); g.fillStyle = '#7a5030'; g.fillRect(dx + 8, dy + 5, 16, 27);
+  g.fillStyle = '#f8d030'; g.fillRect(dx + 19, dy + 17, 3, 3);
+  if (LABEL[b.type]) {
+    const lw = LABEL[b.type].length * 10 + 14, lx = sx + w / 2 - lw / 2, ly = sy + roofH - 26;
+    g.fillStyle = '#283040'; rr(g, lx, ly, lw, 18, 4); g.fill();
+    text(g, LABEL[b.type], sx + w / 2, ly + 5, 10, b.type === 'center' ? '#ff8080' : '#fff', 'center', null);
+  }
+}
+// ---------- people ----------
+const PAL = {
+  player: { hat: '#e03838', hair: '#402818', skin: '#f8d0a8', shirt: '#3878d8', pants: '#34384c' },
+  rival: { hat: '#9a6a30', hair: '#9a6a30', skin: '#f8d0a8', shirt: '#7048a8', pants: '#303040' },
+  oak: { hat: '#b8b8b8', hair: '#b8b8b8', skin: '#f0c8a0', shirt: '#f4f4f4', pants: '#806040' },
+  youngster: { hat: '#f0c038', hair: '#503010', skin: '#f8d0a8', shirt: '#e8e8e8', pants: '#3858c0' },
+  lass: { hat: '#e06898', hair: '#e06898', skin: '#f8d0a8', shirt: '#f8f0a0', pants: '#4868c8' },
+  bug: { hat: '#58a048', hair: '#402818', skin: '#f8d0a8', shirt: '#f0e8a0', pants: '#486838' },
+  oldman: { hat: '#d8d8d8', hair: '#d8d8d8', skin: '#e8c098', shirt: '#887060', pants: '#504038' },
+  girl: { hat: '#f08030', hair: '#f08030', skin: '#f8d0a8', shirt: '#58b0e8', pants: '#e8e8f0' },
+  camper: { hat: '#c84830', hair: '#402818', skin: '#e8b890', shirt: '#d89850', pants: '#605040' },
+  brock: { hat: '#402818', hair: '#402818', skin: '#d8a070', shirt: '#808048', pants: '#685838' },
+};
+function drawPerson(g, x, y, dir, frame, pal, hatless) {
+  const R = (cx, cy, w, h, c) => { g.fillStyle = c; g.fillRect(x + cx * 2, y + cy * 2, w * 2, h * 2); };
+  g.fillStyle = 'rgba(0,0,0,.22)'; g.beginPath(); g.ellipse(x + 16, y + 30, 10, 3, 0, 0, Math.PI * 2); g.fill();
+  const bob = frame ? 1 : 0, side = dir === 'left' || dir === 'right';
+  g.save();
+  if (dir === 'right') { g.translate(x * 2 + 32, 0); g.scale(-1, 1); }
+  y -= bob * 2;
+  // legs
+  const l1 = frame === 1 ? 1 : 0, l2 = frame === 2 ? 1 : 0;
+  if (side) { R(6, 12, 3, 3 - l1, pal.pants); R(8, 12, 3, 3 - l2, pal.pants); R(6, 15 - l1, 3, 1, '#282828'); R(8, 15 - l2, 3, 1, '#383838'); }
+  else { R(5, 12, 3, 3 - l1, pal.pants); R(8, 12, 3, 3 - l2, pal.pants); R(5, 15 - l1, 3, 1, '#282828'); R(8, 15 - l2, 3, 1, '#282828'); }
+  // body & arms
+  if (side) { R(5, 8, 6, 5, pal.shirt); R(7, 9 + (frame ? 1 : 0), 2, 3, pal.skin); }
+  else { R(4, 8, 8, 5, pal.shirt); R(3, 9, 1, 3, pal.skin); R(12, 9, 1, 3, pal.skin); }
+  // head
+  if (dir === 'up') { R(4, 3, 8, 6, pal.hair); }
+  else if (side) { R(5, 3, 7, 6, pal.skin); R(10, 3, 2, 4, pal.hair); R(6, 5, 1, 2, '#202020'); }
+  else { R(4, 3, 8, 6, pal.skin); R(4, 3, 1, 3, pal.hair); R(11, 3, 1, 3, pal.hair); R(6, 5, 1, 2, '#202020'); R(9, 5, 1, 2, '#202020'); }
+  if (hatless) { R(4, 1, 8, 3, pal.hair); if (dir !== 'up') { R(3, 2, 2, 2, pal.hair); R(11, 2, 2, 2, pal.hair); } }
+  else { R(4, 0, 8, 3, pal.hat); if (dir === 'down') R(3, 3, 10, 1, pal.hat); else if (side) R(2, 3, 5, 1, pal.hat); else R(4, 3, 8, 1, pal.hat); R(6, 1, 4, 1, '#f8f8f8'); }
+  g.restore();
+}
+function drawBall(g, x, y, s = 1) {
+  E(g, x, y, 7 * s, 7 * s, '#202020'); E(g, x, y, 6 * s, 6 * s, '#f8f8f8');
+  g.save(); g.beginPath(); g.rect(x - 7 * s, y - 7 * s, 14 * s, 7 * s); g.clip(); E(g, x, y, 6 * s, 6 * s, '#e83838'); g.restore();
+  g.fillStyle = '#202020'; g.fillRect(x - 6 * s, y - s, 12 * s, 2 * s); E(g, x, y, 2.5 * s, 2.5 * s, '#202020'); E(g, x, y, 1.5 * s, 1.5 * s, '#fff');
+}
+
+// ============================================================
+//  GAME STATE, ITEMS, NPCs
+// ============================================================
+const ITEMS = {
+  potion: { n: 'POTION', price: 200, heal: 20, d: 'Restores 20 HP to one POKéMON.' },
+  superpotion: { n: 'SUPER POTION', price: 500, heal: 50, d: 'Restores 50 HP to one POKéMON.' },
+  fullheal: { n: 'FULL HEAL', price: 400, cure: 1, d: 'Cures any status problem.' },
+  pokeball: { n: 'POKé BALL', price: 200, ball: 1, d: 'A ball for catching wild POKéMON.' },
+  greatball: { n: 'GREAT BALL', price: 600, ball: 1.5, d: 'A good ball with a higher catch rate.' },
+};
+let G = null;
+function newGame(name) {
+  G = { name, rival: 'BLUE', party: [], box: [], bag: { potion: 3, pokeball: 5 }, money: 1000, flags: {}, seen: {}, caught: {},
+    x: 23, y: 89, dir: 'down', heal: { x: 7, y: 87 }, beaten: {}, items: {}, badges: 0 };
+}
+const addItem = (id, n = 1) => { G.bag[id] = (G.bag[id] || 0) + n; };
+const useItem = id => { G.bag[id]--; if (G.bag[id] <= 0) delete G.bag[id]; };
+function registerCaught(m) { G.seen[m.sp] = 1; G.caught[m.sp] = 1; }
+
+const TR = (name, pal, team, money, intro, lose, after) => ({ name, pal, team, money, intro, lose, after });
+const NPCS = [
+  { id: 'momfriend', x: 11, y: 84, dir: 'down', pal: 'girl', wander: 1, text: ['Technology is incredible! You can now store and recall items and POKéMON as data via PC!'] },
+  { id: 'joey', x: 12, y: 68, dir: 'right', pal: 'youngster', sight: 4,
+    tr: TR('YOUNGSTER JOEY', 'youngster', [['rattata', 4]], 15, 'Hey! You have POKéMON! Come on, let\'s battle \'em!', 'Aww! My RATTATA was in the top percentage!', 'Every RATTATA is special in its own way. Mine more so!') },
+  { id: 'ann', x: 19, y: 73, dir: 'left', pal: 'lass', sight: 4,
+    tr: TR('LASS ANN', 'lass', [['pidgey', 4], ['rattata', 5]], 20, 'You looked at me, didn\'t you? That means we battle!', 'No fair! You\'re way too strong!', 'I heard a yellow mouse POKéMON lives deep in VIRIDIAN FOREST...') },
+  { id: 'oldman', x: 12, y: 57, dir: 'down', pal: 'oldman', text: ['Ahh, I\'ve had my coffee now and I feel great!', 'Here\'s a tip: weaken a wild POKéMON before throwing a POKé BALL. Putting it to sleep or paralyzing it helps too!'] },
+  { id: 'vgirl', x: 18, y: 49, dir: 'down', pal: 'girl', wander: 1, text: ['The POKéMON CENTER heals your team for free. The MART sells POKé BALLS and POTIONS!'] },
+  { id: 'rick', x: 10, y: 40, dir: 'right', pal: 'bug', sight: 5,
+    tr: TR('BUG CATCHER RICK', 'bug', [['caterpie', 6], ['weedle', 6]], 10, 'Hey! I caught all my POKéMON in this very forest!', 'No! CATERPIE can\'t cut it!', 'Bug POKéMON evolve super fast. CATERPIE becomes BUTTERFREE at level 10!') },
+  { id: 'doug', x: 5, y: 32, dir: 'down', pal: 'bug', sight: 5,
+    tr: TR('BUG CATCHER DOUG', 'bug', [['weedle', 7], ['kakuna', 7]], 10, 'Wait up! Let me show you my bug collection!', 'Huh? My bugs got squashed!', 'Watch out for POISON. Use a FULL HEAL or visit a POKéMON CENTER.') },
+  { id: 'sammy', x: 22, y: 32, dir: 'down', pal: 'bug', sight: 4,
+    tr: TR('BUG CATCHER SAMMY', 'bug', [['metapod', 8], ['caterpie', 8], ['butterfree', 10]], 12, 'This is my secret spot! You won\'t leave without a battle!', 'My secret spot... my BUTTERFREE...', 'BROCK of PEWTER uses ROCK types. Bugs don\'t do much against them!') },
+  { id: 'pguy', x: 19, y: 17, dir: 'left', pal: 'camper', wander: 1, text: ['BROCK is PEWTER\'s GYM LEADER. He uses ROCK-type POKéMON.', 'WATER and GRASS moves are super effective on ROCK. FIRE and FLYING moves... not so much!'] },
+  { id: 'pgirl', x: 9, y: 9, dir: 'down', pal: 'lass', text: ['A duck-like POKéMON sometimes swims in this pond. It always looks like it has a headache.'] },
+];
+NPCS.forEach(n => { n.hx = n.x; n.hy = n.y; n.wt = 1 + Math.random() * 3; n.anim = null; });
+const SIGNS = {
+  '13,86': 'PALLET TOWN\nShades of your journey await!', '17,78': 'ROUTE 1\nPALLET TOWN - VIRIDIAN CITY',
+  '13,52': 'VIRIDIAN CITY\nThe Eternally Green Paradise', '17,47': 'VIRIDIAN FOREST\nBeware of bug POKéMON!',
+  '13,9': 'PEWTER CITY POKéMON GYM\nLEADER: BROCK\nThe Rock-Solid POKéMON Trainer!', '17,19': 'PEWTER CITY\nA Stone Gray City',
+};
+const GROUND_ITEMS = [
+  { id: 'i1', x: 9, y: 34, item: 'potion', n: 2 }, { id: 'i2', x: 24, y: 37, item: 'greatball', n: 3 },
+  { id: 'i3', x: 27, y: 5, item: 'superpotion', n: 1 }, { id: 'i4', x: 4, y: 76, item: 'pokeball', n: 3 }, { id: 'i5', x: 25, y: 23, item: 'fullheal', n: 1 },
+];
+const npcAt = (x, y) => NPCS.find(n => n.x === x && n.y === y);
+const itemAt = (x, y) => GROUND_ITEMS.find(i => i.x === x && i.y === y && !G.items[i.id]);
+function solidAt(x, y) {
+  if (x < 0 || y < 0 || x >= MW || y >= MH) return true;
+  return SOLID.has(map[y][x]) || !!SIGNS[x + ',' + y] || !!itemAt(x, y);
+}
+
+// ============================================================
+//  OVERWORLD
+// ============================================================
+class Overworld {
+  constructor() { this.mv = null; this.busy = false; this.turnT = 0; this.bumpT = 0; this.zone = null; this.zoneT = 0; this.t = 0; this.stepN = 0; }
+  enter() { this.zone = zoneAt(G.y); this.zoneT = 2.2; Music.play(ZONE[this.zone].music); }
+  blocked(x, y) { return solidAt(x, y) || !!npcAt(x, y); }
+  async run(fn) {
+    this.busy = true;
+    try { await fn(); } catch (e) { console.error(e); }
+    this.busy = false; Input.clear();
+    if (scenes[scenes.length - 1] === this) Music.play(ZONE[zoneAt(G.y)].music);
+  }
+  update(dt, top) {
+    this.t += dt; if (this.zoneT > 0) this.zoneT -= dt; if (this.bumpT > 0) this.bumpT -= dt;
+    this.updateNPCs(dt);
+    if (this.mv) {
+      this.mv.p += dt * (this.mv.run ? 8 : 4.4);
+      if (this.mv.p >= 1) { G.x = this.mv.tx; G.y = this.mv.ty; this.mv = null; this.onStep(); }
+      return;
+    }
+    if (!top || this.busy) return;
+    if (Input.hit('start')) { Input.clear(); SFX.select(); this.run(startMenu); return; }
+    if (Input.hit('a')) { this.run(() => this.interact()); return; }
+    const d = ['up', 'down', 'left', 'right'].find(k => Input.held[k]);
+    if (!d) { this.turnT = 0; return; }
+    if (G.dir !== d) { G.dir = d; this.turnT = 0.09; return; }
+    if (this.turnT > 0) { this.turnT -= dt; return; }
+    const [dx, dy] = DIRS[d], nx = G.x + dx, ny = G.y + dy;
+    if (this.blocked(nx, ny)) { if (this.bumpT <= 0) { SFX.bump(); this.bumpT = 0.35; } return; }
+    this.mv = { fx: G.x, fy: G.y, tx: nx, ty: ny, p: 0, run: Input.held.run || Input.held.b };
+    this.stepN ^= 1;
+  }
+  updateNPCs(dt) {
+    NPCS.forEach(n => {
+      if (n.anim) { n.anim.p += dt * 4; if (n.anim.p >= 1) n.anim = null; return; }
+      if (!n.wander || this.busy) return;
+      n.wt -= dt;
+      if (n.wt > 0) return;
+      n.wt = 1.5 + Math.random() * 3;
+      const d = pick(Object.keys(DIRS)), [dx, dy] = DIRS[d], nx = n.x + dx, ny = n.y + dy;
+      n.dir = d;
+      const px = this.mv ? this.mv.tx : G.x, py = this.mv ? this.mv.ty : G.y;
+      if (Math.abs(nx - n.hx) > 2 || Math.abs(ny - n.hy) > 2 || this.blocked(nx, ny) || (nx === px && ny === py) || (nx === G.x && ny === G.y) || map[ny][nx] === 'D') return;
+      n.x = nx; n.y = ny; n.anim = { dx, dy, p: 0 };
+    });
+  }
+  npcStep(n) {
+    const [dx, dy] = DIRS[n.dir]; n.x += dx; n.y += dy; n.anim = { dx, dy, p: 0 };
+    return wait(260);
+  }
+  onStep() {
+    const z = zoneAt(G.y);
+    if (z !== this.zone) { this.zone = z; this.zoneT = 2.2; Music.play(ZONE[z].music); }
+    const ch = map[G.y][G.x];
+    if (ch === 'D') { this.run(() => this.enterDoor()); return; }
+    const tr = this.spotted();
+    if (tr) { this.run(() => this.trainerBattle(tr, true)); return; }
+    if (ch === '"' && ZONE[z].enc.length && Math.random() < 0.1) this.run(() => this.wildBattle(z));
+  }
+  spotted() {
+    for (const n of NPCS) {
+      if (!n.tr || G.beaten[n.id] || n.anim) continue;
+      const [dx, dy] = DIRS[n.dir];
+      for (let k = 1; k <= n.sight; k++) {
+        const x = n.x + dx * k, y = n.y + dy * k;
+        if (x === G.x && y === G.y) return n;
+        if (solidAt(x, y) || npcAt(x, y)) break;
+      }
+    }
+    return null;
+  }
+  async interact() {
+    const [dx, dy] = DIRS[G.dir], fx = G.x + dx, fy = G.y + dy;
+    const n = npcAt(fx, fy);
+    if (n) {
+      n.dir = OPP[G.dir];
+      if (n.tr && !G.beaten[n.id]) return this.trainerBattle(n, false);
+      return say(n.tr ? n.tr.after : n.text);
+    }
+    const s = SIGNS[fx + ',' + fy];
+    if (s) return say(s);
+    const it = itemAt(fx, fy);
+    if (it) {
+      G.items[it.id] = 1; addItem(it.item, it.n); SFX.money();
+      return say(`${G.name} found ${it.n > 1 ? it.n + ' ' : 'a '}${ITEMS[it.item].n}${it.n > 1 ? 'S' : ''}!`);
+    }
+  }
+  async trainerBattle(n, spotted) {
+    if (spotted) {
+      Music.stop(); SFX.encounter(); n.alert = true; await wait(800); n.alert = false;
+      while (Math.abs(n.x - G.x) + Math.abs(n.y - G.y) > 1) await this.npcStep(n);
+      G.dir = OPP[n.dir];
+    }
+    await say(n.tr.intro);
+    const r = await startBattle({ trainer: n.tr });
+    if (r === 'win') G.beaten[n.id] = true;
+    else if (r === 'lose') await blackout();
+  }
+  async wildBattle(z) {
+    const enc = ZONE[z].enc, tot = enc.reduce((s, e) => s + e[1], 0);
+    let roll = rnd(tot), e = enc[0];
+    for (const x of enc) { if (roll < x[1]) { e = x; break; } roll -= x[1]; }
+    const r = await startBattle({ wild: makeMon(e[0], e[2] + rnd(e[3] - e[2] + 1)) });
+    if (r === 'lose') await blackout();
+  }
+  async enterDoor() {
+    const b = BUILDINGS.find(b => b.door.x === G.x && b.door.y === G.y);
+    SFX.door();
+    await fadeTo(0.55, 150);
+    try { await DOORS[b.type](b); }
+    finally { G.y += 1; G.dir = 'down'; await fadeTo(0, 150); }
+  }
+  draw(g) {
+    let px = G.x, py = G.y;
+    if (this.mv) { px = this.mv.fx + (this.mv.tx - this.mv.fx) * this.mv.p; py = this.mv.fy + (this.mv.ty - this.mv.fy) * this.mv.p; }
+    const camX = Math.round(clamp(px * TS - W / 2 + 16, 0, MW * TS - W)), camY = Math.round(clamp(py * TS - H / 2 + 16, 0, MH * TS - H));
+    const x0 = Math.floor(camX / TS), y0 = Math.floor(camY / TS);
+    for (let ty = y0; ty <= y0 + 15 && ty < MH; ty++) for (let tx = x0; tx <= x0 + 20 && tx < MW; tx++) {
+      const ch = map[ty][tx], sx = tx * TS - camX, sy = ty * TS - camY;
+      drawTile(g, ch === 'B' ? '.' : ch === 'D' ? '=' : ch, sx, sy, tx, ty, this.t);
+    }
+    BUILDINGS.forEach(b => { const sx = b.x * TS - camX, sy = b.y * TS - camY; if (sx < W && sy < H && sx + b.w * TS > 0 && sy + b.h * TS > 0) drawBuilding(g, b, sx, sy); });
+    Object.keys(SIGNS).forEach(k => {
+      const [x, y] = k.split(',').map(Number), sx = x * TS - camX, sy = y * TS - camY;
+      if (sx < -TS || sy < -TS || sx > W || sy > H) return;
+      g.fillStyle = '#6a4828'; g.fillRect(sx + 14, sy + 16, 4, 14); g.fillStyle = '#a07040'; g.fillRect(sx + 4, sy + 4, 24, 15);
+      g.fillStyle = '#c89860'; g.fillRect(sx + 6, sy + 6, 20, 11); g.fillStyle = '#6a4828'; g.fillRect(sx + 9, sy + 9, 14, 2); g.fillRect(sx + 9, sy + 13, 10, 2);
+    });
+    GROUND_ITEMS.forEach(i => { if (!G.items[i.id]) drawBall(g, i.x * TS - camX + 16, i.y * TS - camY + 18, 1); });
+    const ents = NPCS.map(n => {
+      const o = n.anim ? 1 - n.anim.p : 0, ex = (n.x - (n.anim ? n.anim.dx : 0) * o) * TS - camX, ey = (n.y - (n.anim ? n.anim.dy : 0) * o) * TS - camY;
+      return { y: ey, draw: () => {
+        drawPerson(g, ex, ey - 6, n.dir, n.anim ? (n.anim.p < .5 ? 1 : 2) : 0, PAL[n.pal], ['lass', 'girl', 'oldman', 'brock'].includes(n.pal));
+        if (n.alert) { g.fillStyle = '#fff'; rr(g, ex + 6, ey - 34, 20, 22, 4); g.fill(); g.strokeStyle = '#333'; g.lineWidth = 2; g.stroke(); text(g, '!', ex + 17, ey - 29, 14, '#e03030', 'center', null); }
+        if (map[n.y][n.x] === '"' && !n.anim) tallGrass(g, ex, ey, n.x, n.y, this.t, true);
+      } };
+    });
+    const psx = px * TS - camX, psy = py * TS - camY;
+    ents.push({ y: psy, draw: () => {
+      const fr = this.mv ? (this.mv.p > .25 && this.mv.p < .75 ? 1 + this.stepN : 0) : 0;
+      drawPerson(g, psx, psy - 6, G.dir, fr, PAL.player);
+      const gx = this.mv ? (this.mv.p > .5 ? this.mv.tx : this.mv.fx) : G.x, gy = this.mv ? (this.mv.p > .5 ? this.mv.ty : this.mv.fy) : G.y;
+      if (map[gy][gx] === '"') tallGrass(g, gx * TS - camX, gy * TS - camY, gx, gy, this.t, true);
+    } });
+    ents.sort((a, b) => a.y - b.y).forEach(e => e.draw());
+    if (this.zoneT > 0) {
+      const slide = Math.min(1, this.zoneT * 3, (2.2 - this.zoneT) * 4), nm = ZONE[this.zone].name;
+      const bw = nm.length * 12 + 40;
+      g.save(); g.translate(0, -60 * (1 - slide)); box(g, 8, 8, bw, 44); text(g, nm, 28, 24, 12); g.restore();
+    }
+  }
+}
+
+// ============================================================
+//  BATTLE — setup, drawing, menus
+// ============================================================
+const XP_MULT = 1.5;
+const newSide = () => ({ mon: null, stages: {}, hpD: 0, vis: { s: 1, alpha: 1, dx: 0, dy: 0, white: false, hidden: true, blink: false } });
+async function startBattle(o) {
+  Music.stop(); SFX.encounter(); Music.play('battle');
+  for (let i = 0; i < 3; i++) { await fadeTo(0.9, 70, '#fff'); await fadeTo(0, 70, '#fff'); }
+  await fadeTo(1, 260, '#000');
+  const b = push(new Battle(o));
+  await fadeTo(0, 220);
+  const r = await b.run();
+  await fadeTo(1, 300); remove(b); Music.stop();
+  if (r === 'lose') return r;
+  await fadeTo(0, 300);
+  await checkEvolutions();
+  return r;
+}
+class Battle {
+  constructor(o) {
+    this.o = o; this.wild = o.wild; this.tr = o.trainer;
+    this.foes = this.wild ? [this.wild] : this.tr.team.map(([s, l]) => makeMon(s, l));
+    this.P = newSide(); this.F = newSide(); this.runs = 0; this.parts = new Set(); this.t = 0;
+    this.intro = 0; this.trainerX = 0; this.playerX = 0; this.prompt = null; this.ball = null; this.xpD = 0;
+  }
+  nameOf(s) { return s === this.P ? mname(s.mon) : (this.wild ? 'Wild ' : 'Foe ') + mname(s.mon); }
+  msg(t) { return say(t, { auto: 0.9 }); }
+  update(dt) { this.t += dt; }
+  stat(s, k) {
+    const st = s.stages[k] || 0;
+    let v = s.mon.st[k] * (st >= 0 ? (2 + st) / 2 : 2 / (2 - st));
+    if (k === 'spe' && s.mon.status === 'par') v *= 0.5;
+    return v;
+  }
+  // ---------- drawing ----------
+  draw(g) {
+    const sky = g.createLinearGradient(0, 0, 0, 360);
+    sky.addColorStop(0, '#f8f8e8'); sky.addColorStop(1, '#c8e8c0');
+    g.fillStyle = sky; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#b8e0a8'; for (let i = 0; i < 6; i++) g.fillRect(0, 196 + i * 28, W, 2);
+    const ex = 470 + (1 - this.intro) * -420, px = 170 + (1 - this.intro) * 420;
+    E(g, ex, 178, 120, 28, '#88b860'); E(g, ex, 174, 108, 22, '#a8d080');
+    E(g, px, 344, 150, 30, '#88b860'); E(g, px, 340, 136, 24, '#a8d080');
+    // trainers (intro / outro)
+    if (this.tr && this.trainerX < 1) {
+      g.save(); g.translate(ex - 56 + this.trainerX * 300, 40); g.scale(3.5, 3.5);
+      drawPerson(g, 0, 0, 'down', 0, PAL[this.tr.pal], ['lass', 'girl', 'oldman', 'brock'].includes(this.tr.pal)); g.restore();
+    }
+    if (this.playerX < 1) {
+      g.save(); g.translate(px - 64 - this.playerX * 340, 196); g.scale(4, 4);
+      drawPerson(g, 0, 0, 'up', 0, PAL.player); g.restore();
+    }
+    // POKéMON
+    this.drawSide(g, this.F, ex, 182, 2.7, false);
+    this.drawSide(g, this.P, px, 352, 3.3, true);
+    if (this.ball) drawBall(g, this.ball.x, this.ball.y, 1.6);
+    // info boxes
+    if (this.F.mon && !this.F.vis.hidden) this.drawInfo(g, this.F, 24, 28, false);
+    if (this.P.mon && !this.P.vis.hidden) this.drawInfo(g, this.P, 330, 236, true);
+    if (this.tr && this.trainerX < 1 && !this.F.mon) this.drawBalls(g, 40, 70, this.foes);
+    box(g, 8, H - 120, W - 16, 112);
+    if (this.prompt) wrap(this.prompt, 17).forEach((l, i) => text(g, l, 36, H - 90 + i * 36, 16));
+  }
+  drawSide(g, s, x, y, sc, back) {
+    const v = s.vis;
+    if (!s.mon || v.hidden || v.blink) return;
+    g.save();
+    if (v.clip) { g.beginPath(); g.rect(0, 0, W, y + 2); g.clip(); }
+    drawMon(g, s.mon.sp, x + v.dx, y + v.dy, sc * v.s, { flip: back, kind: v.white ? 'w' : 'n', alpha: v.alpha });
+    g.restore();
+  }
+  drawBalls(g, x, y, team) {
+    team.forEach((m, i) => { if (alive(m)) drawBall(g, x + i * 22, y, .9); else { E(g, x + i * 22, y, 6, 6, '#888'); } });
+  }
+  drawInfo(g, s, x, y, mine) {
+    const m = s.mon, w = 290, h = mine ? 100 : 76;
+    g.fillStyle = '#404850'; rr(g, x, y, w, h, 10); g.fill();
+    g.fillStyle = '#f8f8e0'; rr(g, x + 4, y + 4, w - 8, h - 8, 7); g.fill();
+    text(g, mname(m), x + 16, y + 14, 14);
+    text(g, 'Lv' + m.lv, x + w - 16, y + 14, 12, '#303030', 'right');
+    statusBadge(g, m.status, x + 16, y + 38);
+    text(g, 'HP', x + 72, y + 42, 10, '#f8a030', 'left', null);
+    hpBar(g, x + 100, y + 42, 172, s.hpD, m.st.hp, 8);
+    if (G.caught[m.sp] && !mine) drawBall(g, x + w - 26, y + 56, .7);
+    if (mine) {
+      text(g, `${Math.ceil(s.hpD)}/${m.st.hp}`, x + w - 18, y + 58, 12, '#303030', 'right');
+      const lo = xpFor(m.lv), hi = xpFor(m.lv + 1), xd = s === this.P && this.xpD ? this.xpD : m.xp;
+      g.fillStyle = '#404848'; g.fillRect(x + 60, y + 82, 214, 6);
+      g.fillStyle = '#48a8f8'; g.fillRect(x + 62, y + 83, 210 * clamp((xd - lo) / (hi - lo), 0, 1), 4);
+      text(g, 'EXP', x + 20, y + 80, 8, '#48a8f8', 'left', null);
+    }
+  }
+  // ---------- animations ----------
+  async sendOut(s, m, isP) {
+    s.mon = m; s.stages = {}; s.hpD = m.hp; s.fainted = false;
+    if (isP) { this.xpD = m.xp; this.parts.add(m); }
+    const fromX = isP ? -330 : 120, fromY = isP ? -140 : -260;
+    this.ball = { x: (isP ? 170 : 470) + fromX * 0.3, y: (isP ? 352 : 182) - 120 };
+    SFX.ball();
+    await animate(320, p => { this.ball.y = (isP ? 352 : 182) - 120 + p * 60 - Math.sin(p * Math.PI) * 60; this.ball.x = (isP ? 120 : 430) + p * 50; });
+    this.ball = null; s.vis = { s: 0, alpha: 1, dx: 0, dy: 0, white: true, hidden: false, blink: false };
+    SFX.select();
+    await animate(260, p => { s.vis.s = p; });
+    s.vis.white = false;
+    G.seen[m.sp] = 1;
+    tone(isP ? 520 : 400, 0.25, 'sawtooth', 0.05, 0, -150);
+    await wait(200);
+  }
+  async recall(s) {
+    s.vis.white = true; await animate(240, p => { s.vis.s = 1 - p; }); s.vis.hidden = true; s.vis.white = false; s.vis.s = 1;
+  }
+  async lunge(s) {
+    const dir = s === this.P ? 1 : -1;
+    await animate(110, p => { s.vis.dx = dir * 26 * p; s.vis.dy = -dir * 8 * p; });
+    await animate(110, p => { s.vis.dx = dir * 26 * (1 - p); s.vis.dy = -dir * 8 * (1 - p); });
+  }
+  async blink(s) { for (let i = 0; i < 4; i++) { s.vis.blink = true; await wait(60); s.vis.blink = false; await wait(60); } }
+  async shake(s) { await animate(300, p => { s.vis.dx = Math.sin(p * 30) * 6 * (1 - p); }); s.vis.dx = 0; }
+  async damage(s, dmg) {
+    const from = s.mon.hp, to = Math.max(0, from - dmg); s.mon.hp = to;
+    await animate(Math.min(900, 250 + (from - to) / s.mon.st.hp * 900), p => { s.hpD = from + (to - from) * p; });
+  }
+  async heal(s, amt) {
+    const from = s.mon.hp, to = Math.min(s.mon.st.hp, from + amt); s.mon.hp = to;
+    await animate(400, p => { s.hpD = from + (to - from) * p; });
+    return to - from;
+  }
+  // ---------- player choices ----------
+  async chooseAction() {
+    while (true) {
+      this.prompt = `What will ${mname(this.P.mon)} do?`;
+      const i = await choose(['FIGHT', 'BAG', 'POKéMON', 'RUN'], { cols: 2, x: W - 316, y: H - 120, w: 308, lh: 40, cw: 140, size: 14, start: this.lastAct || 0 });
+      this.prompt = null;
+      if (i < 0) continue;
+      this.lastAct = i;
+      if (i === 0) { const mv = await this.chooseMove(); if (mv) return { type: 'move', mv }; }
+      else if (i === 1) { const r = await bagMenu(this); if (r) return r; }
+      else if (i === 2) { const r = await partyMenu('battle', this); if (r != null) return { type: 'switch', idx: r }; }
+      else if (i === 3) {
+        if (this.tr) { await this.msg('No! There\'s no running from a trainer battle!'); continue; }
+        return { type: 'run' };
+      }
+    }
+  }
+  async chooseMove() {
+    const ms = this.P.mon.moves;
+    if (ms.every(m => m.pp <= 0)) { await this.msg(`${mname(this.P.mon)} has no moves left!`); return 'struggle'; }
+    const items = ms.map(m => ({ label: MOVES[m.id].n, disabled: m.pp <= 0 }));
+    const extra = (g, i) => {
+      const m = ms[i], mv = MOVES[m.id];
+      g.fillStyle = '#f8f8f8'; g.fillRect(452, H - 108, 168, 88);
+      g.fillStyle = '#88a8c8'; g.fillRect(448, H - 112, 2, 96);
+      text(g, 'PP', 470, H - 96, 12); text(g, `${m.pp}/${mv.pp}`, 604, H - 96, 12, m.pp ? '#303030' : '#e03030', 'right');
+      typeBadge(g, mv.t, 470, H - 70, 134);
+      text(g, mv.c === 'st' ? 'STATUS' : 'POW ' + mv.p, 470, H - 40, 10, '#606060', 'left', null);
+    };
+    const i = await choose(items, { cols: 2, x: 8, y: H - 120, w: W - 16, lh: 40, cw: 210, size: 12, extra, start: this.lastMove || 0 });
+    if (i < 0) return null;
+    this.lastMove = i;
+    return ms[i];
+  }
+}
+
+// ============================================================
+//  BATTLE — turn engine
+// ============================================================
+Object.assign(Battle.prototype, {
+  async run() {
+    await animate(650, p => { this.intro = p; });
+    if (this.wild) {
+      this.F.mon = this.wild; this.F.hpD = this.wild.hp; this.F.vis = { s: 1, alpha: 1, dx: 0, dy: 0, white: false, hidden: false };
+      G.seen[this.wild.sp] = 1; tone(380, 0.3, 'sawtooth', 0.05, 0, -120);
+      await this.msg(`A wild ${mname(this.wild)} appeared!`);
+    } else {
+      await this.msg(`${this.tr.name} wants to battle!`);
+      await animate(300, p => { this.trainerX = p; });
+      await this.msg(`${this.tr.name} sent out ${mname(this.foes[0])}!`);
+      await this.sendOut(this.F, this.foes[0], false);
+    }
+    const first = G.party.find(alive);
+    await this.msg(`Go! ${mname(first)}!`);
+    await animate(250, p => { this.playerX = p; });
+    await this.sendOut(this.P, first, true);
+    while (true) {
+      const act = await this.chooseAction();
+      const r = await this.turn(act);
+      if (r) return this.finish(r);
+    }
+  },
+  async finish(r) {
+    if (r === 'win' && this.tr) {
+      Music.play('victory');
+      await this.msg(`${G.name} defeated ${this.tr.name}!`);
+      this.F.vis.hidden = true; await animate(300, p => { this.trainerX = 1 - p; });
+      await say(this.tr.lose);
+      const money = this.tr.money * this.foes[this.foes.length - 1].lv;
+      G.money += money; SFX.money();
+      await say(`${G.name} got $${money} for winning!`);
+    } else if (r === 'win') Music.play('victory');
+    if (r === 'lose') {
+      await this.msg(`${G.name} is out of usable POKéMON!`);
+      if (!this.o.noBlackout) await say(`${G.name} blacked out!`);
+    }
+    return r;
+  },
+  pickFoeMove() {
+    const ms = this.F.mon.moves.filter(m => m.pp > 0);
+    if (!ms.length) return 'struggle';
+    if (this.wild || Math.random() < 0.25) return pick(ms);
+    const d = this.P.mon, score = m => {
+      const mv = MOVES[m.id];
+      if (mv.c === 'st') return mv.fx.status ? (d.status ? 0 : 45) : 25;
+      return mv.p * effectiveness(mv.t, SPECIES[d.sp].t) * (SPECIES[this.F.mon.sp].t.includes(mv.t) ? 1.5 : 1);
+    };
+    return ms.reduce((a, b) => score(b) > score(a) ? b : a);
+  },
+  playerFirst(pm, fm) {
+    const pp = pm === 'struggle' ? 0 : MOVES[pm.id].pri || 0, fp = fm === 'struggle' ? 0 : MOVES[fm.id].pri || 0;
+    if (pp !== fp) return pp > fp;
+    const ps = this.stat(this.P, 'spe'), fs = this.stat(this.F, 'spe');
+    return ps === fs ? Math.random() < .5 : ps > fs;
+  },
+  async turn(act) {
+    const P = this.P, F = this.F, fm = this.pickFoeMove();
+    if (act.type === 'run') {
+      this.runs++;
+      const ps = this.stat(P, 'spe'), fs = this.stat(F, 'spe');
+      if (ps >= fs || rnd(256) < (ps * 128 / fs + 30 * this.runs) % 256) { SFX.door(); await this.msg('Got away safely!'); return 'ran'; }
+      await this.msg('Can\'t escape!');
+    } else if (act.type === 'switch') {
+      await this.msg(`${mname(P.mon)}, come back!`); await this.recall(P);
+      await this.msg(`Go! ${mname(G.party[act.idx])}!`); await this.sendOut(P, G.party[act.idx], true);
+    } else if (act.type === 'item') {
+      if (await this.useItem(act) === 'caught') return 'caught';
+    }
+    const order = act.type !== 'move' ? [[F, P, fm]] : this.playerFirst(act.mv, fm) ? [[P, F, act.mv], [F, P, fm]] : [[F, P, fm], [P, F, act.mv]];
+    for (const [a, d, mv] of order) {
+      if (!alive(a.mon)) continue;
+      await this.doMove(a, d, mv);
+      const r = await this.checkFaints();
+      if (r === 'replaced') return null;
+      if (r) return r;
+    }
+    for (const s of [P, F]) {
+      const m = s.mon;
+      if (!alive(m) || (m.status !== 'psn' && m.status !== 'brn')) continue;
+      await this.msg(`${this.nameOf(s)} is hurt by ${m.status === 'psn' ? 'poison' : 'its burn'}!`);
+      SFX.weakHit(); await this.blink(s);
+      await this.damage(s, Math.max(1, Math.floor(m.st.hp / (m.status === 'psn' ? 8 : 16))));
+    }
+    const r = await this.checkFaints();
+    return r === 'replaced' ? null : r;
+  },
+  async doMove(a, d, slot) {
+    const m = a.mon, nm = this.nameOf(a);
+    if (m.status === 'slp') {
+      if (--m.slp <= 0) { m.status = null; await this.msg(`${nm} woke up!`); }
+      else { await this.msg(`${nm} is fast asleep.`); return; }
+    }
+    if (m.status === 'par' && Math.random() < .25) { await this.msg(`${nm} is paralyzed! It can't move!`); return; }
+    const id = slot === 'struggle' ? 'struggle' : slot.id, mv = MOVES[id];
+    if (slot !== 'struggle') slot.pp = Math.max(0, slot.pp - 1);
+    await this.msg(`${nm} used ${mv.n}!`);
+    if (mv.a != null && Math.random() * 100 >= mv.a) { await this.msg(`${nm}'s attack missed!`); return; }
+    const dn = this.nameOf(d), types = SPECIES[d.mon.sp].t;
+    if (mv.c === 'st') {
+      if (mv.fx.status && (effectiveness(mv.t, types) === 0 || (mv.powder && types.includes('Grass')))) { await this.msg(`It doesn't affect ${dn}...`); return; }
+      if (!mv.fx.self) await this.lunge(a);
+      return this.applyFx(a, d, mv.fx, false);
+    }
+    const eff = mv.t === 'None' ? 1 : effectiveness(mv.t, types);
+    if (eff === 0) { await this.msg(`It doesn't affect ${dn}...`); return; }
+    const crit = Math.random() < (mv.crit ? 1 / 8 : 1 / 16);
+    const dmg = Math.min(d.mon.hp, this.calcDamage(a, d, mv, eff, crit));
+    await this.lunge(a);
+    (eff > 1 ? SFX.superHit : eff < 1 ? SFX.weakHit : SFX.hit)();
+    await this.blink(d);
+    await this.damage(d, dmg);
+    if (crit) await this.msg('A critical hit!');
+    if (eff > 1) await this.msg('It\'s super effective!'); else if (eff < 1) await this.msg('It\'s not very effective...');
+    if (mv.drain && alive(a.mon) && a.mon.hp < a.mon.st.hp) { await this.heal(a, Math.max(1, Math.floor(dmg * mv.drain))); await this.msg(`${dn} had its energy drained!`); }
+    if (mv.recoil) { await this.damage(a, Math.max(1, Math.floor(a.mon.st.hp * mv.recoil))); await this.msg(`${nm} is hit with recoil!`); }
+    if (mv.sec && alive(d.mon) && Math.random() * 100 < mv.sec.ch) await this.applyFx(a, d, mv.sec, true);
+  },
+  calcDamage(a, d, mv, eff, crit) {
+    const phys = mv.c === 'p', ak = phys ? 'atk' : 'spa', dk = phys ? 'def' : 'spd';
+    let A = this.stat(a, ak), D = this.stat(d, dk);
+    if (crit) { A = Math.max(A, a.mon.st[ak]); D = Math.min(D, d.mon.st[dk]); }
+    let dmg = Math.floor(Math.floor(Math.floor(2 * a.mon.lv / 5 + 2) * mv.p * A / D) / 50) + 2;
+    if (phys && a.mon.status === 'brn') dmg = Math.floor(dmg / 2);
+    const stab = SPECIES[a.mon.sp].t.includes(mv.t) ? 1.5 : 1;
+    return Math.max(1, Math.floor(dmg * stab * eff * (crit ? 1.5 : 1) * (0.85 + Math.random() * 0.15)));
+  },
+  async applyFx(a, d, fx, secondary) {
+    if (fx.stat) {
+      const s = fx.self ? a : d, cur = s.stages[fx.stat] || 0, nv = clamp(cur + fx.n, -6, 6), nm = this.nameOf(s), st = STAT_NAME[fx.stat];
+      if (nv === cur) { if (!secondary) await this.msg(`${nm}'s ${st} won't go any ${fx.n > 0 ? 'higher' : 'lower'}!`); return; }
+      s.stages[fx.stat] = nv;
+      (fx.n > 0 ? SFX.statUp : SFX.statDown)(); await this.shake(s);
+      const how = fx.n > 1 ? 'sharply rose' : fx.n > 0 ? 'rose' : fx.n < -1 ? 'harshly fell' : 'fell';
+      return this.msg(`${nm}'s ${st} ${how}!`);
+    }
+    if (fx.status) {
+      const m = d.mon, nm = this.nameOf(d), t = SPECIES[m.sp].t;
+      const immune = (fx.status === 'psn' && t.includes('Poison')) || (fx.status === 'brn' && t.includes('Fire')) || (fx.status === 'par' && t.includes('Electric'));
+      if (m.status || immune) { if (!secondary) await this.msg(m.status === fx.status ? `${nm} is already ${{ psn: 'poisoned', par: 'paralyzed', slp: 'asleep', brn: 'burned' }[fx.status]}!` : 'But it failed!'); return; }
+      m.status = fx.status; if (fx.status === 'slp') m.slp = 2 + rnd(3);
+      SFX.status(); await this.shake(d);
+      return this.msg(`${nm} ${{ psn: 'was poisoned!', par: 'is paralyzed! It may be unable to move!', slp: 'fell asleep!', brn: 'was burned!' }[fx.status]}`);
+    }
+  },
+  async checkFaints() {
+    const P = this.P, F = this.F;
+    let res = null;
+    if (!alive(F.mon) && !F.fainted) {
+      F.fainted = true; SFX.faint(); F.vis.clip = true;
+      await animate(450, p => { F.vis.dy = p * 120; });
+      F.vis.hidden = true; F.vis.dy = 0; F.vis.clip = false;
+      await this.msg(`${this.nameOf(F)} fainted!`);
+      await this.giveXP();
+      const next = this.foes.find(alive);
+      if (!next) return 'win';
+      await this.msg(`${this.tr.name} sent out ${mname(next)}!`);
+      await this.sendOut(F, next, false);
+      res = 'replaced';
+    }
+    if (!alive(P.mon) && !P.vis.hidden) {
+      SFX.faint(); P.vis.clip = true;
+      await animate(450, p => { P.vis.dy = p * 150; });
+      P.vis.hidden = true; P.vis.dy = 0; P.vis.clip = false;
+      await this.msg(`${mname(P.mon)} fainted!`);
+      this.parts.delete(P.mon);
+      if (!G.party.some(alive)) return 'lose';
+      const idx = await partyMenu('forced', this);
+      await this.msg(`Go! ${mname(G.party[idx])}!`);
+      await this.sendOut(P, G.party[idx], true);
+      res = 'replaced';
+    }
+    return res;
+  },
+  async giveXP() {
+    const F = this.F, parts = [...this.parts].filter(m => alive(m) && G.party.includes(m));
+    if (!parts.length) return;
+    const each = Math.max(1, Math.floor(SPECIES[F.mon.sp].xp * F.mon.lv / 7 * (this.tr ? 1.5 : 1) * XP_MULT / parts.length));
+    for (const m of parts) {
+      await this.msg(`${mname(m)} gained ${each} EXP. Points!`);
+      let left = each;
+      while (left > 0 && m.lv < 100) {
+        const gain = Math.min(xpFor(m.lv + 1) - m.xp, left), from = m.xp;
+        m.xp += gain; left -= gain;
+        if (m === this.P.mon) await animate(450, p => { this.xpD = from + gain * p; });
+        if (m.xp >= xpFor(m.lv + 1)) await levelUp(m, this);
+      }
+      if (m === this.P.mon) this.xpD = m.xp;
+    }
+    this.parts = new Set([this.P.mon].filter(alive));
+  },
+  async useItem(act) {
+    const it = ITEMS[act.id];
+    if (it.ball) {
+      if (this.tr) { await say(['The trainer blocked the BALL!', 'Don\'t be a thief!']); return; }
+      useItem(act.id);
+      await this.msg(`${G.name} used ${it.n}!`);
+      return this.throwBall(it.ball);
+    }
+    useItem(act.id);
+    const m = G.party[act.target], s = m === this.P.mon ? this.P : null;
+    if (it.heal) {
+      if (s) { const h = await this.heal(s, it.heal); SFX.heal(); await this.msg(`${mname(m)}'s HP was restored by ${h} points.`); }
+      else { const h = Math.min(it.heal, m.st.hp - m.hp); m.hp += h; SFX.heal(); await this.msg(`${mname(m)}'s HP was restored by ${h} points.`); }
+    } else if (it.cure) { m.status = null; m.slp = 0; SFX.heal(); await this.msg(`${mname(m)} was cured of its status problem!`); }
+  },
+  async throwBall(mult) {
+    const F = this.F, m = F.mon;
+    this.ball = { x: 120, y: 320 };
+    SFX.ball();
+    await animate(550, p => { this.ball.x = 120 + p * 350; this.ball.y = 320 - p * 210 - Math.sin(p * Math.PI) * 120; });
+    F.vis.white = true; SFX.select();
+    await animate(250, p => { F.vis.s = 1 - p; });
+    F.vis.hidden = true; F.vis.s = 1; F.vis.white = false;
+    await animate(250, p => { this.ball.y = 110 + p * 50; });
+    const sb = m.status === 'slp' ? 2 : m.status ? 1.5 : 1;
+    const a = Math.floor((3 * m.st.hp - 2 * m.hp) * SPECIES[m.sp].cr * mult / (3 * m.st.hp) * sb);
+    const b = a >= 255 ? 65536 : 1048560 / Math.sqrt(Math.sqrt(16711680 / Math.max(1, a)));
+    let shakes = 0;
+    while (shakes < 4 && rnd(65536) < b) shakes++;
+    for (let i = 0; i < Math.min(3, shakes); i++) {
+      await wait(350); SFX.shake();
+      const x0 = this.ball.x; await animate(300, p => { this.ball.x = x0 + Math.sin(p * Math.PI * 2) * 8; });
+    }
+    if (shakes >= 4) {
+      await wait(300); SFX.caught(); Music.play('victory');
+      await this.msg(`Gotcha! ${mname(m)} was caught!`);
+      const isNew = !G.caught[m.sp];
+      registerCaught(m); this.ball = null;
+      if (isNew) await say(`${mname(m)}'s data was added to the POKéDEX.`);
+      if (G.party.length < 6) G.party.push(m);
+      else { G.box.push(m); await say(`${mname(m)} was sent to the PC BOX.`); }
+      return 'caught';
+    }
+    await wait(250); this.ball = null; F.vis.hidden = false; F.vis.white = true; SFX.select();
+    await animate(200, p => { F.vis.s = p; }); F.vis.white = false;
+    await this.msg(['Oh no! The POKéMON broke free!', 'Aww! It appeared to be caught!', 'Aargh! Almost had it!', 'Shoot! It was so close, too!'][shakes]);
+  },
+});
+
+// ---------- leveling, learning, evolving ----------
+async function levelUp(m, battle) {
+  const old = { ...m.st };
+  m.lv++; calcStats(m); m.hp = Math.min(m.st.hp, m.hp + m.st.hp - old.hp);
+  if (battle && m === battle.P.mon) battle.P.hpD = m.hp;
+  SFX.levelUp();
+  const d = k => `${k === 'hp' ? 'HP ' : k.toUpperCase()}+${m.st[k] - old[k]}`;
+  await say([`${mname(m)} grew to Lv. ${m.lv}!`, `${d('hp')}  ${d('atk')}  ${d('def')}\n${d('spa')}  ${d('spd')}  ${d('spe')}`]);
+  for (const [l, id] of SPECIES[m.sp].ls) if (l === m.lv) await learnMove(m, id);
+  const e = SPECIES[m.sp].evo;
+  if (e && m.lv >= e.lv) m.evoPending = true;
+}
+async function learnMove(m, id) {
+  if (m.moves.some(x => x.id === id)) return;
+  const nm = mname(m), mv = MOVES[id].n;
+  if (m.moves.length < 4) { m.moves.push({ id, pp: MOVES[id].pp }); SFX.levelUp(); await say(`${nm} learned ${mv}!`); return; }
+  while (true) {
+    if (await yesNo(`${nm} wants to learn ${mv}, but already knows 4 moves. Forget a move for ${mv}?`)) {
+      const i = await ask('Which move should be forgotten?', m.moves.map(x => MOVES[x.id].n), { w: 300 });
+      if (i >= 0) {
+        const old = MOVES[m.moves[i].id].n; m.moves[i] = { id, pp: MOVES[id].pp }; SFX.levelUp();
+        await say(['1, 2, and... Poof!', `${nm} forgot ${old}. And... ${nm} learned ${mv}!`]);
+        return;
+      }
+    }
+    if (await yesNo(`Stop trying to teach ${mv}?`)) { await say(`${nm} did not learn ${mv}.`); return; }
+  }
+}
+class EvoScene {
+  constructor(m) { this.m = m; this.sp = m.sp; this.white = false; this.t = 0; this.flash = 0; }
+  update(dt) { this.t += dt; if (this.flash > 0) this.flash -= dt * 2; }
+  draw(g) {
+    const bg = g.createRadialGradient(W / 2, 230, 20, W / 2, 230, 400);
+    bg.addColorStop(0, '#384878'); bg.addColorStop(1, '#101828'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    for (let i = 0; i < 24; i++) {
+      const a = i / 24 * Math.PI * 2 + this.t * .6, r = 130 + Math.sin(this.t * 3 + i) * 30;
+      g.fillStyle = i % 2 ? '#f8f0a0' : '#a0d8f8'; g.fillRect(W / 2 + Math.cos(a) * r, 220 + Math.sin(a) * r * .7, 4, 4);
+    }
+    drawMon(g, this.sp, W / 2, 320, 3.4, { kind: this.white ? 'w' : 'n' });
+    if (this.flash > 0) { g.fillStyle = `rgba(255,255,255,${this.flash})`; g.fillRect(0, 0, W, H); }
+  }
+}
+async function checkEvolutions() {
+  for (const m of G.party) {
+    const e = SPECIES[m.sp].evo;
+    if (!m.evoPending) continue;
+    m.evoPending = false;
+    if (!e || m.lv < e.lv) continue;
+    const s = push(new EvoScene(m)), old = mname(m);
+    Music.stop();
+    await say(`What? ${old} is evolving!`);
+    s.white = true;
+    for (let i = 0; i < 16; i++) { s.sp = i % 2 ? e.to : m.sp; tone(300 + i * 40, 0.08, 'triangle', 0.06); await wait(Math.max(70, 420 - i * 26)); }
+    s.sp = e.to; s.flash = 1; s.white = false; SFX.evolve();
+    const hpLost = m.st.hp - m.hp; m.sp = e.to; calcStats(m); m.hp = Math.max(1, m.st.hp - hpLost); registerCaught(m);
+    await wait(500);
+    await say(`Congratulations! Your ${old} evolved into ${SPECIES[e.to].n}!`);
+    for (const [l, id] of SPECIES[e.to].ls) if (l === 0 || l === m.lv) await learnMove(m, id);
+    remove(s);
+  }
+}
+
+// ============================================================
+//  MENUS — party, summary, bag, pokédex, start menu
+// ============================================================
+function menuBg(g, c1 = '#3870a8', c2 = '#5898d0') {
+  g.fillStyle = c1; g.fillRect(0, 0, W, H);
+  g.fillStyle = c2; for (let y = 0; y < H; y += 32) for (let x = (y / 32) % 2 * 32; x < W; x += 64) g.fillRect(x, y, 32, 32);
+}
+class PartyScene {
+  constructor(mode, battle, res) {
+    this.mode = mode; this.battle = battle; this.res = res; this.swapFrom = -1; this.busy = false;
+    this.i = mode === 'forced' ? Math.max(0, G.party.findIndex(alive)) : 0;
+  }
+  update(dt, top) {
+    if (!top || this.busy) return;
+    const n = G.party.length, old = this.i;
+    if (Input.hit('up') && this.i >= 2) this.i -= 2;
+    if (Input.hit('down') && this.i + 2 < n) this.i += 2;
+    if (Input.hit('left') && this.i % 2) this.i--;
+    if (Input.hit('right') && this.i % 2 === 0 && this.i + 1 < n) this.i++;
+    if (old !== this.i) SFX.blip();
+    if (Input.hit('b')) {
+      if (this.swapFrom >= 0) { this.swapFrom = -1; SFX.back(); return; }
+      if (this.mode === 'forced') { SFX.bump(); return; }
+      SFX.back(); remove(this); this.res(null); return;
+    }
+    if (Input.hit('a')) { SFX.select(); this.busy = true; this.onA().finally(() => { this.busy = false; Input.clear(); }); }
+  }
+  async onA() {
+    const m = G.party[this.i];
+    if (this.swapFrom >= 0) { const a = this.swapFrom; [G.party[a], G.party[this.i]] = [G.party[this.i], G.party[a]]; this.swapFrom = -1; return; }
+    if (this.mode === 'item') { remove(this); this.res(this.i); return; }
+    const opts = this.mode === 'field' ? ['SUMMARY', 'SWITCH', 'CANCEL'] : this.mode === 'battle' ? ['SHIFT', 'SUMMARY', 'CANCEL'] : ['SHIFT', 'SUMMARY'];
+    const k = await choose(opts, { x: W - 236, y: H - 128 - (opts.length * 36 + 32), w: 228 });
+    const o = opts[k];
+    if (o === 'SUMMARY') await showSummary(this.i);
+    else if (o === 'SWITCH') this.swapFrom = this.i;
+    else if (o === 'SHIFT') {
+      if (!alive(m)) return say('There\'s no will to fight!');
+      if (this.battle && m === this.battle.P.mon) return say(`${mname(m)} is already in battle!`);
+      remove(this); this.res(this.i);
+    }
+  }
+  draw(g) {
+    menuBg(g);
+    G.party.forEach((m, k) => {
+      const x = 16 + (k % 2) * 308, y = 16 + Math.floor(k / 2) * 106, sel = k === this.i;
+      g.fillStyle = sel ? '#f8d048' : '#284060'; rr(g, x, y, 300, 98, 12); g.fill();
+      g.fillStyle = !alive(m) ? '#e8b0a8' : k === this.swapFrom ? '#b8f0b0' : this.battle && m === this.battle.P.mon ? '#c8e0f8' : '#a8d8f8';
+      rr(g, x + 4, y + 4, 292, 90, 9); g.fill();
+      drawMon(g, m.sp, x + 44, y + 84, 1.25);
+      text(g, mname(m), x + 86, y + 14, 12);
+      text(g, 'Lv' + m.lv, x + 86, y + 36, 10);
+      statusBadge(g, m.status, x + 150, y + 32);
+      hpBar(g, x + 120, y + 58, 160, m.hp, m.st.hp, 8);
+      text(g, 'HP', x + 90, y + 58, 8, '#f8a030', 'left', null);
+      text(g, `${m.hp}/${m.st.hp}`, x + 282, y + 74, 10, '#303030', 'right');
+    });
+    box(g, 8, H - 120, W - 16, 112);
+    const p = this.swapFrom >= 0 ? 'Move to where?' : this.mode === 'item' ? 'Use on which POKéMON?' : this.mode === 'forced' ? 'Choose the next POKéMON.' : 'Choose a POKéMON.';
+    text(g, p, 36, H - 90, 16);
+    if (this.mode !== 'forced') text(g, 'B: CANCEL', W - 40, H - 46, 10, '#808080', 'right', null);
+  }
+}
+const partyMenu = (mode, battle) => new Promise(r => push(new PartyScene(mode, battle, r)));
+
+class SummaryScene {
+  constructor(i, res) { this.i = i; this.res = res; }
+  update(dt, top) {
+    if (!top) return;
+    const n = G.party.length;
+    if (Input.hit('up')) { this.i = (this.i + n - 1) % n; SFX.blip(); }
+    if (Input.hit('down')) { this.i = (this.i + 1) % n; SFX.blip(); }
+    if (Input.hit('a') || Input.hit('b')) { SFX.back(); remove(this); this.res(); }
+  }
+  draw(g) {
+    const m = G.party[this.i], sp = SPECIES[m.sp];
+    menuBg(g, '#c84848', '#d86060');
+    g.fillStyle = '#f8f8f0'; rr(g, 12, 12, 260, 300, 12); g.fill();
+    text(g, `No.${String(sp.dex).padStart(3, '0')}`, 28, 28, 10, '#808080', 'left', null);
+    text(g, 'Lv' + m.lv, 256, 28, 12, '#303030', 'right');
+    E(g, 142, 230, 90, 16, '#d8e8d0');
+    drawMon(g, m.sp, 142, 236, 3);
+    text(g, mname(m), 142, 250, 14, '#303030', 'center');
+    sp.t.forEach((t, k) => typeBadge(g, t, sp.t.length === 1 ? 96 : 40 + k * 104, 278, 92));
+    statusBadge(g, m.status, 216, 50);
+    g.fillStyle = '#f8f8f0'; rr(g, 284, 12, 344, 300, 12); g.fill();
+    text(g, 'HP', 304, 32, 12); text(g, `${m.hp}/${m.st.hp}`, 608, 32, 12, '#303030', 'right');
+    hpBar(g, 304, 56, 304, m.hp, m.st.hp, 6);
+    ['atk', 'def', 'spa', 'spd', 'spe'].forEach((k, j) => { text(g, STAT_NAME[k], 304, 80 + j * 30, 12); text(g, String(m.st[k]), 608, 80 + j * 30, 12, '#303030', 'right'); });
+    text(g, 'EXP POINTS', 304, 238, 10); text(g, String(m.xp), 608, 238, 10, '#303030', 'right');
+    text(g, 'NEXT LV.', 304, 262, 10); text(g, String(Math.max(0, xpFor(m.lv + 1) - m.xp)), 608, 262, 10, '#303030', 'right');
+    g.fillStyle = '#404848'; g.fillRect(304, 284, 304, 6);
+    g.fillStyle = '#48a8f8'; g.fillRect(305, 285, 302 * clamp((m.xp - xpFor(m.lv)) / (xpFor(m.lv + 1) - xpFor(m.lv)), 0, 1), 4);
+    g.fillStyle = '#f8f8f0'; rr(g, 12, 322, 616, 146, 12); g.fill();
+    m.moves.forEach((mv, k) => {
+      const x = 28 + (k % 2) * 304, y = 338 + Math.floor(k / 2) * 64, d = MOVES[mv.id];
+      typeBadge(g, d.t, x, y, 84); text(g, d.n, x + 96, y + 4, 12);
+      text(g, `PP ${mv.pp}/${d.pp}`, x + 96, y + 28, 10, '#606060', 'left', null);
+      text(g, d.c === 'st' ? 'STATUS' : 'POW ' + d.p, x + 284, y + 28, 10, '#606060', 'right', null);
+    });
+    text(g, 'UP/DOWN: switch', W - 16, H - 4 - 10, 8, '#fff', 'right', null);
+  }
+}
+const showSummary = i => new Promise(r => push(new SummaryScene(i, r)));
+
+class Panel { constructor(draw) { this.d = draw; } update() {} draw(g) { this.d(g); } }
+const BAG_ORDER = ['potion', 'superpotion', 'fullheal', 'pokeball', 'greatball'];
+async function bagMenu(battle) {
+  const bg = push(new Panel(g => {
+    menuBg(g, '#c89048', '#d8a058');
+    g.fillStyle = '#7a5028'; rr(g, 40, 70, 200, 220, 26); g.fill(); g.fillStyle = '#a87038'; rr(g, 52, 90, 176, 190, 18); g.fill();
+    g.fillStyle = '#7a5028'; rr(g, 96, 40, 88, 50, 20); g.fill(); g.fillStyle = '#c89048'; rr(g, 112, 52, 56, 30, 12); g.fill();
+    text(g, 'BAG', 140, 160, 20, '#f8e8c0', 'center', '#5a3818');
+    text(g, '$' + G.money, 140, 196, 12, '#f8e8c0', 'center', '#5a3818');
+  }));
+  try {
+    while (true) {
+      const ids = BAG_ORDER.filter(id => G.bag[id] > 0);
+      if (!ids.length) { await say('The BAG is empty.'); return null; }
+      const k = await choose(ids.map(id => ({ label: ITEMS[id].n, right: 'x' + G.bag[id] })).concat({ label: 'CANCEL' }), {
+        x: 264, y: 16, w: 368, rows: 6,
+        extra: (g, i) => { box(g, 8, H - 120, W - 16, 112); const id = ids[i]; wrap(id ? ITEMS[id].d : 'Close the BAG.', 35).forEach((l, j) => text(g, l, 36, H - 90 + j * 36, 16)); },
+      });
+      if (k < 0 || k >= ids.length) return null;
+      const id = ids[k], it = ITEMS[id];
+      if (it.ball) {
+        if (!battle) { await say('There\'s no wild POKéMON to catch here!'); continue; }
+        return { type: 'item', id };
+      }
+      const t = await partyMenu('item', battle);
+      if (t == null) continue;
+      const m = G.party[t];
+      const ok = alive(m) && (it.heal ? m.hp < m.st.hp : !!m.status);
+      if (!ok) { await say('It won\'t have any effect.'); continue; }
+      if (battle) return { type: 'item', id, target: t };
+      useItem(id); SFX.heal();
+      if (it.heal) { const h = Math.min(it.heal, m.st.hp - m.hp); m.hp += h; await say(`${mname(m)}'s HP was restored by ${h} points.`); }
+      else { m.status = null; m.slp = 0; await say(`${mname(m)} was cured of its status problem!`); }
+    }
+  } finally { remove(bg); }
+}
+
+class DexScene {
+  constructor(res) { this.res = res; this.i = 0; this.top = 0; }
+  update(dt, top) {
+    if (!top) return;
+    const n = DEX_ORDER.length, old = this.i;
+    if (Input.hit('up')) this.i = Math.max(0, this.i - 1);
+    if (Input.hit('down')) this.i = Math.min(n - 1, this.i + 1);
+    if (Input.hit('left')) this.i = Math.max(0, this.i - 8);
+    if (Input.hit('right')) this.i = Math.min(n - 1, this.i + 8);
+    if (old !== this.i) SFX.blip();
+    this.top = clamp(this.top, this.i - 8, this.i);
+    if (Input.hit('b')) { SFX.back(); remove(this); this.res(); }
+    else if (Input.hit('a')) { const sp = DEX_ORDER[this.i]; if (G.caught[sp]) { SFX.select(); say(SPECIES[sp].txt); } else SFX.bump(); }
+  }
+  draw(g) {
+    menuBg(g, '#c03838', '#d04848');
+    const sp = DEX_ORDER[this.i], s = SPECIES[sp], seen = G.seen[sp], caught = G.caught[sp];
+    g.fillStyle = '#f8f8f0'; rr(g, 12, 12, 280, 456, 12); g.fill();
+    g.fillStyle = '#d8e8d0'; rr(g, 28, 28, 248, 220, 10); g.fill();
+    if (seen) drawMon(g, sp, 152, 236, 3.4, { kind: caught ? 'n' : 'k' });
+    else text(g, '?', 152, 110, 48, '#a0b0a0', 'center', null);
+    text(g, `No.${String(s.dex).padStart(3, '0')}`, 28, 262, 12, '#808080', 'left', null);
+    text(g, seen ? s.n : '----------', 28, 286, 14);
+    if (caught) {
+      s.t.forEach((t, k) => typeBadge(g, t, 28 + k * 104, 316, 96));
+      wrap(s.txt, 21).slice(0, 5).forEach((l, j) => text(g, l, 28, 352 + j * 20, 10, '#404040', 'left', null));
+    } else text(g, seen ? 'Not caught yet.' : 'Not seen yet.', 28, 320, 10, '#808080', 'left', null);
+    g.fillStyle = '#f8f8f0'; rr(g, 304, 12, 324, 456, 12); g.fill();
+    text(g, `SEEN ${Object.keys(G.seen).length}  OWN ${Object.keys(G.caught).length}`, 466, 28, 10, '#606060', 'center', null);
+    for (let r = 0; r < 9; r++) {
+      const k = this.top + r, id = DEX_ORDER[k]; if (!id) break;
+      const y = 60 + r * 44;
+      if (k === this.i) { g.fillStyle = '#f8d048'; rr(g, 312, y - 6, 308, 36, 8); g.fill(); }
+      if (G.caught[id]) drawBall(g, 332, y + 10, .8);
+      text(g, String(SPECIES[id].dex).padStart(3, '0'), 350, y + 4, 10, '#606060', 'left', null);
+      text(g, G.seen[id] ? SPECIES[id].n : '-----', 400, y + 2, 12);
+    }
+  }
+}
+async function startMenu() {
+  let start = 0;
+  while (true) {
+    const opts = ['POKéDEX', 'POKéMON', 'BAG', G.name, 'SAVE', 'EXIT'];
+    const i = await choose(opts, { x: W - 236, y: 8, w: 228, start });
+    if (i < 0 || i === 5) return;
+    start = i;
+    if (i === 0) await new Promise(r => push(new DexScene(r)));
+    else if (i === 1) await partyMenu('field');
+    else if (i === 2) await bagMenu(null);
+    else if (i === 3) await trainerCard();
+    else if (i === 4) {
+      if (await yesNo('Would you like to save the game?')) {
+        if (saveGame()) { SFX.heal(); await say(`${G.name} saved the game!`); } else await say('The game could not be saved on this browser.');
+      }
+    }
+  }
+}
+async function trainerCard() {
+  const p = push(new Panel(g => {
+    menuBg(g, '#2c6898', '#3878a8');
+    g.fillStyle = '#f8e8b8'; rr(g, 40, 40, 560, 300, 18); g.fill();
+    g.strokeStyle = '#c8a860'; g.lineWidth = 4; rr(g, 52, 52, 536, 276, 12); g.stroke();
+    text(g, 'TRAINER CARD', 320, 70, 16, '#a06030', 'center');
+    text(g, 'NAME:  ' + G.name, 80, 120, 14); text(g, 'MONEY: $' + G.money, 80, 160, 14);
+    text(g, 'POKéDEX: ' + Object.keys(G.caught).length, 80, 200, 14);
+    text(g, 'BADGES:', 80, 260, 14);
+    if (G.flags.badge) { P(g, '#a0a8b8', 230, 268, 250, 252, 270, 268, 250, 284); P(g, '#d0d8e0', 236, 268, 250, 256, 264, 268, 250, 278); }
+    else text(g, 'none yet', 214, 262, 10, '#806040', 'left', null);
+    g.save(); g.translate(440, 110); g.scale(4, 4); drawPerson(g, 0, 0, 'down', 0, PAL.player); g.restore();
+  }));
+  await say(`${G.name}'s adventure so far. Keep it up!`);
+  remove(p);
+}
+
+// ============================================================
+//  BUILDINGS — mart, PC, gym, home, lab
+// ============================================================
+class QtyScene {
+  constructor(max, price, res) { this.transparent = true; this.q = 1; this.max = max; this.price = price; this.res = res; }
+  update(dt, top) {
+    if (!top) return;
+    const old = this.q;
+    if (Input.hit('up')) this.q = this.q >= this.max ? 1 : this.q + 1;
+    if (Input.hit('down')) this.q = this.q <= 1 ? this.max : this.q - 1;
+    if (Input.hit('right')) this.q = Math.min(this.max, this.q + 10);
+    if (Input.hit('left')) this.q = Math.max(1, this.q - 10);
+    if (old !== this.q) SFX.blip();
+    if (Input.hit('a')) { SFX.select(); remove(this); this.res(this.q); }
+    else if (Input.hit('b')) { SFX.back(); remove(this); this.res(0); }
+  }
+  draw(g) {
+    box(g, W - 300, H - 216, 292, 88);
+    text(g, 'x' + String(this.q).padStart(2, '0'), W - 268, H - 182, 16);
+    text(g, '$' + this.q * this.price, W - 36, H - 182, 16, '#303030', 'right');
+    tri(g, W - 222, H - 200, 5, '#e04040', 'up'); tri(g, W - 222, H - 152, 5, '#e04040', 'down');
+  }
+}
+async function shop() {
+  const wares = ['pokeball', 'greatball', 'potion', 'superpotion', 'fullheal'];
+  await say('Hi there! May I help you?');
+  while (true) {
+    const k = await choose(wares.map(id => ({ label: ITEMS[id].n, right: '$' + ITEMS[id].price })).concat({ label: 'CANCEL' }), {
+      x: 200, y: 16, w: 432, size: 14,
+      extra: (g, i) => {
+        box(g, 8, 16, 184, 76); text(g, 'MONEY', 30, 34, 10, '#808080', 'left', null); text(g, '$' + G.money, 172, 56, 14, '#303030', 'right');
+        box(g, 8, H - 120, W - 16, 112); wrap(wares[i] ? ITEMS[wares[i]].d : 'Quit shopping.', 35).forEach((l, j) => text(g, l, 36, H - 90 + j * 36, 16));
+      },
+    });
+    if (k < 0 || k >= wares.length) break;
+    const id = wares[k], price = ITEMS[id].price, max = Math.min(99, Math.floor(G.money / price));
+    if (max < 1) { await say('You don\'t have enough money.'); continue; }
+    const d = new Dialog(`${ITEMS[id].n}? Certainly. How many would you like?`, null, { hold: true });
+    await new Promise(r => { d.res = r; push(d); });
+    const q = await new Promise(r => push(new QtyScene(max, price, r)));
+    remove(d);
+    if (!q) continue;
+    if (await yesNo(`${ITEMS[id].n}, and you want ${q}. That will be $${q * price}. OK?`)) {
+      G.money -= q * price; addItem(id, q); SFX.money();
+      await say('Here you are! Thank you!');
+    }
+  }
+  await say('Please come again!');
+}
+async function pc() {
+  SFX.select();
+  await say(`${G.name} booted up the PC.`);
+  while (true) {
+    const i = await ask('Accessed the POKéMON Storage System.', ['WITHDRAW', 'DEPOSIT', 'LOG OFF']);
+    const list = arr => arr.map(m => ({ label: mname(m), right: 'Lv' + m.lv })).concat({ label: 'CANCEL' });
+    if (i === 0) {
+      if (!G.box.length) { await say('There are no POKéMON in the BOX.'); continue; }
+      if (G.party.length >= 6) { await say('Your party is full!'); continue; }
+      const k = await choose(list(G.box), { x: 176, y: 8, w: 456, rows: 7 });
+      if (k >= 0 && k < G.box.length) { const m = G.box.splice(k, 1)[0]; G.party.push(m); await say(`${mname(m)} was taken out. Take good care of it!`); }
+    } else if (i === 1) {
+      if (G.party.length <= 1) { await say('You can\'t deposit your last POKéMON!'); continue; }
+      const k = await choose(list(G.party), { x: 176, y: 8, w: 456 });
+      if (k < 0 || k >= G.party.length) continue;
+      if (G.party.filter((m, j) => j !== k && alive(m)).length === 0) { await say('You need at least one healthy POKéMON with you!'); continue; }
+      const m = G.party.splice(k, 1)[0]; healMon(m); G.box.push(m); await say(`${mname(m)} was stored in the BOX.`);
+    } else break;
+  }
+}
+function healAll(b) { G.party.forEach(healMon); G.heal = { x: b.door.x, y: b.door.y + 1 }; }
+const BROCK = TR('LEADER BROCK', 'brock', [['geodude', 11], ['onix', 13]], 99, '',
+  'I took you for granted. As proof of your victory, here\'s the BOULDERBADGE!', '');
+const DOORS = {
+  async home(b) {
+    await say(`MOM: ${G.name}! You should take a quick rest.`);
+    Music.stop(); SFX.heal(); await wait(1300); healAll(b);
+    await say('MOM: Oh good! You and your POKéMON are looking great! Take care now!');
+  },
+  async center(b) {
+    const i = await ask('Welcome to our POKéMON CENTER! What would you like to do?', ['HEAL', 'USE PC', 'LEAVE']);
+    if (i === 0) {
+      await say('OK. I\'ll take your POKéMON for a few seconds.');
+      Music.stop(); SFX.heal(); await wait(1700); healAll(b);
+      await say(['Thank you for waiting. We\'ve restored your POKéMON to full health.', 'We hope to see you again!']);
+    } else if (i === 1) await pc();
+  },
+  mart: () => shop(),
+  async house2() {
+    await say(pick([
+      'A family is eating lunch. "Oh, hello! Feel free to rest a bit, young trainer!"',
+      'A man is polishing a rock. "Did you know GEODUDE are often mistaken for boulders?"',
+      'A girl is playing with a PIDGEY. "When POKéMON grow strong, they can evolve!"',
+    ]));
+  },
+  async lab() {
+    const n = Object.keys(G.caught).length, total = DEX_ORDER.length;
+    if (!G.flags.oakBalls) {
+      G.flags.oakBalls = 1; addItem('pokeball', 5); SFX.money();
+      await say([`OAK: Ah, ${G.name}! How is your POKéDEX coming along?`, 'Here, take these to help you on your way.', `${G.name} received 5 POKé BALLS!`]);
+      return;
+    }
+    const rating = n < 5 ? 'You still have lots to do. Look for POKéMON in grassy areas!' : n < 10 ? 'Good, you\'re trying hard! Have you explored VIRIDIAN FOREST?'
+      : n < 16 ? 'Excellent! You\'re becoming a real expert!' : n < total ? 'Amazing! Only a few more to go!' : 'Incredible! You completed the POKéDEX! Congratulations!';
+    await say([`OAK: Let's see your POKéDEX... You've caught ${n} of ${total} kinds of POKéMON!`, rating]);
+  },
+  async gym() {
+    if (G.flags.badge) { await say(`BROCK: There are all kinds of trainers in the world. Keep training, ${G.name}! I look forward to our rematch.`); return; }
+    if (!G.beaten.gymtr) {
+      await say(['The PEWTER GYM is dim and rocky...', 'CAMPER LIAM: Stop right there, kid! You\'re light-years from facing BROCK!']);
+      const r = await startBattle({ trainer: TR('CAMPER LIAM', 'camper', [['geodude', 9], ['zubat', 9]], 20, '', 'Darn! Light-years isn\'t time... it measures distance!', '') });
+      if (r === 'win') { G.beaten.gymtr = true; await say('CAMPER LIAM: You\'re pretty good, but not as good as BROCK! Heal up before you challenge him.'); }
+      else if (r === 'lose') await blackout();
+      return;
+    }
+    await say(['BROCK: So, you\'re here. I\'m BROCK! I\'m PEWTER\'s GYM LEADER!', 'My rock-hard willpower is evident even in my POKéMON.', 'That\'s why my POKéMON are all ROCK-type! Fine then! Show me your best!']);
+    const r = await startBattle({ trainer: BROCK });
+    if (r === 'lose') return blackout();
+    if (r !== 'win') return;
+    G.flags.badge = 1; G.badges = 1; Music.play('victory');
+    await say([`${G.name} received the BOULDERBADGE!`, 'BROCK: That\'s an official POKéMON LEAGUE BADGE. It proves you beat me!', 'There are many more GYMS beyond this city. You\'ve got a real future as a trainer!']);
+    await ending();
+  },
+};
+async function ending() {
+  const p = push(new Panel(g => {
+    const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#182848'); bg.addColorStop(1, '#384878'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    text(g, 'CONGRATULATIONS!', W / 2, 40, 22, '#f8d030', 'center', '#a05010');
+    G.party.forEach((m, i) => drawMon(g, m.sp, 80 + i * 96, 230, 1.6));
+    text(g, `${G.name} - BOULDERBADGE`, W / 2, 260, 12, '#fff', 'center', null);
+    text(g, `POKéDEX: ${Object.keys(G.caught).length}/${DEX_ORDER.length}`, W / 2, 290, 12, '#fff', 'center', null);
+  }));
+  Music.play('victory');
+  await say(['You conquered the PEWTER CITY GYM!', 'Thanks for playing! Your journey continues - try to catch all the POKéMON in the region!']);
+  remove(p);
+}
+async function blackout() {
+  await fadeTo(1, 500);
+  G.money = Math.floor(G.money / 2); G.party.forEach(healMon);
+  G.x = G.heal.x; G.y = G.heal.y; G.dir = 'down';
+  if (ow) ow.zone = zoneAt(G.y);
+  await fadeTo(0, 500);
+  await say(`${G.name} hurried back to safety, protecting the exhausted POKéMON...`);
+}
+
+// ============================================================
+//  SAVE / LOAD
+// ============================================================
+const SAVE_KEY = 'pokemon-kanto-quest-save';
+const serMon = m => ({ sp: m.sp, lv: m.lv, xp: m.xp, iv: m.iv, hp: m.hp, status: m.status, slp: m.slp, moves: m.moves });
+const deMon = o => { const m = { ...o }; calcStats(m); m.hp = Math.min(m.hp, m.st.hp); return m; };
+function saveGame() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify({ ...G, party: G.party.map(serMon), box: G.box.map(serMon) })); return true; }
+  catch (e) { return false; }
+}
+function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
+function loadGame() {
+  try {
+    const o = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (!o || !o.party || !o.party.length) return false;
+    G = { ...o, party: o.party.map(deMon), box: (o.box || []).map(deMon) };
+    return true;
+  } catch (e) { return false; }
+}
+
+// ============================================================
+//  TITLE, INTRO, STARTER SELECTION
+// ============================================================
+let ow = null;
+function startOverworld() {
+  scenes.length = 0;
+  ow = new Overworld(); push(ow); ow.enter();
+}
+class Title {
+  constructor() { this.t = 0; this.busy = false; this.mons = ['pikachu', 'charmander', 'bulbasaur', 'squirtle']; }
+  update(dt, top) {
+    this.t += dt;
+    if (!top || this.busy) return;
+    if (Input.hit('a') || Input.hit('start')) { SFX.select(); this.busy = true; titleMenu().finally(() => { this.busy = false; Input.clear(); }); }
+  }
+  draw(g) {
+    const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#2850a0'); bg.addColorStop(1, '#88c8f8'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    for (let i = 0; i < 40; i++) { g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect((i * 97 + this.t * 20 * (1 + i % 3)) % W, (i * 53) % 260, 2, 2); }
+    E(g, W / 2, 470, 420, 140, '#58a848'); E(g, W / 2, 476, 400, 126, '#78c858');
+    const by = Math.sin(this.t * 2) * 6;
+    for (const [dx, dy, c] of [[-4, 0, '#2850a0'], [4, 0, '#2850a0'], [0, -4, '#2850a0'], [0, 4, '#2850a0'], [4, 6, '#183060']]) text(g, 'POKéMON', W / 2 + dx, 56 + dy + by, 52, c, 'center', null);
+    text(g, 'POKéMON', W / 2, 56 + by, 52, '#f8d030', 'center', null);
+    text(g, 'KANTO QUEST', W / 2, 128 + by, 18, '#fff', 'center', '#183060');
+    const sp = this.mons[Math.floor(this.t / 3) % this.mons.length];
+    drawMon(g, sp, W / 2, 380 + Math.abs(Math.sin(this.t * 4)) * -8, 3.2);
+    if (!this.busy && Math.floor(this.t * 2) % 2) text(g, 'PRESS START', W / 2, 420, 16, '#fff', 'center', '#183060');
+    text(g, 'A fan-made adventure', W / 2, 456, 8, '#e8f8e8', 'center', null);
+  }
+}
+async function titleMenu() {
+  const has = hasSave();
+  const i = await choose([{ label: 'CONTINUE', disabled: !has }, 'NEW GAME'], { x: W / 2 - 140, y: 300, w: 280, start: has ? 0 : 1 });
+  if (i === 0) {
+    if (!loadGame()) { await say('The save data could not be loaded.'); return; }
+    await fadeTo(1, 300); startOverworld(); await fadeTo(0, 300);
+  } else if (i === 1) {
+    if (has && !(await yesNo('Start a new game? Your old save will be replaced the next time you save.'))) return;
+    await fadeTo(1, 300); newGame('RED'); startOverworld();
+    await intro();
+  }
+}
+class IntroScene {
+  constructor() { this.who = 'oak'; this.mon = null; this.t = 0; }
+  update(dt) { this.t += dt; }
+  draw(g) {
+    const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#f8f8f8'); bg.addColorStop(1, '#c8d8e8'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    E(g, W / 2, 330, 160, 30, '#a8b8c8'); E(g, W / 2, 326, 146, 24, '#c8d4e0');
+    const x = this.mon ? W / 2 - 110 : W / 2 - 64;
+    g.save(); g.translate(x, 196); g.scale(4, 4);
+    drawPerson(g, 0, 0, 'down', 0, PAL[this.who], this.who === 'oak'); g.restore();
+    if (this.mon) drawMon(g, this.mon, W / 2 + 100, 336 + Math.sin(this.t * 5) * 3, 2.4);
+  }
+}
+class StarterScene {
+  constructor(res) { this.res = res; this.i = 1; this.t = 0; this.opts = ['bulbasaur', 'charmander', 'squirtle']; }
+  update(dt, top) {
+    this.t += dt;
+    if (!top) return;
+    const old = this.i;
+    if (Input.hit('left')) this.i = Math.max(0, this.i - 1);
+    if (Input.hit('right')) this.i = Math.min(2, this.i + 1);
+    if (old !== this.i) SFX.blip();
+    if (Input.hit('a')) { SFX.select(); this.res(this.i); }
+  }
+  draw(g) {
+    menuBg(g, '#d8c8a0', '#e4d6b0');
+    g.fillStyle = '#986838'; rr(g, 40, 250, 560, 40, 8); g.fill(); g.fillStyle = '#b88050'; rr(g, 40, 244, 560, 20, 8); g.fill();
+    text(g, 'Choose your partner!', W / 2, 30, 16, '#303030', 'center');
+    this.opts.forEach((sp, k) => {
+      const x = 140 + k * 180, sel = k === this.i;
+      if (sel) { E(g, x, 242, 70, 14, 'rgba(248,208,64,.6)'); tri(g, x - 8, 70 + Math.sin(this.t * 6) * 4, 8, '#e04040', 'down'); }
+      drawMon(g, sp, x, 248 - (sel ? Math.abs(Math.sin(this.t * 6)) * 10 : 0), sel ? 2.6 : 2.1, { alpha: sel ? 1 : .75 });
+    });
+    const s = SPECIES[this.opts[this.i]];
+    box(g, 8, H - 172, W - 16, 52);
+    text(g, s.n, 36, H - 154, 14);
+    s.t.forEach((t, k) => typeBadge(g, t, 300 + k * 100, H - 158, 92));
+  }
+}
+async function intro() {
+  const s = push(new IntroScene());
+  Music.play('town');
+  await fadeTo(0, 400);
+  await say(['Hello there! Welcome to the world of POKéMON!', 'My name is OAK! People call me the POKéMON PROF!']);
+  s.mon = 'pikachu';
+  await say(['This world is inhabited by creatures called POKéMON!', 'For some people, POKéMON are pets. Others use them for battles.', 'Myself... I study POKéMON as a profession.']);
+  s.mon = null; s.who = 'player';
+  const names = ['RED', 'ASH', 'JACK', 'LEAF'];
+  G.name = names[Math.max(0, await ask('First, what is your name?', names, { cancel: false }))];
+  await say(`Right! So your name is ${G.name}!`);
+  s.who = 'rival';
+  await say('This is my grandson. He\'s been your rival since you were both babies. ...Erm, what is his name again?');
+  const rivals = ['BLUE', 'GARY', 'JOHN'];
+  G.rival = rivals[Math.max(0, await ask('Your rival\'s name?', rivals, { cancel: false }))];
+  await say(`That's right! I remember now! His name is ${G.rival}!`);
+  s.who = 'oak';
+  await say([`${G.name}! Your very own POKéMON legend is about to unfold!`, 'But first, you\'ll need a partner. I have three POKéMON here. Go on, choose one!']);
+  let pickIdx;
+  const st = push(new StarterScene(i => { pickIdx = i; }));
+  while (true) {
+    pickIdx = null;
+    await new Promise(r => { st.res = i => { pickIdx = i; r(); }; });
+    const sp = st.opts[pickIdx], kind = { bulbasaur: 'GRASS', charmander: 'FIRE', squirtle: 'WATER' }[sp];
+    if (await yesNo(`So! You want the ${kind} POKéMON, ${SPECIES[sp].n}?`)) break;
+  }
+  remove(st);
+  const mine = st.opts[pickIdx], theirs = { bulbasaur: 'charmander', charmander: 'squirtle', squirtle: 'bulbasaur' }[mine];
+  const starter = makeMon(mine, 5); G.party = [starter]; registerCaught(starter);
+  SFX.caught();
+  await say(`${G.name} received a ${SPECIES[mine].n} from PROF. OAK!`);
+  s.who = 'rival'; s.mon = theirs;
+  await say([`${G.rival}: Then I'll take this one!`, `${G.rival} received a ${SPECIES[theirs].n} from PROF. OAK!`, `${G.rival}: Wait, ${G.name}! Let's check out our POKéMON! Come on, I'll take you on!`]);
+  remove(s);
+  const r = await startBattle({ trainer: TR(G.rival, 'rival', [[theirs, 5]], 35, '', `${G.rival}: WHAT? Unbelievable! I picked the wrong POKéMON!`, ''), noBlackout: true });
+  if (r === 'lose') { await fadeTo(0, 300); await say(`${G.rival}: Yeah! Am I great or what?`); }
+  G.party.forEach(healMon);
+  await say([`OAK: Your POKéMON fought well! Let me heal it for you.`, `${G.rival}: Smell ya later, ${G.name}! I'm going to be the greatest trainer ever!`,
+    `OAK: ${G.name}, head north through ROUTE 1 to VIRIDIAN CITY, then through VIRIDIAN FOREST to PEWTER CITY.`,
+    'BROCK, the GYM LEADER of PEWTER, will be a worthy first challenge. Catch POKéMON and train hard!',
+    'TIP: Press ENTER (START) to open the menu and SAVE. Hold SHIFT (or B) to run. Visit my LAB anytime!']);
+  G.flags.started = 1;
+  saveGame();
+}
+
+// ============================================================
+//  MAIN LOOP
+// ============================================================
+let last = performance.now();
+function frame(now) {
+  const dt = clamp((now - last) / 1000, 0, 0.05); last = now;
+  updateTweens(dt);
+  const top = scenes[scenes.length - 1];
+  [...scenes].forEach(s => s.update && s.update(dt, s === top));
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  let i = scenes.length - 1;
+  while (i > 0 && scenes[i].transparent) i--;
+  for (; i >= 0 && i < scenes.length; i++) scenes[i].draw(ctx);
+  if (fadeAlpha > 0.001) { ctx.globalAlpha = fadeAlpha; ctx.fillStyle = fadeColor; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+  Input.clear();
+  requestAnimationFrame(frame);
+}
+push(new Title());
+Music.play('route');
+if (document.fonts && document.fonts.load) document.fonts.load('16px "Press Start 2P"').catch(() => {});
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
