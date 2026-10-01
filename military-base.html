@@ -154,7 +154,7 @@ const NOBODY = new Set(['camera', 'turret', 'drone']); // these leave wreckage, 
    TIERS are the AI operators (your squad, the rookies, and the intruder squad).
    GDIFF scales the base personnel when you are the one sneaking in. */
 const TIERS = [
-  { name: 'ROOKIE', stars: 0, hp: 230, speed: 165, spread: .075, react: .24, rate: .13, dmg: 11, lead: true,  nades: 2, sight: 500, armor: .12,   color: '#c9c08a' },
+  { name: 'ROOKIE', stars: 0, hp: 220, speed: 165, spread: .08,  react: .25, rate: .13, dmg: 10.5, lead: true,  nades: 2, sight: 500, armor: .12,   color: '#c9c08a' },
   { name: 'EASY',   stars: 1, hp: 150, speed: 155, spread: .13,  react: .42, rate: .16, dmg: 9,  lead: false, nades: 0, sight: 440, armor: 0,   color: '#3ddc84', time: 150 },
   { name: 'MID',    stars: 2, hp: 210, speed: 162, spread: .09,  react: .3,  rate: .13, dmg: 10, lead: false, nades: 1, sight: 480, armor: .1,  color: '#ffd23f', time: 180 },
   { name: 'HARD',   stars: 3, hp: 290, speed: 170, spread: .06,  react: .2,  rate: .11, dmg: 11, lead: true,  nades: 2, sight: 520, armor: .15, color: '#ff8a3d', time: 210 },
@@ -2205,7 +2205,7 @@ function startDef(i, diff, carry) {
   INTRUDER_NAMES.forEach((n, k) => {
     const tier = k === 0 ? diff : Math.max(0, diff - 1);
     const o = makeOp(n, 'A', k === 0 ? 'lead' : 'follow', tier, sx + (k === 0 ? 0 : -20), sy + (k - 1) * 22, 'smgsd');
-    o.maxhp = o.hp = Math.round(o.maxhp * 1.5); // intruders wear heavy plate carriers
+    o.maxhp = o.hp = Math.round(o.maxhp * 2.1); // intruders wear heavy plate carriers
     if (prev) { const p = prev[k]; o.state = p.state === 'ok' ? 'ok' : 'dead'; o.hp = p.hp; o.role = p.role; }
     collide(o); OPS.push(o);
   });
