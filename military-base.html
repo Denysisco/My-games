@@ -144,7 +144,7 @@ const ETYPES = {
   officer: { name: 'OFFICER',      hp: 94,   r: 12, speed: 80,  dmg: 8,  ranged: true, rate: .8,  range: 380, bspeed: 540,  sight: 1.05, cone: .85, alarm: 1.2, tk: true, color: '#4f5b33' },
   heavy:   { name: 'HEAVY GUNNER', hp: 230,  r: 15, speed: 60,  dmg: 7,  ranged: true, rate: .09, range: 430, bspeed: 580,  sight: .95,  cone: .75, alarm: 2.6, tk: true, burst: 8, color: '#3e4a2a' },
   sniper:  { name: 'SNIPER',       hp: 60,   r: 12, speed: 55,  dmg: 30, ranged: true, rate: 2.6, range: 820, bspeed: 1300, sight: 1.9,  cone: .42, alarm: 3,   tk: true, post: true, sniper: true, color: '#4d5a2c' },
-  spec:    { name: 'SPEC-OPS',     hp: 125,  r: 12, speed: 92,  dmg: 11, ranged: true, rate: .14, range: 470, bspeed: 660,  sight: 1.15, cone: .9,  alarm: 1.6, tk: true, burst: 3, armor: .2, color: '#2b3540' }, // body armour, burst rifle, sharp eyes
+  spec:    { name: 'SPEC-OPS',     hp: 132,  r: 12, speed: 93,  dmg: 11.5, ranged: true, rate: .14, range: 470, bspeed: 660,  sight: 1.15, cone: .9,  alarm: 1.6, tk: true, burst: 3, armor: .2, color: '#2b3540' }, // body armour, burst rifle, sharp eyes
   dog:     { name: 'K9 UNIT',      hp: 60,   r: 12, speed: 215, dmg: 10, melee: true,                                         sight: .9,   cone: 1.1, alarm: 1.5, smell: 120, color: '#9a6a32' },
   camera:  { name: 'CAMERA',       hp: 25,   r: 9,  speed: 0,   stat: true, cam: true,                                        sight: 1.25, cone: .4,  alarm: 0,   color: '#9aa7b3' },
   turret:  { name: 'SENTRY GUN',   hp: 160,  r: 14, speed: 0,   dmg: 8,  ranged: true, rate: .3,  range: 450, bspeed: 620,  sight: 1.3,  cone: .6,  alarm: 1.5, stat: true, color: '#ff8a3d' },
@@ -406,6 +406,7 @@ function buildLevel(def, codes, gd) {
   L.boss = L.enemies.find(e => e.type === 'boss') || null;
   // extra security: Spec-Ops posts and roaming patrols in rooms away from where you come in
   { const li = Math.max(0, LEVELS.indexOf(def)); let seed = 777 + li * 97; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (const e of L.enemies) if (e.type === 'guard' && rnd() < .25 + li * .03) { const s = makeEnemy('spec', e.x, e.y, null, gd); Object.assign(e, { type: 'spec', hp: s.hp, maxhp: s.maxhp, r: s.r }); } // a quarter of the soldiers are swapped for Spec-Ops (a few more in deeper sectors)
     const rd = new Uint16Array(w * h).fill(65535); { const q = [def.player[1] * w + def.player[0]]; rd[q[0]] = 0; for (let qh = 0; qh < q.length; qh++) { const i = q[qh], x = i % w; for (const n of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w]) if (n >= 0 && n < w * h && rd[n] === 65535 && t[n] !== 0) { rd[n] = rd[i] + 1; q.push(n); } } }
     const segD = (px, py, a, b) => { const dx = b.x - a.x, dy = b.y - a.y, l = dx * dx + dy * dy || 1, u = clamp(((px - a.x) * dx + (py - a.y) * dy) / l, 0, 1); return Math.hypot(px - a.x - dx * u, py - a.y - dy * u); };
     const onRoute = (x, y) => L.enemies.some(e => e.route && e.route.some((p, k) => segD((x + .5) * TS, (y + .5) * TS, p, e.route[(k + 1) % e.route.length]) < TS * 2.2));
@@ -1200,7 +1201,7 @@ function squadHold() {
 const CMD_NAME = { follow: 'FOLLOW ME', hold: 'HOLD POSITION', move: 'GO THERE', attack: 'ATTACK TARGET', kill: 'TAKE HIM DOWN', guard: 'GUARD THE EXIT', hunt: 'HUNT INTRUDERS', retreat: 'RETREAT', cover: 'COVER ME', heal: 'HEAL UP', assault: 'ATTACK ALL' };
 function cmdList() {
   return G.mode === 'op'
-    ? [['follow', 'Follow me'], ['hold', 'Hold position'], ['move', 'Go there'], ['attack', 'Attack target'], ['assault', 'ATTACK ALL'], ['kill', 'Take him down (knife)'], ['stance', G.stance === 'stealth' ? 'Weapons free' : 'Back to stealth'], ['retreat', 'Retreat!'], ['cover', 'Cover me'], ['heal', 'Heal up'], ['grenade', 'Throw a grenade there']]
+    ? [['follow', 'Follow me'], ['hold', 'Hold position'], ['move', 'Go there'], ['attack', 'Attack target'], ['assault', 'ATTACK ALL'], ['kill', 'Take him down (knife)'], ['stance', G.stance === 'stealth' ? 'Weapons free' : 'Back to stealth'], ['retreat', 'Retreat!'], ['cover', 'Cover me'], ['heal', 'Heal up'], ['grenade', 'Throw a grenade there'], ['bodies', 'Hide bodies next to me']]
     : [['follow', 'Follow me'], ['hold', 'Hold position'], ['move', 'Go there'], ['attack', 'Attack target'], ['assault', 'ATTACK ALL'], ['guard', 'Guard the exit'], ['hunt', 'Hunt intruders'], ['retreat', 'Retreat!'], ['reinforce', G.reinfT > 0 ? 'Respawn troops (' + Math.ceil(G.reinfT) + 's)' : 'Respawn troops'], ['alarm', G.alarmUsed ? 'Alarm used' : 'Sound the alarm'], ['heal', 'Heal up'], ['grenade', 'Throw a grenade there']];
 }
 // the spot you're pointing at, and whoever is standing closest to it
@@ -1262,6 +1263,19 @@ function runCmd(i) {
     case 'cover': giveOrder({ kind: 'cover' }); return;
     case 'assault': giveOrder({ kind: 'assault' }); return;
     case 'heal': giveOrder({ kind: 'heal' }); return;
+    case 'bodies': { // each free squadmate grabs the nearest body and drags it to a spot right next to you
+      const squad = myOps().filter(o => o.state === 'ok'); for (const o of squad) o.drag = null; const taken = new Set(OPS.filter(o => o.drag).map(o => o.drag.b));
+      let n = 0;
+      for (const o of squad) {
+        const b = L.bodies.filter(b => !taken.has(b) && !b.found && Math.hypot(b.x - P.x, b.y - P.y) < 900).sort((a, c) => Math.hypot(a.x - o.x, a.y - o.y) - Math.hypot(c.x - o.x, c.y - o.y))[0];
+        if (!b) break;
+        let spot = null;
+        for (let pass = 0; pass < 2 && !spot; pass++) for (let k = 0; k < 16 && !spot; k++) { const a = (n * 2.1 + k * .8) % TAU, r = 26 + (k % 2) * 12, x = P.x + Math.cos(a) * r, y = P.y + Math.sin(a) * r; if (!solidAt(x, y) && los(P.x, P.y, x, y) && (pass || !watched(x, y))) spot = { x, y }; } // out of sight if we can, otherwise just next to you
+        if (!spot) spot = { x: P.x, y: P.y };
+        taken.add(b); o.claim = null; o.drag = { b, x: spot.x, y: spot.y, t: 0, ordered: true }; n++;
+      }
+      msg(n ? 'SQUAD: "Moving ' + (n > 1 ? n + ' bodies' : 'the body') + ' to you."' : 'SQUAD: "No bodies near you to move."', n ? '#7fe0d0' : '#9aa58e');
+      return; }
     case 'grenade': {
       const tw = myOps().filter(o => o.state === 'ok' && o.nadesUsed < TIERS[o.tier].nades + 1).sort((a, b) => Math.hypot(a.x - pt.x, a.y - pt.y) - Math.hypot(b.x - pt.x, b.y - pt.y))[0];
       if (!tw) { msg('Nobody has a grenade left', '#86907a'); return; }
@@ -1950,6 +1964,7 @@ function opScan(o, stealth) {
     }
     if (h === P || (h.op && h.target && h.target.team === o.team)) w *= .8;
     if (o.team === P.team && h === P.focus && G.time - (P.focusT || -9) < 3) w *= .4;   // focus fire on your target
+    if (o.team === P.team && !o.ally2 && G.cmd.kind === 'cover' && !P.dead) { w = w * .3 + Math.hypot(h.x - P.x, h.y - P.y) * .7; if (h.target === P) w *= .4; } // COVER ME: whoever is closest to you / shooting at you goes first
     if (h.op && h.hp < h.maxhp * .35) w *= .75;                                          // finish off the wounded
     if (w >= bs || !sightLine(o.x, o.y, h.x, h.y)) continue;
     bs = w; best = h;
@@ -2086,7 +2101,7 @@ function updateOp(o, dt) {
   }
   const T = TIERS[o.tier], friendly = o.team === P.team, mine = friendly && !o.ally2;
   const spotted = o.team === 'A' ? (G.mode === 'def' && G.spottedSq ? G.spottedSq[o.sq] : G.spottedA) : true;
-  const stealthy = !spotted && (G.mode === 'def' ? o.team === 'A' : o.ally2 ? G.bravoStealth : G.stance === 'stealth');
+  const stealthy = !spotted && !(mine && G.cmd.kind === 'cover') && (G.mode === 'def' ? o.team === 'A' : o.ally2 ? G.bravoStealth : G.stance === 'stealth');
   // intruders switch from silenced SMGs to rifles once the shooting starts
   if (G.mode === 'def' && o.team === 'A') o.weapon = spotted ? 'rifle' : 'smgsd';
   // ---- leader of the intruder squad: objectives
@@ -2139,8 +2154,8 @@ function updateOp(o, dt) {
   if (o.healIt) { gx = o.healIt.x; gy = o.healIt.y; o.cov = null; }
   else if (o.drag) { // walk over, grab the body, drag it out of sight
     const dg = o.drag; dg.t += dt;
-    if (!dg.carry) { gx = dg.b.x; gy = dg.b.y; if (Math.hypot(gx - o.x, gy - o.y) < 22) { dg.carry = true; dg.t = 0; } else if (dg.t > 6) o.drag = null; }
-    else { gx = dg.x; gy = dg.y; if (Math.hypot(gx - o.x, gy - o.y) < 16 || dg.t > 8) o.drag = null; }
+    if (!dg.carry) { gx = dg.b.x; gy = dg.b.y; if (Math.hypot(gx - o.x, gy - o.y) < 22) { dg.carry = true; dg.t = 0; } else if (dg.t > (dg.ordered ? 25 : 6)) o.drag = null; }
+    else { gx = dg.x; gy = dg.y; if (Math.hypot(gx - o.x, gy - o.y) < 16 || dg.t > (dg.ordered ? 25 : 8)) { if (dg.ordered && !solidAt(dg.x, dg.y)) { dg.b.x = dg.x; dg.b.y = dg.y; } o.drag = null; } }
   } else if (o.claim) {
     gx = o.claim.x; gy = o.claim.y; mode = 'sneak';
     if (!o.claim.sleep && Math.hypot(o.claim.x - o.x, o.claim.y - o.y) > 70) { // come at him from behind
@@ -2187,7 +2202,17 @@ function updateOp(o, dt) {
     const c = G.cmd, mates = myOps().filter(x => x.state !== 'dead'), k = mates.indexOf(o);
     const off = [[0, 0], [26, 20], [-26, 20]][k % 3];
     o.overwatch = false;
-    if (c.kind === 'hold' || c.kind === 'cover') { gx = o.holdX; gy = o.holdY; }
+    if (c.kind === 'hold') { gx = o.holdX; gy = o.holdY; }
+    else if (c.kind === 'cover') { // stick close to you and put yourselves between you and the threat
+      if (P.dead) { gx = o.holdX; gy = o.holdY; }
+      else {
+        const th = hostilesOf(o.team).filter(h => alive(h) && !(ETYPES[h.type] && ETYPES[h.type].cam) && Math.hypot(h.x - P.x, h.y - P.y) < 520).sort((a, b) => Math.hypot(a.x - P.x, a.y - P.y) - Math.hypot(b.x - P.x, b.y - P.y))[0];
+        const a = th ? Math.atan2(th.y - P.y, th.x - P.x) : (P.heading || 0), side = [0, .8, -.8][k % 3];
+        gx = P.x + Math.cos(a + side) * 44; gy = P.y + Math.sin(a + side) * 44;
+        if (solidAt(gx, gy) || !los(P.x, P.y, gx, gy)) { const sl = slotFor(P, k, 3, P.heading || 0); gx = sl.x; gy = sl.y; }
+        if (Math.hypot(gx - o.x, gy - o.y) < 14) mode = 'hold';
+      }
+    }
     else if (c.kind === 'assault') { // go after the nearest enemy anyone can see (or the last one called out)
       const tg = t || hostilesOf(o.team).filter(h => !(ETYPES[h.type] && ETYPES[h.type].cam) && (h.op ? G.time - (h.spottedT || -99) < 4 : true) && Math.hypot(h.x - o.x, h.y - o.y) < 900).sort((a, b) => Math.hypot(a.x - o.x, a.y - o.y) - Math.hypot(b.x - o.x, b.y - o.y))[0];
       const ref = tg || INTEL[o.team];
@@ -3622,7 +3647,7 @@ function menu() {
       <b>1–7 / WHEEL</b><span>weapons: SD pistol, MP5-SD, M4, shotgun, sniper, LMG, RPG</span>
       <b>E</b><span>takedown · revive · keypad · note</span>
       <b>Q · Z</b><span>throw grenade · switch frag / smoke / flashbang</span>
-      <b>R</b><span>orders menu: follow, hold, go there, attack, ATTACK ALL, knife, retreat, cover me, heal up, grenade, guard exit, hunt, respawn troops, alarm (keys 1–9, 0, -, =)</span>
+      <b>R</b><span>orders menu: follow, hold, go there, attack, ATTACK ALL, knife, retreat, cover me, heal up, grenade, hide bodies next to you, guard exit, hunt, respawn troops, alarm (keys 1–9, 0, -, =)</span>
       <b>F · V</b><span>quick orders: hold / follow · stealth / weapons free</span>
       <b>T</b><span>radio SGT. KANE of BRAVO (Infiltrate): stick with me / go on without me, quiet / loud, fall back to camp, quiet takedown, hold position</span>
       <b>TAB · ESC</b><span>datapad · pause (M mutes)</span>
