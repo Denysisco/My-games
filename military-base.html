@@ -1416,7 +1416,7 @@ const gd = () => G.mode === 'op' ? GDIFF[G.diff] : GDIFF[2];
 const eliteGuards = () => G.mode === 'op' && G.diff >= 4;
 // how easy someone is to spot: crouching (and keeping still) makes you much harder to see
 function visOf(h) {
-  if (h.crouch) return h.still ? .42 : .58;
+  if (h.crouch) return (h.still ? .42 : .58) * (h.ally2 ? .72 : 1); // BRAVO are trained infiltrators: harder to pick out when they're low
   if (h.sprinting) return 1.15;
   return 1;
 }
@@ -1790,11 +1790,11 @@ function coneMap() {
   for (const e of L.enemies) {
     const T = ETYPES[e.type];
     if (e.sleep || e.off || e.stun > 0 || e.state === 'combat' || T.boss || e.hp <= 0) continue;
-    const range = A.sight * T.sight * (T.cam ? 1 : .62) + 20, r = Math.ceil(range / TS), cx = Math.floor(e.x / TS), cy = Math.floor(e.y / TS); // cameras: their whole view is off limits
+    const range = A.sight * T.sight * (T.cam ? 1 : .8) + 20, r = Math.ceil(range / TS), cx = Math.floor(e.x / TS), cy = Math.floor(e.y / TS); // cameras: their whole view is off limits
     for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) {
       if (x < 0 || y < 0 || x >= L.w || y >= L.h || L.t[y * L.w + x] === 0) continue;
       const px = (x + .5) * TS, py = (y + .5) * TS, d = Math.hypot(px - e.x, py - e.y);
-      if (d > range || (d > 40 && Math.abs(angDiff(e.angle, Math.atan2(py - e.y, px - e.x))) > T.cone + .15)) continue;
+      if (d > range || (d > (T.smell ? T.smell + 30 : 40) && Math.abs(angDiff(e.angle, Math.atan2(py - e.y, px - e.x))) > T.cone + .3)) continue; // flashlight + a safety margin (dogs: their whole nose range too)
       if (sightLine(e.x, e.y, px, py)) m[y * L.w + x] = T.cam ? 2 : Math.max(m[y * L.w + x], 1);
     }
   }
@@ -2173,7 +2173,8 @@ function updateOp(o, dt) {
   }
   // freeze while a guard looks our way, but never forever: after a few seconds of a guard just standing there staring, crawl on anyway
   o.boldT = (o.boldT || 0) - dt;
-  if (stealthy && mode !== 'sneak' && o.boldT <= 0) { const ex = exposedTo(o); if (ex) o.freezeT = Math.max(o.freezeT, .5); }
+  o.exposedBy = null;
+  if (stealthy && mode !== 'sneak' && o.boldT <= 0) { const ex = exposedTo(o); if (ex) { o.freezeT = Math.max(o.freezeT, .5); o.exposedBy = ex; } }
   if (o.freezeT > 0 && stealthy && (!friendly || o.ally2 || P.dead || Math.hypot(P.x - o.x, P.y - o.y) > 260)) { o.frzAcc = (o.frzAcc || 0) + dt; if (o.frzAcc > 4.5) { o.frzAcc = 0; o.boldT = 2.5; o.freezeT = 0; o.crouch = true; } } else o.frzAcc = Math.max(0, (o.frzAcc || 0) - dt * .5);
   const toGoal = Math.hypot(gx - o.x, gy - o.y);
   let mvx = 0, mvy = 0;
@@ -2187,7 +2188,7 @@ function updateOp(o, dt) {
       if (!near && !o.rush && !here && ahead && (o.waitT || 0) < 5) { o.waitT = (o.waitT || 0) + dt; f = { x: 0, y: 0 }; o.crouch = true; }
       else if (!ahead) o.waitT = Math.max(0, (o.waitT || 0) - dt * .5);
     } else if (toGoal < 70 && los(o.x, o.y, gx, gy)) f = { x: (gx - o.x) / toGoal, y: (gy - o.y) / toGoal };
-    else if (stealthy && !o.drag && ((!friendly && o.role === 'lead') || (o.cmdr && !G.allyJoin))) {
+    else if (stealthy && !o.drag && ((!friendly && o.role === 'lead') || (o.cmdr && !G.allyJoin) || (o.ally2 && !o.cmdr))) { // BRAVO's soldiers pick their own way around the flashlights too
       f = stealthPath(o, gx, gy) || opPath(o, gx, gy) || { x: (gx - o.x) / toGoal, y: (gy - o.y) / toGoal };
       const cm = coneMap(), here = cm[tileIdx(o)], ahead = cm[tileIdx({ x: o.x + f.x * 26, y: o.y + f.y * 26 })];
       if (!here && ahead && (o.lwaitT || 0) < 3.5) { o.lwaitT = (o.lwaitT || 0) + dt; f = { x: 0, y: 0 }; o.crouch = true; } // let him look away first
@@ -2261,6 +2262,13 @@ function updateOp(o, dt) {
   if (friendly && !P.dead && (P.aiming || G.time - (P.shotT || -9) < .7)) {
     const ca = Math.cos(P.angle), sa = Math.sin(P.angle), rx = o.x - P.x, ry = o.y - P.y, along = rx * ca + ry * sa, perp = ry * ca - rx * sa;
     if (along > 12 && along < 560 && Math.abs(perp) < o.r + 14) { const sd = perp >= 0 ? 1 : -1; mvx += -sa * sd * 1.6; mvy += ca * sd * 1.6; }
+  }
+  // a guard looking our way is too close to freeze in front of: slip back out of his flashlight instead
+  if (friendly && stealthy && o.exposedBy && !o.claim && G.mode === 'op') {
+    const e = o.exposedBy, d = Math.hypot(o.x - e.x, o.y - e.y);
+    if (d < 170) { const ax = (o.x - e.x) / (d || 1), ay = (o.y - e.y) / (d || 1), sd = angDiff(e.angle, Math.atan2(o.y - e.y, o.x - e.x)) > 0 ? 1 : -1;
+      let vx = ax * .6 - ay * sd * .8, vy = ay * .6 + ax * sd * .8; if (solidAt(o.x + vx * 24, o.y + vy * 24)) { vx = ax; vy = ay; } if (solidAt(o.x + vx * 24, o.y + vy * 24)) { vx = -ay * sd; vy = ax * sd; }
+      mvx = vx; mvy = vy; o.freezeT = 0; o.crouch = true; }
   }
   { const gdg = grenadeDodge(o); if (gdg) { mvx = gdg.x * 1.5; mvy = gdg.y * 1.5; spd = Math.max(spd, T.speed * 1.3); o.cov = null; } }
   // separation from teammates and you
