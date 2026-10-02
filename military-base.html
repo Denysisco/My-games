@@ -2292,6 +2292,8 @@ function updateOp(o, dt) {
   }
   // ---- under fire: duck behind cover, wait a beat, then step back out and shoot
   o.covCd = (o.covCd || 0) - dt;
+  const guarding = mine && G.cmd.kind === 'cover' && !P.dead; // COVER ME: never wander off from you
+  if (o.cov && guarding && Math.hypot(o.cov.x - P.x, o.cov.y - P.y) > 110) o.cov = null;
   if (o.cov) {
     o.cov.t -= dt;
     if (!alive(o.cov.from) || mode === 'sneak') o.cov = null;
@@ -2302,7 +2304,7 @@ function updateOp(o, dt) {
     }
   } else if (t && !stealthy && o.seenT > .25 && (o.lastHit < .4 || o.hp < o.maxhp * .5) && o.covCd <= 0 && !o.claim && !(friendly && G.cmd.kind === 'hold')) {
     const c = findCover(o, t);
-    if (c) { o.cov = { x: c.x, y: c.y, px: o.x, py: o.y, t: .8 + Math.random() * .7 + (o.hp < o.maxhp * .3 ? 1.5 : 0), phase: 'hide', from: t }; }
+    if (c && !(guarding && Math.hypot(c.x - P.x, c.y - P.y) > 110)) { o.cov = { x: c.x, y: c.y, px: o.x, py: o.y, t: .8 + Math.random() * .7 + (o.hp < o.maxhp * .3 ? 1.5 : 0), phase: 'hide', from: t }; }
     else o.covCd = 1;
   }
   let spd = T.speed * (o.crouch ? .62 : 1);
@@ -2324,7 +2326,7 @@ function updateOp(o, dt) {
     o.angle = Math.atan2(t.y - o.y, t.x - o.x);
     if (o.cd <= 0 && !holdFire) opFire(o, t);
     if (o.blockedT > 0) { const k = (o.seed > 5 ? 1 : -1); mvx += -(t.y - o.y) / dist * k * 1.2; mvy += (t.x - o.x) / dist * k * 1.2; }
-    if (!o.claim && !o.cov) {
+    if (!o.claim && !o.cov && !(guarding && Math.hypot(P.x - o.x, P.y - o.y) > 90)) {
       spd *= .7;
       if (dist < 100) { mvx = mvx * .3 - (t.x - o.x) / dist; mvy = mvy * .3 - (t.y - o.y) / dist; }
       const k = Math.sin(G.time * 2.6 + o.seed) * .6; mvx += -(t.y - o.y) / dist * k; mvy += (t.x - o.x) / dist * k;
