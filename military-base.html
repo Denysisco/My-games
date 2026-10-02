@@ -1961,7 +1961,7 @@ function planHawk(o) {
 }
 const compass = (dx, dy) => ['east', 'south-east', 'south', 'south-west', 'west', 'north-west', 'north', 'north-east'][((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8];
 function talkList() {
-  return [['stick', G.bravoMode === 'join' ? 'Go on without me' : 'Stick with me'], ['bstealth', G.bravoStealth ? 'Go loud (weapons free)' : 'Go quiet (full stealth)'], ['bretreat', 'Fall back to camp'], ['bkill', 'Quiet takedown — click the target']];
+  return [['stick', G.bravoMode === 'join' ? 'Go on without me' : 'Stick with me'], ['bstealth', G.bravoStealth ? 'Go loud (weapons free)' : 'Go quiet (full stealth)'], ['bretreat', 'Fall back to camp'], ['bkill', 'Quiet takedown — click the target'], ['bhold', G.bravoMode === 'hold' ? 'Holding — move out (go on without me)' : 'Hold position (stop moving)']];
 }
 function openTalk() {
   if (P.dead || G.mode !== 'op') return;
@@ -1986,6 +1986,9 @@ function runTalk(i) {
     hawkSay(G.allyJoin ? 'BRAVO moving to you — we\'ll stick with you.' : 'Copy. BRAVO going on without you — we\'ll go after the keys and codes ourselves.');
   } else if (c[0] === 'bretreat') {
     G.bravoMode = 'retreat'; G.allyJoin = false; hawkSay('Falling back to camp. We\'ll lay low and patch up there.');
+  } else if (c[0] === 'bhold') {
+    if (G.bravoMode === 'hold') { G.bravoMode = 'solo'; hawkSay('Moving out.'); }
+    else { G.bravoMode = 'hold'; G.allyJoin = false; G.bravoHold = { x: h.x, y: h.y }; for (const o of OPS) if (o.ally2) { o.holdX = o.x; o.holdY = o.y; } hawkSay('BRAVO holding right here. Nobody moves.'); }
   } else if (c[0] === 'bstealth') {
     G.bravoStealth = !G.bravoStealth; hawkSay(G.bravoStealth ? 'Going quiet. Knives and silenced shots only — we don\'t fire unless we\'re seen.' : 'Weapons free — we engage everything we see.');
   }
@@ -2149,6 +2152,7 @@ function updateOp(o, dt) {
       if (live.indexOf(o) % 2 !== phase) { mode = 'hold'; o.overwatch = true; }
     }
   }
+  else if (o.ally2 && G.bravoMode === 'hold') { gx = o.holdX; gy = o.holdY; if (Math.hypot(gx - o.x, gy - o.y) < 14) mode = 'hold'; } // BRAVO told to hold: every man stays on his spot
   else if (anchor) {
     const mates = OPS.filter(x => x.team === o.team && x.sq === o.sq && x.role !== 'lead' && !(x.cmdr && x !== o && anchor !== P) && x.state !== 'dead' && (anchor === P ? !x.ally2 || G.allyJoin : true));
     const k = mates.indexOf(o), a = anchor === P ? (P.heading || 0) : anchor.angle;
@@ -3523,7 +3527,7 @@ function menu() {
       <b>Q · Z</b><span>throw grenade · switch frag / smoke / flashbang</span>
       <b>R</b><span>orders menu: follow, hold, go there, attack, ATTACK ALL, knife, retreat, cover me, heal up, grenade, guard exit, hunt, respawn troops, alarm (keys 1–9, 0, -, =)</span>
       <b>F · V</b><span>quick orders: hold / follow · stealth / weapons free</span>
-      <b>T</b><span>radio SGT. KANE of BRAVO (Infiltrate): stick with me / go on without me, quiet / loud, fall back to camp, quiet takedown</span>
+      <b>T</b><span>radio SGT. KANE of BRAVO (Infiltrate): stick with me / go on without me, quiet / loud, fall back to camp, quiet takedown, hold position</span>
       <b>TAB · ESC</b><span>datapad · pause (M mutes)</span>
       <b>TOUCH</b><span>left stick move · right stick aim+fire · double-tap NADE to switch grenade</span>
     </div>
