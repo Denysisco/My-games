@@ -144,6 +144,7 @@ const ETYPES = {
   officer: { name: 'OFFICER',      hp: 94,   r: 12, speed: 80,  dmg: 8,  ranged: true, rate: .8,  range: 380, bspeed: 540,  sight: 1.05, cone: .85, alarm: 1.2, tk: true, color: '#4f5b33' },
   heavy:   { name: 'HEAVY GUNNER', hp: 230,  r: 15, speed: 60,  dmg: 7,  ranged: true, rate: .09, range: 430, bspeed: 580,  sight: .95,  cone: .75, alarm: 2.6, tk: true, burst: 8, color: '#3e4a2a' },
   sniper:  { name: 'SNIPER',       hp: 60,   r: 12, speed: 55,  dmg: 30, ranged: true, rate: 2.6, range: 820, bspeed: 1300, sight: 1.9,  cone: .42, alarm: 3,   tk: true, post: true, sniper: true, color: '#4d5a2c' },
+  spec:    { name: 'SPEC-OPS',     hp: 125,  r: 12, speed: 92,  dmg: 11, ranged: true, rate: .14, range: 470, bspeed: 660,  sight: 1.15, cone: .9,  alarm: 1.6, tk: true, burst: 3, armor: .3, color: '#2b3540' }, // body armour, burst rifle, sharp eyes
   dog:     { name: 'K9 UNIT',      hp: 60,   r: 12, speed: 215, dmg: 10, melee: true,                                         sight: .9,   cone: 1.1, alarm: 1.5, smell: 120, color: '#9a6a32' },
   camera:  { name: 'CAMERA',       hp: 25,   r: 9,  speed: 0,   stat: true, cam: true,                                        sight: 1.25, cone: .4,  alarm: 0,   color: '#9aa7b3' },
   turret:  { name: 'SENTRY GUN',   hp: 160,  r: 14, speed: 0,   dmg: 8,  ranged: true, rate: .3,  range: 450, bspeed: 620,  sight: 1.3,  cone: .6,  alarm: 1.5, stat: true, color: '#ff8a3d' },
@@ -403,6 +404,28 @@ function buildLevel(def, codes, gd) {
   };
   for (const [x, y, type, extra] of def.enemies) L.enemies.push(makeEnemy(type, (x + .5) * TS, (y + .5) * TS, extra, gd));
   L.boss = L.enemies.find(e => e.type === 'boss') || null;
+  // extra security: Spec-Ops posts and roaming patrols in rooms away from where you come in
+  { const li = Math.max(0, LEVELS.indexOf(def)); let seed = 777 + li * 97; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const rd = new Uint16Array(w * h).fill(65535); { const q = [def.player[1] * w + def.player[0]]; rd[q[0]] = 0; for (let qh = 0; qh < q.length; qh++) { const i = q[qh], x = i % w; for (const n of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w]) if (n >= 0 && n < w * h && rd[n] === 65535 && t[n] !== 0) { rd[n] = rd[i] + 1; q.push(n); } } }
+    const segD = (px, py, a, b) => { const dx = b.x - a.x, dy = b.y - a.y, l = dx * dx + dy * dy || 1, u = clamp(((px - a.x) * dx + (py - a.y) * dy) / l, 0, 1); return Math.hypot(px - a.x - dx * u, py - a.y - dy * u); };
+    const onRoute = (x, y) => L.enemies.some(e => e.route && e.route.some((p, k) => segD((x + .5) * TS, (y + .5) * TS, p, e.route[(k + 1) % e.route.length]) < TS * 2.2));
+    // which open area each tile belongs to (locked doors split areas) and how many rooms that area holds
+    const comp = new Int16Array(w * h).fill(-1), compRooms = []; let nc = 0;
+    const walk = i => t[i] === 1 || (t[i] === 2 && !doors.get(i).locked);
+    for (let s0 = 0; s0 < w * h; s0++) if (comp[s0] < 0 && walk(s0)) { const q = [s0]; comp[s0] = nc; for (let qh = 0; qh < q.length; qh++) { const i = q[qh], x = i % w; for (const n of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w]) if (n >= 0 && n < w * h && comp[n] < 0 && walk(n)) { comp[n] = nc; q.push(n); } } compRooms[nc++] = 0; }
+    def.rooms.forEach(([rx, ry, rw, rh]) => { const c = comp[(ry + (rh >> 1)) * w + rx + (rw >> 1)]; if (c >= 0) compRooms[c]++; });
+    const spots = [];
+    def.rooms.forEach(([rx, ry, rw, rh]) => { let got = 0; for (let k = 0; k < 12 && got < (rw * rh >= 120 ? 2 : 1); k++) { const x = rx + 1 + Math.floor(rnd() * Math.max(1, rw - 2)), y = ry + 1 + Math.floor(rnd() * Math.max(1, rh - 2)), i = y * w + x;
+      if (L.t[i] === 1 && rd[i] !== 65535 && rd[i] > 18 && !onRoute(x, y) && !L.enemies.some(e => Math.hypot(e.x - (x + .5) * TS, e.y - (y + .5) * TS) < 110) && !spots.some(p => Math.hypot(p[0] - x, p[1] - y) < 5)) { spots.push([x, y, compRooms[comp[i]] || 0]); got++; } } });
+    for (let k = spots.length - 1; k > 0; k--) { const j = Math.floor(rnd() * (k + 1)); [spots[k], spots[j]] = [spots[j], spots[k]]; }
+    const posts = 2 + (li >= 2 ? 1 : 0) + (li >= 4 ? 1 : 0), rovers = ['guard', 'spec', 'guard', li >= 3 ? 'spec' : 'guard'];
+    // roamers need a big open area to walk; the rest become Spec-Ops posts
+    const roam = spots.filter(p => p[2] >= Math.min(4, def.rooms.length - 1)).slice(0, rovers.length), rest = spots.filter(p => !roam.includes(p));
+    roam.forEach(([x, y], k) => L.enemies.push(makeEnemy(rovers[k], (x + .5) * TS, (y + .5) * TS, 'rover', gd)));
+    rest.slice(0, posts).forEach(([x, y]) => L.enemies.push(makeEnemy('spec', (x + .5) * TS, (y + .5) * TS, Math.floor(rnd() * 4) * 90, gd)));
+    L.roomVisit = def.rooms.map(() => 0); L.hot = null; L.zones = []; for (const [rx, ry, rw, rh] of def.rooms) { const nx = Math.ceil(rw / 10), ny = Math.ceil(rh / 10); for (let a = 0; a < nx; a++) for (let b = 0; b < ny; b++) { const x0 = rx + Math.floor(a * rw / nx), y0 = ry + Math.floor(b * rh / ny); L.zones.push([x0, y0, rx + Math.floor((a + 1) * rw / nx) - x0, ry + Math.floor((b + 1) * rh / ny) - y0]); } } // big yards are swept in chunks
+    L.teamVisit = { A: L.zones.map(() => -999), D: L.zones.map(() => -999) }; L.sweep = {};
+  }
   L.mobile0 = L.enemies.filter(e => !ETYPES[e.type].stat && e.type !== 'boss').length;
   return L;
 }
@@ -417,6 +440,7 @@ function makeEnemy(type, x, y, extra, gd) {
   if (Array.isArray(extra)) { e.route = extra.map(([wx, wy]) => ({ x: (wx + .5) * TS, y: (wy + .5) * TS })); e.angle = Math.atan2(e.route[0].y - y, e.route[0].x - x) || 0; }
   else if (typeof extra === 'number') e.angle = extra * Math.PI / 180;
   else if (extra === 'sleep') { e.sleep = true; e.angle = Math.PI / 2; }
+  else if (extra === 'rover') e.rover = true; // the patrol director plans this one's routes
   e.baseA = e.angle;
   if (T.cam) e.sweep = Math.random() * TAU;
   return e;
@@ -1332,6 +1356,7 @@ function hurtOp(o, d, src) {
 function damageEnemy(e, dmg, src, silent) {
   if (e.hp <= 0) return;
   if (e.type === 'boss' && e.pat === 'charge') dmg *= .6;
+  if (ETYPES[e.type].armor) dmg *= 1 - ETYPES[e.type].armor; // plate carriers
   e.hp -= dmg; e.flash = .08; e.lastHitT = G.time;
   if (!silent) sfx('hit');
   floater(e.x + rand(-6, 6), e.y - e.r - 4, Math.round(dmg), '#fff');
@@ -1431,10 +1456,31 @@ function guardSees(e, h, range, cone) {
   if (!sightLine(e.x, e.y, h.x, h.y)) return 0;
   return Math.max(1, d);
 }
+// PATROL DIRECTOR: roaming guards get routes through the rooms nobody has checked lately,
+// and once something is going on, through the rooms around the last place an intruder was seen
+function planRover(e) {
+  const rooms = L.def.rooms, w = L.w, rd = e.rpf || (e.rpf = new Uint16Array(L.w * L.h)); bfs(tileIdx(e), enemyPassable, rd);
+  const hot = L.hot && ALERTS[G.alert].lvl >= 1 && G.time - L.hot.t < 90 ? L.hot : null;
+  const cand = [];
+  rooms.forEach(([rx, ry, rw, rh], r) => { for (let s = 0, ns = rw * rh >= 150 ? 3 : 1; s < ns; s++) { // big yards get several checkpoints
+    let cx = -1, cy = -1; for (let k = 0; k < 8; k++) { const x = rx + 1 + Math.floor(Math.random() * Math.max(1, rw - 2)), y = ry + 1 + Math.floor(Math.random() * Math.max(1, rh - 2)), j = y * w + x; if (L.t[j] === 1 && rd[j] >= 4 && rd[j] <= 85) { cx = x; cy = y; break; } }
+    if (cx < 0) continue; const i = cy * w + cx;
+    let sc = Math.min(120, G.time - (L.roomVisit[r] || 0)) - rd[i] * .4 + Math.random() * 15;
+    if (hot) sc += 90 - Math.min(90, Math.hypot((cx + .5) * TS - hot.x, (cy + .5) * TS - hot.y) / TS * 3);
+    if (L.enemies.some(o => o !== e && o.rover && o.route && o.route.some(p => Math.abs(p.x - (cx + .5) * TS) < 40 && Math.abs(p.y - (cy + .5) * TS) < 40))) sc -= 60; // spread the roamers out
+    cand.push({ r, x: (cx + .5) * TS, y: (cy + .5) * TS, sc });
+  } });
+  cand.sort((a, b) => b.sc - a.sc);
+  const pick = cand.slice(0, 3); if (cand.length < 2) { e.route = null; e.rover = false; return; } // boxed in -> just guard this spot
+  const route = []; let cx = e.x, cy = e.y; // visit them nearest-first
+  while (pick.length) { pick.sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy)); const n = pick.shift(); route.push({ x: n.x, y: n.y }); cx = n.x; cy = n.y; }
+  e.route = route; e.wp = 0; e.routeDone = false;
+}
 function enterCombat(e, h) {
   if (!h) return;
   e.target = h; e.lastX = h.x; e.lastY = h.y; e.lostT = 0; e.sleep = false;
   if (e.state === 'combat') return;
+  L.hot = { x: h.x, y: h.y, t: G.time }; // the patrol director sends roamers toward trouble
   e.state = 'combat'; e.sus = 1; e.alarmT = 0; e.bang = 1.2; e.cd = Math.max(e.cd, .45 * gd().alarm);
   if (e.type === 'dog') { sfx('bark'); } else sfx('spot');
   if (G.alert === 'GREEN') setAlert('YELLOW', (e.type === 'dog' ? 'A K9 UNIT' : 'A ' + ETYPES[e.type].name) + ' SPOTTED SOMEONE');
@@ -1461,7 +1507,7 @@ function guardFire(e, t) {
   const T = ETYPES[e.type], D = gd();
   const d = Math.hypot(t.x - e.x, t.y - e.y), tt = d / T.bspeed;
   const a = Math.atan2(t.y + (t.vy || 0) * tt * .5 - e.y, t.x + (t.vx || 0) * tt * .5 - e.x);
-  const inacc = (T.sniper ? .012 : e.type === 'drone' ? .13 : e.type === 'heavy' ? .13 : .085) * D.acc;
+  const inacc = (T.sniper ? .012 : e.type === 'spec' ? .06 : e.type === 'drone' ? .13 : e.type === 'heavy' ? .13 : .085) * D.acc;
   const dmg = T.dmg * (G.mode === 'op' ? D.dmg : 1) * (G.alert === 'RED' || G.alert === 'BLACK' ? 1.1 : 1);
   enemyFire(e, a + rand(-inacc, inacc), T.bspeed, dmg, T.sniper ? '#ffe9a0' : e.type === 'drone' ? '#5cc8ff' : '#ff6b3d', T.sniper ? 3 : e.type === 'drone' ? 3 : 4, T.sniper ? { life: 1.2 } : null);
   e.flash2 = .06; flashLight(e.x, e.y, T.sniper ? 160 : 90, .5);
@@ -1577,9 +1623,14 @@ function updateGuard(e, dt) {
     return false;
   };
   if (e.state === 'patrol') {
+    if (e.rover && (!e.route || e.routeDone)) planRover(e);
+    if (e.rover && e.route) { // stuck watchdog: no progress for a few seconds -> pick a new route
+      if (Math.hypot(e.x - (e.sx || 0), e.y - (e.sy || 0)) > 20 || e.wt > 0) { e.sx = e.x; e.sy = e.y; e.stuckT = 0; }
+      else if ((e.stuckT = (e.stuckT || 0) + dt) > 4) { e.stuckT = 0; planRover(e); }
+    }
     if (e.route) {
       if (e.wt > 0) { e.wt -= dt; e.angle = turnTo(e.angle, e.lookA || e.angle, 2 * dt); }
-      else if (goTo(e.route[e.wp].x, e.route[e.wp].y, .45)) { e.wp = (e.wp + 1) % e.route.length; e.wt = rand(.6, 1.8); e.lookA = e.angle + rand(-1.2, 1.2); }
+      else if (goTo(e.route[e.wp].x, e.route[e.wp].y, e.rover ? .55 : .45)) { e.wp = (e.wp + 1) % e.route.length; if (e.rover && e.wp === 0) e.routeDone = true; e.wt = rand(.6, 1.8); e.lookA = e.angle + rand(-1.2, 1.2); }
     } else if (Math.hypot(e.hx - e.x, e.hy - e.y) > 24) goTo(e.hx, e.hy, .45);
     else {
       e.lookT -= dt;
@@ -1643,7 +1694,7 @@ function updateGuard(e, dt) {
         if (blocked) { mvx += -dy / dist * e.strafe * 1.2; mvy += dx / dist * e.strafe * 1.2; e.cd = .15; }
         if (e.cd <= 0 && dist < T.range && Math.abs(angDiff(e.angle, toA)) < .35) {
           guardFire(e, t);
-          if (T.burst) { e.burstN++; e.cd = e.burstN >= T.burst ? (e.burstN = 0, 1.4) : T.rate; }
+          if (T.burst) { e.burstN++; e.cd = e.burstN >= T.burst ? (e.burstN = 0, e.type === 'spec' ? .9 : 1.4) : T.rate; }
           else e.cd = T.rate * rand(.8, 1.25);
         }
       }
@@ -1965,6 +2016,7 @@ function talkList() {
 }
 function openTalk() {
   if (P.dead || G.mode !== 'op') return;
+  if (G.useBravo === false) { msg('No second squad this run — turn BRAVO on in the Infiltrate menu', '#86907a'); return; }
   if (!hawk()) { msg(OPS.some(o => o.cmdr && o.state === 'down') ? HAWK_NAME + ' is down — revive him (E)' : HAWK_NAME + ' is gone', '#86907a'); return; }
   if (G.cmdOpen) closeCmd();
   G.cmdOpen = true; G.talk = true;
@@ -2097,7 +2149,7 @@ function updateOp(o, dt) {
   else if (o.cmdr && G.bravoMode === 'retreat') { gx = L.camp.x - 40; gy = L.camp.y; if (solidAt(gx, gy)) { gx = L.camp.x; gy = L.camp.y; } }
   else if (o.cmdr && G.bravoMode === 'assault') {
     const tg = t || hostilesOf(o.team).filter(h => !(ETYPES[h.type] && ETYPES[h.type].cam) && Math.hypot(h.x - o.x, h.y - o.y) < 900).sort((a, b) => Math.hypot(a.x - o.x, a.y - o.y) - Math.hypot(b.x - o.x, b.y - o.y))[0] || INTEL[o.team];
-    if (tg) { gx = tg.x; gy = tg.y; if (t && sightLine(o.x, o.y, t.x, t.y) && Math.hypot(t.x - o.x, t.y - o.y) < 300) { gx = o.x; gy = o.y; mode = 'hold'; } } else { gx = o.x; gy = o.y; mode = 'hold'; }
+    if (tg) { gx = tg.x; gy = tg.y; if (t && sightLine(o.x, o.y, t.x, t.y) && Math.hypot(t.x - o.x, t.y - o.y) < 300) { gx = o.x; gy = o.y; mode = 'hold'; } } else { const sw = sweepGoal(o); if (sw) { gx = sw.x; gy = sw.y; } else { gx = o.x; gy = o.y; mode = 'hold'; } }
   }
   else if (o.cmdr && !G.allyJoin) {
     o.planT -= dt; if (o.planT <= 0 || !o.goal) { o.planT = .6; planHawk(o); }
@@ -2129,7 +2181,7 @@ function updateOp(o, dt) {
       const tg = t || hostilesOf(o.team).filter(h => !(ETYPES[h.type] && ETYPES[h.type].cam) && (h.op ? G.time - (h.spottedT || -99) < 4 : true) && Math.hypot(h.x - o.x, h.y - o.y) < 900).sort((a, b) => Math.hypot(a.x - o.x, a.y - o.y) - Math.hypot(b.x - o.x, b.y - o.y))[0];
       const ref = tg || INTEL[o.team];
       if (ref) { if (t && sightLine(o.x, o.y, t.x, t.y) && Math.hypot(t.x - o.x, t.y - o.y) < 300) { gx = o.x; gy = o.y; mode = 'hold'; } else { gx = ref.x + off[0]; gy = ref.y + off[1]; if (solidAt(gx, gy)) { gx = ref.x; gy = ref.y; } } }
-      else if (!P.dead) { const sl = slotFor(P, k, 5, P.heading || 0); gx = sl.x; gy = sl.y; } else { gx = o.x; gy = o.y; }
+      else { const sw = sweepGoal(o); if (sw) { gx = sw.x + off[0] * .6; gy = sw.y + off[1] * .6; if (solidAt(gx, gy)) { gx = sw.x; gy = sw.y; } } else if (!P.dead) { const sl = slotFor(P, k, 5, P.heading || 0); gx = sl.x; gy = sl.y; } else { gx = o.x; gy = o.y; } }
     }
     else if (c.kind === 'retreat') { gx = c.x + off[0]; gy = c.y + off[1]; if (solidAt(gx, gy)) { gx = c.x; gy = c.y; } }
     else if (c.kind === 'heal') {
@@ -2142,7 +2194,8 @@ function updateOp(o, dt) {
       else if (sightLine(o.x, o.y, c.t.x, c.t.y) && Math.hypot(c.t.x - o.x, c.t.y - o.y) < 320) { gx = o.x; gy = o.y; mode = 'hold'; }
       else { gx = c.t.x + off[0]; gy = c.t.y + off[1]; }
     } else if (c.kind === 'hunt') {
-      const hx = SQ && SQ.seenT > 0 ? SQ.lastX : (L.def.player[0] + .5) * TS, hy = SQ && SQ.seenT > 0 ? SQ.lastY : (L.def.player[1] + .5) * TS;
+      const sw = SQ && SQ.seenT > 0 ? null : sweepGoal(o);
+      const hx = SQ && SQ.seenT > 0 ? SQ.lastX : sw ? sw.x : (L.def.player[0] + .5) * TS, hy = SQ && SQ.seenT > 0 ? SQ.lastY : sw ? sw.y : (L.def.player[1] + .5) * TS;
       gx = hx + off[0]; gy = hy + off[1]; if (solidAt(gx, gy)) { gx = hx; gy = hy; }
     }
     // bounding overwatch: half the team moves while the other half covers, then swap
@@ -2334,6 +2387,29 @@ function intruderOrders(lead) {
   }
   setOrder({ kind: 'follow' });
 }
+// SWEEP ROUTE: when a side is told to attack but nobody's in sight, it plans a route through the base,
+// clearing the nearest rooms it hasn't checked yet one by one (walking through every door it can open) until it finds someone
+function sweepGoal(o) {
+  const tv = L.teamVisit && L.teamVisit[o.team]; if (!tv) return null;
+  const S = L.sweep[o.team];
+  if (S && Math.hypot(S.x - o.x, S.y - o.y) < 48) tv[S.r] = G.time;
+  if (S && tv[S.r] < S.t && G.time - S.t < 30) return S; // still on the way to the current room
+  const reach = L.tmp; bfs(tileIdx(o), unitPass(o), reach);
+  const intel = INTEL[o.team];
+  let best = null, bs = -1e9;
+  L.zones.forEach(([rx, ry, rw, rh], r) => {
+    if (G.time - tv[r] < 35) return; // cleared recently
+    let tx = -1, ty = -1, d = 65535;
+    for (let y = ry; y < ry + rh; y++) for (let x = rx; x < rx + rw; x++) { const i = y * L.w + x, cd = reach[i] + Math.abs(x - rx - (rw >> 1)) + Math.abs(y - ry - (rh >> 1)); if (L.t[i] === 1 && reach[i] !== 65535 && cd < d) { d = cd; tx = x; ty = y; } }
+    if (tx < 0) return;
+    let sc = Math.min(300, G.time - tv[r]) * .3 - d; // near and long unchecked first
+    if (intel && G.time - intel.time < 60) sc -= Math.hypot((tx + .5) * TS - intel.x, (ty + .5) * TS - intel.y) / TS * .8; // lean toward the last contact
+    if (sc > bs) { bs = sc; best = { r, x: (tx + .5) * TS, y: (ty + .5) * TS, t: G.time }; }
+  });
+  L.sweep[o.team] = best;
+  if (best && o.team === P.team && G.time - (G.sweepMsgT || -9) > 6) { G.sweepMsgT = G.time; msg(o.name + ': "No contacts. Sweeping the room to the ' + compass(best.x - o.x, best.y - o.y) + '."', G.mode === 'op' ? '#7fe0d0' : '#d6d0a0'); }
+  return best;
+}
 // intruder squad leader: keycards first, then the exit if it's open, otherwise hunt for code notes and crack keypads
 function planIntruder(o) {
   const reach = L.tmp; bfs(tileIdx(o), unitPass(o), reach);
@@ -2493,6 +2569,12 @@ function update(dt) {
   }
   for (let i = L.enemies.length - 1; i >= 0; i--) { const e = L.enemies[i]; if (e) updateGuard(e, dt); }
   for (const o of OPS) { o.pathT -= dt; updateOp(o, dt); }
+  // the patrol director's map of which rooms have been checked recently
+  if (L.roomVisit && (L.visitT = (L.visitT || 0) - dt) <= 0) { L.visitT = .5;
+    for (const e of L.enemies) { if (ETYPES[e.type].stat || e.hp <= 0) continue; const tx = Math.floor(e.x / TS), ty = Math.floor(e.y / TS);
+      L.def.rooms.forEach(([rx, ry, rw, rh], r) => { if (tx >= rx && tx < rx + rw && ty >= ry && ty < ry + rh) L.roomVisit[r] = G.time; }); }
+    for (const u of [P, ...OPS]) { if (u === P ? P.dead : u.state !== 'ok') continue; const tv = L.teamVisit[u.team]; if (!tv) continue; const tx = Math.floor(u.x / TS), ty = Math.floor(u.y / TS);
+      L.zones.forEach(([rx, ry, rw, rh], r) => { if (tx >= rx && tx < rx + rw && ty >= ry && ty < ry + rh) tv[r] = G.time; }); } }
   // the camp at your spawn: anyone on your side resting there patches up (not while being shot)
   if (L.camp) {
     for (const u of [P, ...OPS]) {
@@ -2623,10 +2705,10 @@ function startOp(i, diff) {
   OPS = []; SQ = null; INTEL = { A: null, D: null };
   const tier = diff;
   ALLY_NAMES.forEach((n, k) => { const s = slotFor(P, k, 3, -Math.PI / 2), o = makeOp(n, 'A', 'escort', tier, s.x, s.y, 'smgsd'); o.maxhp = o.hp = Math.round(o.maxhp * 1.15); collide(o); OPS.push(o); }); // your 5: same level as you, tougher than any soldier
-  { // BRAVO: a second squad with its own leader, starting to your left, working the sector on its own
-    const st = def.player[1] * L.w + def.player[0], rd = new Uint16Array(L.w * L.h); bfs(st, k => L.t[k] === 1, rd, 40);
+  if (G.useBravo !== false) { // BRAVO: a second squad with its own leader, starting to your right, working the sector on its own
+    const st = def.player[1] * L.w + def.player[0], rd = new Uint16Array(L.w * L.h); bfs(st, k => L.t[k] === 1 || (L.t[k] === 2 && !L.doors.get(k).locked), rd, 40);
     const tiles = []; for (let k = 0; k < rd.length; k++) if (rd[k] !== 65535 && rd[k] >= 2 && L.t[k] === 1) tiles.push(k);
-    const left = tiles.filter(k => k % L.w <= def.player[0] - 2); const pool = (left.length >= 8 ? left : tiles).sort((p, q) => rd[p] - rd[q]);
+    const right = tiles.filter(k => k % L.w >= def.player[0] + 2 && Math.abs((k / L.w | 0) - def.player[1]) <= 6); const pool = (right.length >= 8 ? right : tiles).sort((p, q) => rd[p] - rd[q]);
     BRAVO.forEach((n, k) => { const tile = pool[Math.min(pool.length - 1, k * 2)] ?? st;
       const o = makeOp(n, 'A', k ? 'follow' : 'escort', k ? Math.max(0, diff - 1) : diff, (tile % L.w + .5) * TS, ((tile / L.w | 0) + .5) * TS, 'smgsd');
       o.ally2 = true; o.sq = 1; if (!k) o.cmdr = true; collide(o); OPS.push(o); });
@@ -2635,13 +2717,13 @@ function startOp(i, diff) {
   L.camp = { x: P.x, y: P.y }; // your camp: retreat here to hide and heal
   { const w = L.w, ex = tileIdx(L.exit), room = new Set([ex]), q = [ex]; L.exitKey = null;
     while (q.length) { const k = q.pop(); for (const n of [k - 1, k + 1, k - w, k + w]) { if (room.has(n)) continue; if (L.t[n] === 1) { room.add(n); q.push(n); } else if (L.t[n] === 2 && DOORKEY[L.doors.get(n).type]) L.exitKey = DOORKEY[L.doors.get(n).type]; } } }
-  setTimeout(() => { if (L === lvl && G.state === 'play') hawkSay(HAWK_BRIEF[i] + (i === 0 ? ' BRAVO is on your left — press T to radio me.' : '')); }, 4200);
+  setTimeout(() => { if (L === lvl && G.state === 'play' && G.useBravo !== false) hawkSay(HAWK_BRIEF[i] + (i === 0 ? ' BRAVO is on your right — press T to radio me.' : '')); }, 4200);
   L.focus = P;
   G.alert = def.base; G.stance = 'stealth';
   if (ALERTS[G.alert].lvl >= 2) applyLockdown(true);
   prerender(); computeFlow();
   G.state = 'play';
-  banner(def.name + ' — ' + def.sub, ALERTS[def.base].label + ' · YOU + 3 ('  + TIERS[tier].name + ') · BRAVO SQUAD ON YOUR LEFT · T = RADIO', ALERTS[def.base].c, 3.5);
+  banner(def.name + ' — ' + def.sub, ALERTS[def.base].label + ' · YOU + 3 ('  + TIERS[tier].name + ')' + (G.useBravo !== false ? ' · BRAVO SQUAD ON YOUR RIGHT · T = RADIO' : ' · NO SECOND SQUAD'), ALERTS[def.base].c, 3.5);
   if (i === 0) setTimeout(() => L === lvl && G.state === 'play' && msg((touch.on ? 'CROUCH button' : 'C') + ' crouch · ' + (touch.on ? 'USE' : 'E') + ' behind a guard = silent takedown · ' + (touch.on ? 'SQUAD' : 'R') + ' opens squad orders', '#9aa7b3'), 3800);
   last = performance.now();
 }
@@ -2981,6 +3063,9 @@ function drawGuard(e, now) {
   }
   if (e.type === 'guard' || e.type === 'officer') {
     drawTrooper(e.x, e.y, e.angle, { body: '#55623a', head: e.type === 'officer' ? '#c8a07a' : '#46512f', beret: e.type === 'officer' ? '#8a1f1f' : null, vest: e.type === 'guard' ? '#3f4a2b' : null, flash: fl, muzzle: e.flash2 > 0, gunLen: 18, walk: e.walk }, now);
+  } else if (e.type === 'spec') {
+    drawTrooper(e.x, e.y, e.angle, { body: '#2b3540', head: '#141a1f', vest: '#1c242b', visor: '#ff5a3d', flash: fl, muzzle: e.flash2 > 0, gunLen: 22, walk: e.walk }, now);
+    if (!fl) { ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.angle); ctx.fillStyle = '#ff5a3d'; ctx.fillRect(-3, -10, 2, 2); ctx.fillRect(-3, 8, 2, 2); ctx.restore(); }
   } else if (e.type === 'heavy') {
     drawTrooper(e.x, e.y, e.angle, { body: '#3e4a2a', head: '#2e3820', vest: '#2a3320', big: true, heavyGun: true, flash: fl, muzzle: e.flash2 > 0, gunLen: 24, walk: e.walk }, now);
   } else if (e.type === 'sniper') {
@@ -3489,6 +3574,7 @@ const ACTIONS = {
   opmenu: () => opMenu(),
   odiff: a => { G.odiff = +a; opMenu(); },
   newop: () => { G.carry = defaultCarry(); G.totalStats = newStats(); startOp(0, G.odiff || 2); },
+  obravo: () => { G.useBravo = G.useBravo === false; opMenu(); },
   osector: a => { const i = +a; G.carry = sectorCarry(i); G.totalStats = newStats(); startOp(i, G.odiff || 2); },
   defmenu: () => defMenu(),
   ddiff: a => { G.ddiff = +a; defMenu(); },
@@ -3538,9 +3624,10 @@ function opMenu() {
   const d = G.odiff || 2, un = getSaved(), sq = TIERS[Math.max(0, d - 1)];
   const secs = LEVELS.map((l, i) => `<button class="btn alt" data-act="osector" data-arg="${i}" ${i > un ? 'disabled' : ''} style="font-size:11px;padding:8px 10px">${l.name}<br>${l.sub}</button>`).join('');
   showScreen(`<div class="card"><h2 style="color:#4fd8ff">INFILTRATE</h2>
-    <p class="sub">Start outside the fence. Get into Fort Irongate, go down through all five sectors and take out IRONCLAD in the missile silo. A second squad, <b style="color:#b8e07a">BRAVO</b> (SGT. KANE + 3 soldiers), starts on your left and works the sector on its own — grabbing keycards, reading codes, opening gates. Press <b>T</b> to radio KANE. You lead your squad of three — <b style="color:#7fe0d0">VIPER, GHOST and SABER</b> — who move when you move, freezes when a guard looks their way, knifes guards who are alone, and only opens fire when the squad is spotted (or when you say weapons free).</p>
+    <p class="sub">Start outside the fence. Get into Fort Irongate, go down through all five sectors and take out IRONCLAD in the missile silo. A second squad, <b style="color:#b8e07a">BRAVO</b> (SGT. KANE + 3 soldiers), starts on your right (turn it on or off below) and works the sector on its own — grabbing keycards, reading codes, opening gates. Press <b>T</b> to radio KANE. You lead your squad of three — <b style="color:#7fe0d0">VIPER, GHOST and SABER</b> — who move when you move, freezes when a guard looks their way, knifes guards who are alone, and only opens fire when the squad is spotted (or when you say weapons free).</p>
     <div class="lbl">DIFFICULTY (BASE GUARDS)</div><div>${diffButtons(d, 'odiff')}</div>
     <div style="margin:8px 0;font-size:12px;color:#9aa58e">Guards: ${['', 'slow to notice, weak aim', 'normal', 'sharp eyes, good aim', 'notice you fast, deadly aim'][d]} · Your squad: <span style="color:${sq.color}">${sq.name}</span> (your level, tougher than the guards)</div>
+    <div class="lbl">SECOND SQUAD</div><div><button class="btn ${G.useBravo !== false ? '' : 'alt'}" data-act="obravo" style="font-size:13px;padding:10px 14px">${G.useBravo !== false ? '✔ BRAVO SQUAD: ON' : '✘ BRAVO SQUAD: OFF'}</button><div style="font-size:12px;color:#9aa58e;margin:4px 0">${G.useBravo !== false ? 'SGT. KANE + 3 start on your right and work the sector on their own (press T to radio them)' : 'Just you and your three'}</div></div>
     <button class="btn" data-act="newop">▶ Start at the fence</button>
     <div class="lbl">OR JUMP TO A SECTOR YOU REACHED</div><div>${secs}</div>
     <button class="btn alt" data-act="menu">Back</button></div>`, ACTIONS.newop);
