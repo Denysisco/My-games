@@ -115,7 +115,6 @@ const ALERTS = {
   GREEN:  { c: '#3ddc84', lvl: 0, sight: 270, dark: 0.40, label: 'CODE GREEN',  desc: 'ALL QUIET' },
   YELLOW: { c: '#ffd23f', lvl: 1, sight: 340, dark: 0.44, label: 'CODE YELLOW', desc: 'GUARDS ON EDGE · SEARCHING' },
   RED:    { c: '#ff3b3b', lvl: 2, sight: 450, dark: 0.50, label: 'CODE RED',    desc: 'ALARM · BASE LOCKDOWN' },
-  PURPLE: { c: '#a65cff', lvl: 2, sight: 450, dark: 0.50, label: 'CODE PURPLE', desc: 'ALL GUARDS TO THE EXIT' },
   BLACK:  { c: '#c070ff', lvl: 3, sight: 650, dark: 0.48, label: 'CODE BLACK',  desc: 'SELF-DESTRUCT' },
 };
 
@@ -696,8 +695,8 @@ function enemyPassable(i) {
   const v = L.t[i]; if (v === 1) return true; if (v !== 2) return false;
   const d = L.doors.get(i); return d.open >= 0.7 || !d.locked || guardKeys(d);
 }
-// base personnel carry keycards for their own doors in Defend, and during CODE PURPLE
-const guardKeys = d => !!(DOORKEY[d.type] && !d.sealed && (G.mode === 'def' || G.purpleOn));
+// base personnel carry keycards for their own doors in Defend
+const guardKeys = d => !!(DOORKEY[d.type] && !d.sealed && G.mode === 'def');
 // may this unit walk through this door tile?
 function doorOK(d, u) {
   if (!d.locked) return true;
@@ -825,8 +824,6 @@ addEventListener('keydown', e => {
   if (G.state === 'play' && G.pick && (k === 'escape' || k === 'r')) { G.pick = null; msg('Order cancelled', '#86907a'); return; }
   if (G.state === 'play' && G.cmdOpen && G.talk) {
     if (digit) { runTalk(digit - 1); return; }
-    if (e.code === 'Digit0' || k === '0') { runTalk(9); return; }
-    if (e.code === 'Minus' || k === '-') { runTalk(10); return; }
     if (k === 't' || k === 'escape' || k === 'r') { closeCmd(); return; }
   }
   if (G.state === 'play' && G.cmdOpen && G.armoury) {
@@ -1179,7 +1176,7 @@ const CMD_NAME = { follow: 'FOLLOW ME', hold: 'HOLD POSITION', move: 'GO THERE',
 function cmdList() {
   return G.mode === 'op'
     ? [['follow', 'Follow me'], ['hold', 'Hold position'], ['move', 'Go there'], ['attack', 'Attack target'], ['assault', 'ATTACK ALL'], ['kill', 'Take him down (knife)'], ['stance', G.stance === 'stealth' ? 'Weapons free' : 'Back to stealth'], ['retreat', 'Retreat!'], ['cover', 'Cover me'], ['heal', 'Heal up'], ['grenade', 'Throw a grenade there']]
-    : [['follow', 'Follow me'], ['hold', 'Hold position'], ['move', 'Go there'], ['attack', 'Attack target'], ['assault', 'ATTACK ALL'], ['guard', 'Guard the exit'], ['hunt', 'Hunt intruders'], ['retreat', 'Retreat!'], ['reinforce', G.reinfT > 0 ? 'Respawn troops (' + Math.ceil(G.reinfT) + 's)' : 'Respawn troops'], ['alarm', G.alarmUsed ? 'Alarm used' : 'Sound the alarm'], ['purple', G.alert === 'PURPLE' ? 'Code PURPLE active' : 'CODE PURPLE: all guards to the exit'], ['heal', 'Heal up'], ['grenade', 'Throw a grenade there']];
+    : [['follow', 'Follow me'], ['hold', 'Hold position'], ['move', 'Go there'], ['attack', 'Attack target'], ['assault', 'ATTACK ALL'], ['guard', 'Guard the exit'], ['hunt', 'Hunt intruders'], ['retreat', 'Retreat!'], ['reinforce', G.reinfT > 0 ? 'Respawn troops (' + Math.ceil(G.reinfT) + 's)' : 'Respawn troops'], ['alarm', G.alarmUsed ? 'Alarm used' : 'Sound the alarm'], ['heal', 'Heal up'], ['grenade', 'Throw a grenade there']];
 }
 // the spot you're pointing at, and whoever is standing closest to it
 function aimPoint() {
@@ -1226,7 +1223,6 @@ function runCmd(i) {
       G.reinfT = 40; msg('REINFORCEMENTS: ' + gone.map(o => o.name).join(', ') + ' back in the fight', '#d6a93c'); sfx('ok');
       return;
     }
-    case 'purple': if (G.alert === 'PURPLE') { msg('CODE PURPLE is already on', '#86907a'); return; } codePurple('BASE SECURITY CALLED CODE PURPLE'); return;
     case 'alarm':
       if (G.alarmUsed) { msg('The alarm was already sounded in this sector', '#86907a'); return; }
       G.alarmUsed = true;
@@ -1321,7 +1317,7 @@ function hurtPlayer(d, src, self) {
 function hurtOp(o, d, src) {
   if (o.state !== 'ok') return;
   d *= 1 - Math.min(.6, TIERS[o.tier].armor + (o.armorX || 0));
-  if (o.shield && src && Math.abs(angDiff(o.angle, Math.atan2(src.y - o.y, src.x - o.x))) < 1.15) { d *= .25; burst(o.x + Math.cos(o.angle) * 14, o.y + Math.sin(o.angle) * 14, '#cfd8dc', 3, 90, .2, 2); } // ballistic shield soaks hits from the front
+  if (o.shield && src && Math.abs(angDiff(o.angle, Math.atan2(src.y - o.y, src.x - o.x))) < 1.15) { d *= .55; burst(o.x + Math.cos(o.angle) * 14, o.y + Math.sin(o.angle) * 14, '#cfd8dc', 3, 90, .2, 2); } // ballistic shield takes the edge off hits from the front (45%)
   o.hp -= d; o.hurt = .2; o.lastHit = 0;
   if (src && src.who) { o.lastHitBy = src.who; if (!o.target || !alive(o.target)) o.target = src.who; if (src.who !== P && alive(src.who)) INTEL[o.team] = { x: src.who.x, y: src.who.y, time: G.time }; }
   floater(o.x + rand(-6, 6), o.y - 18, Math.round(d), o.team === P.team ? '#ff8a8a' : '#ffd23f');
@@ -1435,29 +1431,6 @@ function guardSees(e, h, range, cone) {
   if (!sightLine(e.x, e.y, h.x, h.y)) return 0;
   return Math.max(1, d);
 }
-// CODE PURPLE: every guard still standing drops what it's doing and sets up around the exit
-function codePurple(reason) {
-  G.alert = 'PURPLE'; G.calm = 0; G.lastContact = G.time; G.stats.alarms++; G.purpleOn = true;
-  banner('CODE PURPLE', reason || 'ALL GUARDS TO THE EXIT', ALERTS.PURPLE.c, 3.5); sfx('alarm'); shake(6);
-  const ex = L.exit, spots = [];
-  // which way will they come from? follow the walkable path from the exit back toward the insertion point
-  const rd = new Uint16Array(L.w * L.h); bfs(L.def.player[1] * L.w + L.def.player[0], k => L.t[k] !== 0, rd);
-  let cur = tileIdx(ex); for (let st = 0; st < 7; st++) { const w = L.w, nb = [cur - 1, cur + 1, cur - w, cur + w].filter(n => n >= 0 && n < rd.length && rd[n] < rd[cur]); if (!nb.length) break; cur = nb.sort((p, q) => rd[p] - rd[q])[0]; }
-  const fx = (cur % L.w + .5) * TS, fy = ((cur / L.w | 0) + .5) * TS, fa = Math.atan2(fy - ex.y, fx - ex.x);
-  // three ranks across that approach, each a line of guards shoulder to shoulder
-  for (const [dist, n] of [[70, 5], [115, 6], [160, 7]]) for (let i = 0; i < n; i++) {
-    const side = (i - (n - 1) / 2) * 34, x = ex.x + Math.cos(fa) * dist - Math.sin(fa) * side, y = ex.y + Math.sin(fa) * dist + Math.cos(fa) * side;
-    if (!solidAt(x, y) && los(ex.x, ex.y, x, y)) spots.push({ x, y, face: fa });
-  }
-  for (let r = 70; r <= 230 && spots.length < 40; r += 40) for (let a = 0; a < TAU; a += .5) { const x = ex.x + Math.cos(a) * r, y = ex.y + Math.sin(a) * r; if (!solidAt(x, y) && los(ex.x, ex.y, x, y)) spots.push({ x, y, face: a }); }
-  if (!spots.length) spots.push({ x: ex.x, y: ex.y, face: fa });
-  let k = 0;
-  for (const e of L.enemies) {
-    const T = ETYPES[e.type]; if (T.stat || T.boss || e.hp <= 0) continue;
-    e.sleep = false; e.purple = spots[k++ % spots.length]; e.route = null; e.healGoal = null;
-    if (e.state !== 'combat') { e.state = 'search'; e.sus = 1; e.invX = e.purple.x; e.invY = e.purple.y; guardPathTo(e, e.invX, e.invY); }
-  }
-}
 function enterCombat(e, h) {
   if (!h) return;
   e.target = h; e.lastX = h.x; e.lastY = h.y; e.lostT = 0; e.sleep = false;
@@ -1549,7 +1522,6 @@ function updateGuard(e, dt) {
     }
   }
   const h = e.seen && alive(e.seen) ? e.seen : null;
-  if (h && e.purple && e.state !== 'combat') enterCombat(e, h); // CODE PURPLE: no questions asked — anyone who isn't base personnel gets shot
   if (h) {
     e.lastX = h.x; e.lastY = h.y; e.lastVX = h.vx || 0; e.lastVY = h.vy || 0; e.predicted = false; if (e.state === 'combat') e.seenAt = G.time;
     if (e.state !== 'combat') {
@@ -1604,9 +1576,7 @@ function updateGuard(e, dt) {
     e.angle = turnTo(e.angle, Math.atan2(mvy, mvx), 5 * dt);
     return false;
   };
-  if (e.purple && e.state !== 'combat') { // CODE PURPLE: hold the line at the exit
-    if (goTo(e.purple.x, e.purple.y, 1)) { e.lookT -= dt; if (e.lookT <= 0) { e.lookT = rand(1, 2); e.lookA = (e.purple.face ?? Math.atan2(e.y - L.exit.y, e.x - L.exit.x)) + rand(-.35, .35); } e.angle = turnTo(e.angle, e.lookA === undefined ? e.angle : e.lookA, 2 * dt); }
-  } else if (e.state === 'patrol') {
+  if (e.state === 'patrol') {
     if (e.route) {
       if (e.wt > 0) { e.wt -= dt; e.angle = turnTo(e.angle, e.lookA || e.angle, 2 * dt); }
       else if (goTo(e.route[e.wp].x, e.route[e.wp].y, .45)) { e.wp = (e.wp + 1) % e.route.length; e.wt = rand(.6, 1.8); e.lookA = e.angle + rand(-1.2, 1.2); }
@@ -1991,7 +1961,7 @@ function planHawk(o) {
 }
 const compass = (dx, dy) => ['east', 'south-east', 'south', 'south-west', 'west', 'north-west', 'north', 'north-east'][((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8];
 function talkList() {
-  return [['plan', "What's the plan?"], ['bkill', 'Take someone out quietly (click him)'], ['solo', 'Go ahead without me'], ['join', 'Join up with me'], ['hold', 'Hold there'], ['bretreat', 'Retreat to camp'], ['bassault', 'ATTACK ALL'], ['bstealth', G.bravoStealth ? 'Go loud (weapons free)' : 'Go quiet (stealth)'], ['scout', 'Scout ahead'], ['advice', 'Any advice?'], ['status', 'Status report']];
+  return [['stick', G.bravoMode === 'join' ? 'Go on without me' : 'Stick with me'], ['bstealth', G.bravoStealth ? 'Go loud (weapons free)' : 'Go quiet (full stealth)'], ['bretreat', 'Fall back to camp'], ['bkill', 'Quiet takedown — click the target']];
 }
 function openTalk() {
   if (P.dead || G.mode !== 'op') return;
@@ -2011,42 +1981,13 @@ function runTalk(i) {
   const c = talkList()[i], h = hawk(); if (!c || !h) return;
   closeCmd();
   if (c[0] === 'bkill') { G.pick = { kind: 'bkill' }; mouse.down = false; msg((touch.on ? 'TAP' : 'CLICK') + ' the enemy BRAVO should knife' + (touch.on ? '' : ' · right-click / ESC to cancel'), '#b8e07a'); sfx('beep'); return; }
-  if (c[0] === 'plan') {
-    planHawk(h); const g = h.goal;
-    const d = Math.round(Math.hypot(g.x - P.x, g.y - P.y) / TS * 1.5), dir = compass(g.x - P.x, g.y - P.y);
-    const what = g.key ? 'the ' + g.key.toUpperCase() + ' keycard' : g.boss ? 'IRONCLAD' : g.term ? 'the keypad — we have the code' : g.note ? 'some intel: "' + g.note.title + '"' : L.def.exitName;
-    hawkSay('BRAVO is going for ' + what + '. ' + (d < 3 ? 'Right here.' : dir.charAt(0).toUpperCase() + dir.slice(1) + ', about ' + d + ' metres.') + (G.alert === 'RED' ? ' Alarm\'s on — careful.' : ' Stay low.'));
-  } else if (['solo', 'join', 'hold', 'bretreat', 'bassault'].includes(c[0])) {
-    G.bravoMode = { solo: 'solo', join: 'join', hold: 'hold', bretreat: 'retreat', bassault: 'assault' }[c[0]]; G.allyJoin = G.bravoMode === 'join'; h.planT = 0;
-    if (G.bravoMode === 'hold') G.bravoHold = { x: h.x, y: h.y };
-    hawkSay({ solo: 'Copy. BRAVO going ahead — we\'ll go after the keys and codes ourselves.', join: 'BRAVO moving to you. We\'ve got your back.', hold: 'BRAVO holding here.', retreat: 'Falling back to camp. We\'ll patch up there.', assault: 'BRAVO, weapons free — hit them!' }[G.bravoMode]);
+  if (c[0] === 'stick') {
+    G.bravoMode = G.bravoMode === 'join' ? 'solo' : 'join'; G.allyJoin = G.bravoMode === 'join'; h.planT = 0;
+    hawkSay(G.allyJoin ? 'BRAVO moving to you — we\'ll stick with you.' : 'Copy. BRAVO going on without you — we\'ll go after the keys and codes ourselves.');
+  } else if (c[0] === 'bretreat') {
+    G.bravoMode = 'retreat'; G.allyJoin = false; hawkSay('Falling back to camp. We\'ll lay low and patch up there.');
   } else if (c[0] === 'bstealth') {
-    G.bravoStealth = !G.bravoStealth; hawkSay(G.bravoStealth ? 'Going quiet. We only shoot if we\'re seen.' : 'Weapons free — we engage everything we see.');
-  } else if (c[0] === 'scout') {
-    const near = L.enemies.filter(e => e.hp > 0 && Math.hypot(e.x - h.x, e.y - h.y) < 620);
-    for (const e of near) e.scoutT = G.time + 15;
-    G.scoutT = G.time + 15;
-    const n = t => near.filter(e => e.type === t).length, parts = [];
-    for (const [t, w] of [['guard', 'soldier'], ['officer', 'officer'], ['heavy', 'heavy'], ['dog', 'dog'], ['sniper', 'sniper'], ['camera', 'camera'], ['turret', 'sentry gun'], ['drone', 'drone']]) if (n(t)) parts.push(n(t) + ' ' + w + (n(t) > 1 ? 's' : ''));
-    const watching = near.filter(e => !e.sleep && !ETYPES[e.type].stat && Math.abs(angDiff(e.angle, Math.atan2(P.y - e.y, P.x - e.x))) < ETYPES[e.type].cone && Math.hypot(e.x - P.x, e.y - P.y) < 450).length;
-    hawkSay(parts.length ? 'I count ' + parts.join(', ') + ' around us — marked on your map.' + (watching ? ' ' + watching + ' facing our way.' : '') : 'Looks clear around here.');
-  } else if (c[0] === 'advice') {
-    const cams = L.enemies.some(e => ETYPES[e.type].cam && !e.off), cons = L.consoles.find(k => k.kind === 'cams' && !k.used);
-    const sus = L.enemies.find(e => e.susOn === P && e.sus > .2 && e.state !== 'combat');
-    const W = WEAPONS[P.weapon];
-    const tip = ALERTS[G.alert].lvl >= 2 ? 'Alarm\'s up. Break line of sight and lay low — it dies down if they lose us for long enough. Smoke helps.'
-      : sus ? 'That ' + ETYPES[sus.type].name.toLowerCase() + ' is getting suspicious. Freeze, or back off into the dark.'
-      : !P.crouch && L.enemies.some(e => !e.sleep && e.hp > 0 && Math.hypot(e.x - P.x, e.y - P.y) < 450) ? 'Crouch (C). Standing up we stick out a mile.'
-      : cams && cons ? 'There\'s a camera console on this floor. Kill the cameras first.'
-      : !W.silenced && W.ammo ? 'That ' + W.name + ' is loud. Knife or SD pistol unless it\'s already a firefight.'
-      : P.gadgets.smoke > 0 ? 'If it goes loud: smoke (Z to pick, Q to throw), then move. They can\'t see through it.'
-      : pick(['Go for lone guards from behind — E. Your team can hide the bodies.', 'Let the patrols walk past. Patience beats bullets.', 'Watch their flashlight cones. Dark is safe.']);
-    hawkSay(tip);
-  } else if (c[0] === 'status') {
-    const keys = ['green', 'yellow', 'red'].filter(k => P.keys[k]).map(k => k.toUpperCase()).join(', ') || 'no keycards';
-    const codes = L.terminals.filter(t => !t.solved && hawkKnows(t)).length, open = L.terminals.filter(t => t.solved).length;
-    const sq = OPS.filter(o => o.team === P.team).map(o => o.name.replace('SGT. ', '') + (o.state === 'ok' ? ' ' + Math.round(o.hp / o.maxhp * 100) + '%' : o.state === 'down' ? ' DOWN' : ' KIA')).join(', ');
-    hawkSay(ALERTS[G.alert].label + '. We have ' + keys + (codes ? ', ' + codes + ' code' + (codes > 1 ? 's' : '') + ' ready' : '') + (open ? ', ' + open + ' gate' + (open > 1 ? 's' : '') + ' open' : '') + '. Squad: ' + sq + '.');
+    G.bravoStealth = !G.bravoStealth; hawkSay(G.bravoStealth ? 'Going quiet. Knives and silenced shots only — we don\'t fire unless we\'re seen.' : 'Weapons free — we engage everything we see.');
   }
 }
 // a live frag grenade close by? run from it
@@ -2079,7 +2020,7 @@ function updateOp(o, dt) {
   }
   const T = TIERS[o.tier], friendly = o.team === P.team, mine = friendly && !o.ally2;
   const spotted = o.team === 'A' ? (G.mode === 'def' && G.spottedSq ? G.spottedSq[o.sq] : G.spottedA) : true;
-  const stealthy = !spotted && (G.mode === 'def' ? o.team === 'A' : o.ally2 ? G.bravoStealth && G.bravoMode !== 'assault' : G.stance === 'stealth');
+  const stealthy = !spotted && (G.mode === 'def' ? o.team === 'A' : o.ally2 ? G.bravoStealth : G.stance === 'stealth');
   // intruders switch from silenced SMGs to rifles once the shooting starts
   if (G.mode === 'def' && o.team === 'A') o.weapon = spotted ? 'rifle' : 'smgsd';
   // ---- leader of the intruder squad: objectives
@@ -2221,7 +2162,8 @@ function updateOp(o, dt) {
   // ---- stay hidden: freeze while a guard is looking our way
   o.crouch = stealthy && (o.role !== 'escort' || P.crouch || L.enemies.some(e => e.state !== 'combat' && !e.sleep && Math.hypot(e.x - o.x, e.y - o.y) < 450));
   const quiet = mine && G.mode === 'op' && !P.dead && P.crouch; // you're crouched: so is the squad, and nobody fires
-  const holdFire = quiet && G.cmd.kind !== 'attack' && G.cmd.kind !== 'cover' && G.cmd.kind !== 'assault';
+  const holdFire = (quiet && G.cmd.kind !== 'attack' && G.cmd.kind !== 'cover' && G.cmd.kind !== 'assault') || (o.ally2 && stealthy && !(t && ETYPES[t.type] && ETYPES[t.type].cam));
+  if (o.ally2 && stealthy) o.crouch = true;
   if (quiet) o.crouch = true;
   // ordered knife kill: once he's close and looking the other way, stand up and close the gap fast (crouch again for the last step)
   o.rush = false;
@@ -2593,7 +2535,6 @@ function update(dt) {
       }
     }
   }
-  if (G.mode === 'op' && G.alert === 'RED' && !G.purpleOn && L.exitKey && P.keys[L.exitKey] && G.time - (G.lastContact || 0) < 5) codePurple('INTRUDERS HAVE THE ' + L.exitKey.toUpperCase() + ' KEY — ALL GUARDS TO THE ' + L.def.exitName);
   // alarms calm down when nobody has seen anything for a while
   if (G.alert === 'RED' && G.time - (G.lastContact || 0) > 45 && !L.enemies.some(e => e.state === 'combat')) lowerAlert('YELLOW', 'ALARM CANCELLED — but the guards are still searching');
   if (G.alert === 'YELLOW' && L.def.base === 'GREEN' && G.time - (G.lastContact || 0) > 30 && !L.enemies.some(e => e.state === 'combat' || e.state === 'search')) lowerAlert('GREEN', 'Things calmed down — CODE GREEN');
@@ -2680,7 +2621,6 @@ function startOp(i, diff) {
   }
   G.allyJoin = false; G.bravoMode = 'solo'; G.bravoStealth = true; G.talk = false; G.scoutT = 0;
   L.camp = { x: P.x, y: P.y }; // your camp: retreat here to hide and heal
-  G.purpleOn = false;
   { const w = L.w, ex = tileIdx(L.exit), room = new Set([ex]), q = [ex]; L.exitKey = null;
     while (q.length) { const k = q.pop(); for (const n of [k - 1, k + 1, k - w, k + w]) { if (room.has(n)) continue; if (L.t[n] === 1) { room.add(n); q.push(n); } else if (L.t[n] === 2 && DOORKEY[L.doors.get(n).type]) L.exitKey = DOORKEY[L.doors.get(n).type]; } } }
   setTimeout(() => { if (L === lvl && G.state === 'play') hawkSay(HAWK_BRIEF[i] + (i === 0 ? ' BRAVO is on your left — press T to radio me.' : '')); }, 4200);
@@ -2803,7 +2743,6 @@ function startDef(i, diff, carry) {
   const c = DEF_KIT();
   const sp = defSpot(440);
   L.camp = { x: sp.x, y: sp.y }; // defenders' camp: retreat here to heal
-  G.purpleOn = false;
   P = { team: 'D', x: sp.x, y: sp.y, r: 11, maxhp: 100, angle: Math.PI, heading: Math.PI, cd: 0, kick: 0, hurt: 0, muzzle: 0, walk: 0, stamina: 1, keys: {}, crouch: false, crouchT: false, knife: 0, stepT: 0, dead: false, respawn: 0, still: true, ...c };
   if (carry && carry.php) P.hp = carry.php;
   ROOKIE_NAMES.forEach((n, k) => { const s = slotFor(P, k, 3, P.heading); const o = makeOp(n, 'D', 'escort', 3, s.x, s.y, 'rifle'); o.maxhp = o.hp = Math.round(o.maxhp * 1.3); o.armorX = .15; o.shield = true; collide(o); OPS.push(o); }); // 5 sergeants: HARD-rank, heavy armour
@@ -3576,7 +3515,7 @@ function menu() {
       <b>Q · Z</b><span>throw grenade · switch frag / smoke / flashbang</span>
       <b>R</b><span>orders menu: follow, hold, go there, attack, ATTACK ALL, knife, retreat, cover me, heal up, grenade, guard exit, hunt, respawn troops, alarm (keys 1–9, 0, -, =)</span>
       <b>F · V</b><span>quick orders: hold / follow · stealth / weapons free</span>
-      <b>T</b><span>radio SGT. KANE of BRAVO (Infiltrate): go ahead without you, join you, hold, retreat to camp, ATTACK ALL, stealth / loud, scout, advice, status</span>
+      <b>T</b><span>radio SGT. KANE of BRAVO (Infiltrate): stick with me / go on without me, quiet / loud, fall back to camp, quiet takedown</span>
       <b>TAB · ESC</b><span>datapad · pause (M mutes)</span>
       <b>TOUCH</b><span>left stick move · right stick aim+fire · double-tap NADE to switch grenade</span>
     </div>
