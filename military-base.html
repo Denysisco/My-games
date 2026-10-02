@@ -145,6 +145,7 @@ const ETYPES = {
   heavy:   { name: 'HEAVY GUNNER', hp: 230,  r: 15, speed: 60,  dmg: 7,  ranged: true, rate: .09, range: 430, bspeed: 580,  sight: .95,  cone: .75, alarm: 2.6, tk: true, burst: 8, color: '#3e4a2a' },
   sniper:  { name: 'SNIPER',       hp: 60,   r: 12, speed: 55,  dmg: 30, ranged: true, rate: 2.6, range: 820, bspeed: 1300, sight: 1.9,  cone: .42, alarm: 3,   tk: true, post: true, sniper: true, color: '#4d5a2c' },
   spec:    { name: 'SPEC-OPS',     hp: 132,  r: 12, speed: 93,  dmg: 11.5, ranged: true, rate: .14, range: 470, bspeed: 660,  sight: 1.15, cone: .9,  alarm: 1.6, tk: true, burst: 3, armor: .2, color: '#2b3540' }, // body armour, burst rifle, sharp eyes
+  secop:   { name: 'SECURITY OPERATOR', hp: 70, r: 12, speed: 70, dmg: 7, ranged: true, rate: .9, range: 360, bspeed: 520, sight: .8, cone: .7, alarm: 1.2, tk: true, post: true, color: '#465260' }, // watches the camera feeds
   dog:     { name: 'K9 UNIT',      hp: 60,   r: 12, speed: 215, dmg: 10, melee: true,                                         sight: .9,   cone: 1.1, alarm: 1.5, smell: 120, color: '#9a6a32' },
   camera:  { name: 'CAMERA',       hp: 25,   r: 9,  speed: 0,   stat: true, cam: true,                                        sight: 1.25, cone: .4,  alarm: 0,   color: '#9aa7b3' },
   turret:  { name: 'SENTRY GUN',   hp: 160,  r: 14, speed: 0,   dmg: 8,  ranged: true, rate: .3,  range: 450, bspeed: 620,  sight: 1.3,  cone: .6,  alarm: 1.5, stat: true, color: '#ff8a3d' },
@@ -269,15 +270,15 @@ const LEVELS = [
   rooms: [[1,14,6,7],[8,8,3,20],[8,8,43,3],[8,25,43,3],[48,8,3,20],[8,1,12,6],[21,1,12,6],[34,1,17,6],[12,12,8,12],[21,12,18,12],[40,12,7,12],
           [8,29,12,6],[21,29,14,6],[36,29,15,6],[52,1,7,20],[52,22,7,13]],
   walls: [[46,8,1,3],[46,25,1,3]],
-  deco: [[10,4,4,1,'desk'],[24,4,8,1,'desk'],[36,2,1,4,'rack'],[39,2,1,4,'rack'],[45,2,1,4,'rack'],[13,14,2,1,'bunk'],[13,20,2,1,'bunk'],
+  deco: [[10,4,4,1,'desk'],[24,4,8,1,'desk'],[25,1,8,1,'monitors'],[36,2,1,4,'rack'],[39,2,1,4,'rack'],[45,2,1,4,'rack'],[13,14,2,1,'bunk'],[13,20,2,1,'bunk'],
          [22,15,6,1,'barrier'],[31,15,7,1,'barrier'],[22,20,6,1,'barrier'],[31,20,7,1,'barrier'],[41,17,4,1,'sandbag'],[12,31,3,1,'table'],
          [23,30,2,1,'bunk'],[23,33,2,1,'bunk'],[30,30,2,1,'bunk'],[30,33,2,1,'bunk'],[38,30,3,1,'crate'],[44,32,2,2,'crate'],[54,8,3,1,'sandbag'],[53,3,4,1,'desk'],[15,25,3,1,'sandbag']],
   doors: [[7,17,'D'],[14,7,'D'],[27,7,'D'],[42,7,'B',0],[43,7,'B',0],[11,17,'D'],[29,11,'B',1],[30,11,'B',1],[43,11,'D'],[46,9,'G'],[46,26,'G'],
-          [14,28,'D'],[27,28,'D'],[43,28,'D','lock'],[51,10,'D'],[51,24,'R'],[20,31,'D'],[20,4,'D'],[35,31,'D']],
+          [14,28,'D'],[27,28,'D'],[43,28,'D','lock'],[51,10,'D'],[51,24,'R'],[20,31,'D'],[20,4,'D'],[35,31,'D'],[33,4,'D']],
   player: [3,17], exit: [55,30], exitName: 'SERVICE LIFT',
   keyTrigger: { red: 'RED' },
   terminals: [[41,9,0],[31,10,1]],
-  consoles: [[23,2,'cams']],
+  consoles: [[23,2,'cams']], secRoom: [21, 1, 12, 6],
   notes: [
     [16,32,'INTERROGATION LOG','Server room keypad: {c0}\n\nThe prisoner talked. Moved the RED keycard for the service lift into the cell block.'],
     [10,2,'RECEPTION — STICKY NOTE','Cell block code (first half):\n\n{c1a} _ _'],
@@ -285,7 +286,7 @@ const LEVELS = [
   ],
   items: [[29,18,'r'],[44,15,'N'],[42,22,'n'],[37,3,'W'],[31,2,'g'],[33,32,'b'],[45,31,'a'],[2,19,'H'],[17,13,'H'],[18,33,'H'],[30,26,'a'],[56,10,'H'],[56,26,'s'],[13,22,'k'],[47,32,'f']],
   enemies: [[9,9,'camera',0],[24,27,'camera',180],[49,9,'camera',90],[57,2,'camera',180],[33,13,'camera',180],[53,23,'camera',90],
-            [16,3,'guard',180],[28,2,'officer',0],[41,4,'guard',180],[49,5,'guard',180],[20,9,'guard',[[12,9],[45,9]]],[30,26,'guard',[[12,26],[45,26]]],[9,24,'guard',90],
+            [16,3,'guard',180],[28,2,'officer',0],[25,5,'secop',270],[30,5,'secop',270],[22,5,'spec','bodyguard'],[32,5,'spec','bodyguard'],[19,3,'guard',180],[19,5,'guard',180],[34,3,'guard',0],[34,5,'guard',0],[26,8,'guard',90],[28,8,'guard',90],[41,4,'guard',180],[49,5,'guard',180],[20,9,'guard',[[12,9],[45,9]]],[30,26,'guard',[[12,26],[45,26]]],[9,24,'guard',90],
             [15,15,'guard',0],[17,20,'dog',[[13,18],[18,18]]],[25,17,'guard',0],[35,17,'guard',180],[29,22,'heavy',270],[43,20,'guard',270],
             [10,30,'guard',0],[25,31,'guard','sleep'],[32,32,'guard',180],[40,32,'guard',0],[47,30,'heavy',180],[49,18,'guard',[[49,12],[49,23]]],
             [55,12,'heavy',90],[57,4,'sniper',180],[53,16,'guard',[[53,16],[57,16],[57,6],[53,6]]],[57,24,'turret',180],[57,31,'guard',180],[8,27,'camera',315],[50,27,'camera',225],[55,28,'guard',[[53,28],[57,28]]],[17,5,'guard',180],[42,31,'guard',[[37,31],[49,31]]]],
@@ -360,7 +361,7 @@ function defaultCarry() {
 }
 
 /* ---------------- LEVEL BUILD ---------------- */
-const SOLID_DECO = new Set(['truck', 'jeep', 'crate', 'container', 'sandbag', 'tree', 'barrier', 'table', 'bunk', 'rack', 'gunrack', 'desk', 'gen', 'missile', 'pillar', 'holo']);
+const SOLID_DECO = new Set(['monitors', 'truck', 'jeep', 'crate', 'container', 'sandbag', 'tree', 'barrier', 'table', 'bunk', 'rack', 'gunrack', 'desk', 'gen', 'missile', 'pillar', 'holo']);
 function genCode() { return String(Math.floor(1000 + Math.random() * 9000)); }
 
 function buildLevel(def, codes, gd) {
@@ -404,9 +405,11 @@ function buildLevel(def, codes, gd) {
   };
   for (const [x, y, type, extra] of def.enemies) L.enemies.push(makeEnemy(type, (x + .5) * TS, (y + .5) * TS, extra, gd));
   L.boss = L.enemies.find(e => e.type === 'boss') || null;
+  L.secOps = L.enemies.filter(e => e.type === 'secop'); // the people watching the camera feeds
   // extra security: Spec-Ops posts and roaming patrols in rooms away from where you come in
   { const li = Math.max(0, LEVELS.indexOf(def)); let seed = 777 + li * 97; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-    for (const e of L.enemies) if (e.type === 'guard' && rnd() < .25 + li * .03) { const s = makeEnemy('spec', e.x, e.y, null, gd); Object.assign(e, { type: 'spec', hp: s.hp, maxhp: s.maxhp, r: s.r }); } // a quarter of the soldiers are swapped for Spec-Ops (a few more in deeper sectors)
+    const nearSec = e => def.secRoom && e.x / TS > def.secRoom[0] - 3 && e.x / TS < def.secRoom[0] + def.secRoom[2] + 3 && e.y / TS < def.secRoom[1] + def.secRoom[3] + 3;
+    for (const e of L.enemies) if (e.type === 'guard' && !nearSec(e) && rnd() < .25 + li * .03) { const s = makeEnemy('spec', e.x, e.y, null, gd); Object.assign(e, { type: 'spec', hp: s.hp, maxhp: s.maxhp, r: s.r }); } // a quarter of the soldiers are swapped for Spec-Ops (a few more in deeper sectors)
     const rd = new Uint16Array(w * h).fill(65535); { const q = [def.player[1] * w + def.player[0]]; rd[q[0]] = 0; for (let qh = 0; qh < q.length; qh++) { const i = q[qh], x = i % w; for (const n of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w]) if (n >= 0 && n < w * h && rd[n] === 65535 && t[n] !== 0) { rd[n] = rd[i] + 1; q.push(n); } } }
     const segD = (px, py, a, b) => { const dx = b.x - a.x, dy = b.y - a.y, l = dx * dx + dy * dy || 1, u = clamp(((px - a.x) * dx + (py - a.y) * dy) / l, 0, 1); return Math.hypot(px - a.x - dx * u, py - a.y - dy * u); };
     const onRoute = (x, y) => L.enemies.some(e => e.route && e.route.some((p, k) => segD((x + .5) * TS, (y + .5) * TS, p, e.route[(k + 1) % e.route.length]) < TS * 2.2));
@@ -442,7 +445,8 @@ function makeEnemy(type, x, y, extra, gd) {
   if (Array.isArray(extra)) { e.route = extra.map(([wx, wy]) => ({ x: (wx + .5) * TS, y: (wy + .5) * TS })); e.angle = Math.atan2(e.route[0].y - y, e.route[0].x - x) || 0; }
   else if (typeof extra === 'number') e.angle = extra * Math.PI / 180;
   else if (extra === 'sleep') { e.sleep = true; e.angle = Math.PI / 2; }
-  else if (extra === 'rover') e.rover = true; // the patrol director plans this one's routes
+  else if (extra === 'rover') e.rover = true;
+  else if (extra === 'bodyguard') { e.bodyguard = true; e.hp = e.maxhp = e.maxhp * 1.15; e.dmgMul = 1.15; } // a bit tougher than a regular Spec-Op // the patrol director plans this one's routes
   e.baseA = e.angle;
   if (T.cam) e.sweep = Math.random() * TAU;
   return e;
@@ -616,6 +620,11 @@ function drawDeco(g, d, rnd) {
     case 'gunrack':
       g.fillStyle = '#3a2e1e'; g.fillRect(X + 2, Y + 1, W - 4, H - 2); g.fillStyle = '#4e3e28'; g.fillRect(X + 2, Y + 1, 3, H - 2);
       for (let yy = Y + 7; yy < Y + H - 5; yy += 9) { g.fillStyle = '#15181b'; g.fillRect(X + 7, yy, W - 12, 3); g.fillStyle = '#5a4630'; g.fillRect(X + 7, yy + 3, 6, 3); }
+      break;
+    case 'monitors': // wall of camera feeds in the security room
+      shadow(); g.fillStyle = '#16191c'; g.fillRect(X + 1, Y + 2, W - 2, H - 4);
+      for (let xx = X + 4; xx < X + W - 12; xx += 16) { g.fillStyle = '#0a0c0e'; g.fillRect(xx, Y + 5, 13, 10); g.fillStyle = rnd() < .25 ? '#7a2b2b' : '#2f6f4f'; g.globalAlpha = .7; g.fillRect(xx + 1, Y + 6, 11, 8); g.globalAlpha = .35; g.fillStyle = '#fff'; g.fillRect(xx + 1, Y + 6 + ((xx / 16) % 7), 11, 1); g.globalAlpha = 1; }
+      g.fillStyle = '#ff3b3b'; g.fillRect(X + W - 9, Y + 6, 4, 4); g.fillStyle = '#9aa7b3'; g.font = 'bold 8px monospace'; g.textAlign = 'left'; g.fillText('SECURITY · CAM FEEDS', X + 4, Y + H - 4);
       break;
     case 'desk':
       g.fillStyle = '#2e3236'; g.fillRect(X + 1, Y + 4, W - 2, H - 8);
@@ -1497,7 +1506,10 @@ function planRover(e) {
     cand.push({ r, x: (cx + .5) * TS, y: (cy + .5) * TS, sc });
   } });
   cand.sort((a, b) => b.sc - a.sc);
-  const pick = cand.slice(0, 3); if (cand.length < 2) { e.route = null; e.rover = false; return; } // boxed in -> just guard this spot
+  if (e.type === 'spec') for (const c of cand) { // Spec-Ops make longer rounds and keep an eye on what matters: keypads, keycards, intel
+    if (L.terminals.some(t => !t.solved && Math.hypot(t.x - c.x, t.y - c.y) < 200) || L.items.some(it => ITEMS[it.k].key && Math.hypot(it.x - c.x, it.y - c.y) < 200) || L.notes.some(n => Math.hypot(n.x - c.x, n.y - c.y) < 200)) c.sc += 30; }
+  cand.sort((a, b) => b.sc - a.sc);
+  const pick = cand.slice(0, e.type === 'spec' ? 5 : 3); if (cand.length < 2) { e.route = null; e.rover = false; return; } // boxed in -> just guard this spot
   const route = []; let cx = e.x, cy = e.y; // visit them nearest-first
   while (pick.length) { pick.sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy)); const n = pick.shift(); route.push({ x: n.x, y: n.y }); cx = n.x; cy = n.y; }
   e.route = route; e.wp = 0; e.routeDone = false;
@@ -1518,7 +1530,7 @@ function enterCombat(e, h, startle) {
 function radioNearby(e, x, y) {
   for (const o of L.enemies) {
     if (o === e || ETYPES[o.type].stat || o.state === 'combat' || o.sleep) continue;
-    if (Math.hypot(o.x - e.x, o.y - e.y) < (eliteGuards() ? 560 : 380)) { o.state = 'search'; o.searchT = 0; o.sus = 1; o.invX = x; o.invY = y; guardPathTo(o, x, y); }
+    if (Math.hypot(o.x - e.x, o.y - e.y) < (eliteGuards() ? 560 : 380) * (e.type === 'spec' || o.type === 'spec' ? 1.4 : 1)) { o.state = 'search'; o.searchT = 0; o.sus = 1; o.invX = x; o.invY = y; guardPathTo(o, x, y); }
   }
 }
 function enemyFire(e, a, spd, dmg, color = '#ff6b3d', r = 4, extra) {
@@ -1539,7 +1551,7 @@ function guardFire(e, t) {
   const d = Math.hypot(t.x - e.x, t.y - e.y), tt = d / T.bspeed;
   const a = Math.atan2(t.y + (t.vy || 0) * tt * .5 - e.y, t.x + (t.vx || 0) * tt * .5 - e.x);
   const inacc = (T.sniper ? .012 : e.type === 'spec' ? .06 : e.type === 'drone' ? .13 : e.type === 'heavy' ? .13 : .085) * D.acc;
-  const dmg = T.dmg * (G.mode === 'op' ? D.dmg : 1) * (G.alert === 'RED' || G.alert === 'BLACK' ? 1.1 : 1);
+  const dmg = T.dmg * (e.dmgMul || 1) * (G.mode === 'op' ? D.dmg : 1) * (G.alert === 'RED' || G.alert === 'BLACK' ? 1.1 : 1);
   enemyFire(e, a + rand(-inacc, inacc), T.bspeed, dmg, T.sniper ? '#ffe9a0' : e.type === 'drone' ? '#5cc8ff' : '#ff6b3d', T.sniper ? 3 : e.type === 'drone' ? 3 : 4, T.sniper ? { life: 1.2 } : null);
   e.flash2 = .06; flashLight(e.x, e.y, T.sniper ? 160 : 90, .5);
   sfx(T.sniper ? 'sniper' : e.type === 'heavy' ? 'lmg' : 'eshot', shotVol(e.x, e.y));
@@ -1562,7 +1574,16 @@ function updateCamera(e, dt) {
       e.sus += dt * (.7 + 1.5 * (1 - clamp(e.seenD / e.range, 0, 1))) * D.detect * (G.alert !== 'GREEN' ? 1.4 : 1);
       if (e.sus >= 1) {
         e.sus = 1; e.bang = 1.2; sfx('spot');
-        if (ALERTS[G.alert].lvl < 2) setAlert('RED', 'A CAMERA SPOTTED INTRUDERS', h.x, h.y);
+        const sec = L.secOps || [];
+        if (sec.length && !sec.some(o => L.enemies.includes(o) && o.hp > 0 && !(o.stun > 0))) { // the monitors are unmanned: the camera sees you but nobody is watching
+          if (G.time - (G.camNobodyT || -99) > 12) { G.camNobodyT = G.time; msg('A camera spotted you — but nobody is watching the monitors', '#3ddc84'); }
+          e.sus = .6; return;
+        }
+        if (sec.length) { // operators call it in: every guard on the floor knows where you are
+          msg('SECURITY: "Camera ' + (L.enemies.filter(c => ETYPES[c.type].cam).indexOf(e) + 1) + ' has movement — ' + compass(h.x - L.def.secRoom[0] * TS, h.y - L.def.secRoom[1] * TS) + ' of the control room! All units!"', '#ff8a3d');
+          for (const o of L.enemies) if (!ETYPES[o.type].stat && !ETYPES[o.type].post && o.state !== 'combat' && !o.sleep && Math.hypot(o.x - h.x, o.y - h.y) < 1000) { o.state = 'search'; o.searchT = 0; o.sus = 1; o.invX = h.x + rand(-40, 40); o.invY = h.y + rand(-40, 40); guardPathTo(o, o.invX, o.invY); }
+        }
+        if (ALERTS[G.alert].lvl < 2) setAlert('RED', sec.length ? 'SECURITY ROOM: INTRUDERS ON CAMERA' : 'A CAMERA SPOTTED INTRUDERS', h.x, h.y);
         else for (const o of L.enemies) if (!ETYPES[o.type].stat && o.state !== 'combat' && Math.hypot(o.x - h.x, o.y - h.y) < 600) { o.state = 'search'; o.sus = 1; o.invX = h.x; o.invY = h.y; guardPathTo(o, h.x, h.y); }
       }
     } else G.lastContact = G.time;
@@ -1589,7 +1610,7 @@ function updateGuard(e, dt) {
     if (!best && e.state !== 'combat') for (const b of L.bodies) {
       if (b.found) continue;
       const dx = b.x - e.x, dy = b.y - e.y, d = Math.hypot(dx, dy);
-      if (d < range * .8 && Math.abs(angDiff(e.angle, Math.atan2(dy, dx))) < cone && sightLine(e.x, e.y, b.x, b.y)) {
+      if (d < range * (e.type === 'spec' ? 1 : .8) && Math.abs(angDiff(e.angle, Math.atan2(dy, dx))) < cone * (e.type === 'spec' ? 1.2 : 1) && sightLine(e.x, e.y, b.x, b.y)) {
         b.found = true; e.state = 'search'; e.searchT = 0; e.sus = 1; e.invX = b.x; e.invY = b.y; e.bang = 1; guardPathTo(e, b.x, b.y);
         sfx('spot'); msg('A guard found a body!', '#ffd23f');
         if (G.alert === 'GREEN') setAlert('YELLOW', 'BODY FOUND — GUARDS ARE SEARCHING');
@@ -1621,7 +1642,7 @@ function updateGuard(e, dt) {
       if (e.target && !alive(e.target)) { e.target = null; e.lostT = Math.max(e.lostT, 4); }
       if (e.lostT > (A.lvl >= 2 ? 12 : 7)) { e.state = 'search'; e.searchT = 0; e.invX = e.lastX; e.invY = e.lastY; guardPathTo(e, e.invX, e.invY); }
     } else if (e.state === 'suspicious') { e.susT = (e.susT || 0) + dt; if (e.susT > 1.2) e.sus -= dt * .16; if (e.sus <= .02) { e.sus = 0; e.state = 'patrol'; } }
-    else if (e.state === 'search') { e.searchT += dt; if (e.searchT > 16 && A.lvl < 2) { e.state = 'suspicious'; e.sus = .45; e.susT = 0; } }
+    else if (e.state === 'search') { e.searchT += dt; if (e.searchT > (e.type === 'spec' ? 32 : 16) && A.lvl < 2) { e.state = 'suspicious'; e.sus = .45; e.susT = 0; } }
     else e.sus = Math.max(0, e.sus - dt * .3);
   }
   if (e.radioT > 0 && (e.radioT -= dt) <= 0) { if (G.alert === 'GREEN') setAlert('YELLOW', e.radioWhy || 'A SOLDIER WAS SHOT'); radioNearby(e, e.radioX, e.radioY); } // a shot guard gets on the radio after a moment
@@ -1661,17 +1682,20 @@ function updateGuard(e, dt) {
       else if ((e.stuckT = (e.stuckT || 0) + dt) > 4) { e.stuckT = 0; planRover(e); }
     }
     if (e.route) {
-      if (e.wt > 0) { e.wt -= dt; e.angle = turnTo(e.angle, e.lookA || e.angle, 2 * dt); }
-      else if (goTo(e.route[e.wp].x, e.route[e.wp].y, e.rover ? .55 : .45)) { e.wp = (e.wp + 1) % e.route.length; if (e.rover && e.wp === 0) e.routeDone = true; e.wt = rand(.6, 1.8); e.lookA = e.angle + rand(-1.2, 1.2); }
+      const smart = e.type === 'spec';
+      if (e.wt > 0) { e.wt -= dt; e.angle = turnTo(e.angle, e.lookA || e.angle, (smart ? 3 : 2) * dt); if (smart && e.wt <= 0 && e.scanN > 0) { e.scanN--; e.wt = rand(.5, .8); e.lookA = e.angle + (e.scanN % 2 ? 1.5 : -3); } } // Spec-Ops sweep the room: left, right, then move on
+      else if (goTo(e.route[e.wp].x, e.route[e.wp].y, e.rover ? .55 : .45)) { e.wp = (e.wp + 1) % e.route.length; if (e.rover && e.wp === 0) e.routeDone = true; e.wt = rand(.6, 1.8); e.lookA = e.angle + rand(-1.2, 1.2); if (smart) e.scanN = 2; }
+      else if (smart && (e.sixT = (e.sixT === undefined ? rand(3, 7) : e.sixT) - dt) <= 0) { e.sixT = rand(4, 8); e.wt = .7; e.lookA = e.angle + Math.PI + rand(-.4, .4); } // ...and keep checking behind them
     } else if (Math.hypot(e.hx - e.x, e.hy - e.y) > 24) goTo(e.hx, e.hy, .45);
     else {
       e.lookT -= dt;
-      if (e.lookT <= 0) { e.lookT = rand(1.5, 3.5); e.lookA = e.baseA + rand(-.9, .9) * (T.post ? .7 : 1); }
+      if (e.lookT <= 0) { e.lookT = e.type === 'spec' ? rand(1, 2.2) : rand(1.5, 3.5); e.lookA = e.baseA + rand(-.9, .9) * (T.post ? .7 : e.type === 'spec' ? 1.8 : 1); }
       e.angle = turnTo(e.angle, e.lookA === undefined ? e.baseA : e.lookA, 1.2 * dt);
     }
   } else if (e.state === 'suspicious') {
     if (T.post) e.angle = turnTo(e.angle, Math.atan2(e.invY - e.y, e.invX - e.x), 2 * dt);
     else if (e.sus > .35 && !e.seen) { if (goTo(e.invX, e.invY, .5)) { e.lookT -= dt; if (e.lookT <= 0) { e.lookT = rand(.8, 1.6); e.lookA = rand(0, TAU); } e.angle = turnTo(e.angle, e.lookA || 0, 2.5 * dt); } }
+    else if (e.seen && e.type === 'spec' && e.sus > .2) { goTo(e.invX, e.invY, .3); e.angle = turnTo(e.angle, Math.atan2(e.invY - e.y, e.invX - e.x), 4 * dt); } // Spec-Ops edge in for a closer look
     else if (e.seen) { /* frozen, staring */ }
   } else if (e.state === 'search') {
     if (T.post) { e.lookT -= dt; if (e.lookT <= 0) { e.lookT = rand(.8, 1.6); e.lookA = Math.atan2(e.invY - e.y, e.invX - e.x) + rand(-.8, .8); } e.angle = turnTo(e.angle, e.lookA || e.angle, 2 * dt); }
@@ -1680,7 +1704,12 @@ function updateGuard(e, dt) {
       e.lookT -= dt;
       if (e.lookT <= 0) {
         e.lookT = rand(1.2, 2.4);
-        for (let k = 0; k < 8; k++) { const a = rand(0, TAU), r = rand(70, 190), x = e.x + Math.cos(a) * r, y = e.y + Math.sin(a) * r; if (!solidAt(x, y) && los(e.x, e.y, x, y) && !L.enemies.some(o => o !== e && o.state === 'search' && Math.hypot(o.invX - x, o.invY - y) < 90)) { e.invX = x; e.invY = y; break; } }
+        let found = false;
+        if (e.type === 'spec') { // Spec-Ops check the places you could be hiding: round corners and behind cover, not just open floor
+          const reach = L.tmp; bfs(tileIdx(e), enemyPassable, reach, 14);
+          for (let k = 0; k < 14 && !found; k++) { const a = rand(0, TAU), r = rand(90, 300), x = e.x + Math.cos(a) * r, y = e.y + Math.sin(a) * r, i = tileIdx({ x, y }); if (!solidAt(x, y) && reach[i] !== 65535 && !los(e.x, e.y, x, y) && !L.enemies.some(o => o !== e && o.state === 'search' && Math.hypot(o.invX - x, o.invY - y) < 110)) { e.invX = x; e.invY = y; found = true; } }
+        }
+        if (!found) for (let k = 0; k < 8; k++) { const a = rand(0, TAU), r = rand(70, 190), x = e.x + Math.cos(a) * r, y = e.y + Math.sin(a) * r; if (!solidAt(x, y) && los(e.x, e.y, x, y) && !L.enemies.some(o => o !== e && o.state === 'search' && Math.hypot(o.invX - x, o.invY - y) < 90)) { e.invX = x; e.invY = y; break; } }
       }
     }
   } else if (e.state === 'combat') {
@@ -1701,7 +1730,7 @@ function updateGuard(e, dt) {
         const side = buddies.length ? (L.enemies.indexOf(e) % 2 ? 1 : -1) : e.strafe;
         mvx = dx / dist * k - dy / dist * side * .6; mvy = dy / dist * k + dx / dist * side * .6;
         // ELITE: one in three works around your side while the others keep you busy
-        if (eliteGuards() && buddies.length && L.enemies.indexOf(e) % 3 === 1 && dist > 90) {
+        if (buddies.length && dist > 90 && (eliteGuards() && L.enemies.indexOf(e) % 3 === 1 || e.type === 'spec' && L.enemies.indexOf(e) % 2 === 1)) { // Spec-Ops always send one round your side
           const fx = t.x - dy / dist * 170 * side, fy = t.y + dx / dist * 170 * side;
           if (!solidAt(fx, fy)) { const fdx = fx - e.x, fdy = fy - e.y, fd = Math.hypot(fdx, fdy) || 1; if (fd > 30) { if (los(e.x, e.y, fx, fy)) { mvx = fdx / fd; mvy = fdy / fd; } else { guardPathTo(e, fx, fy); const f = flowDir(e, e.pf); if (f) { mvx = f.x; mvy = f.y; } } } }
         }
@@ -1761,12 +1790,24 @@ function updateGuard(e, dt) {
         if (Math.hypot(e.lastX - e.x, e.lastY - e.y) < 20 && !t) e.lostT += dt * 2;
         // they're hiding behind something: flush them out with a grenade
         const ld = Math.hypot(e.lastX - e.x, e.lastY - e.y);
-        if (!T.melee && !T.post && e.type !== 'drone' && (e.nades === undefined ? (e.nades = G.mode === 'op' && G.diff === 1 ? 0 : eliteGuards() ? 2 : 1) : e.nades) > 0 && e.lostT > 1.5 && e.lostT < 6 && ld > 110 && ld < 330 && los(e.x, e.y, e.lastX, e.lastY)) {
+        if (!T.melee && !T.post && e.type !== 'drone' && (e.nades === undefined ? (e.nades = e.type === 'spec' ? 2 : G.mode === 'op' && G.diff === 1 ? 0 : eliteGuards() ? 2 : 1) : e.nades) > 0 && e.lostT > 1.5 && e.lostT < 6 && ld > 110 && ld < 330 && los(e.x, e.y, e.lastX, e.lastY)) {
           e.nades--; sfx('throw'); const ga = Math.atan2(e.lastY - e.y, e.lastX - e.x), gs = Math.min(460, ld * 1.6);
           grenades.push({ x: e.x, y: e.y, vx: Math.cos(ga) * gs, vy: Math.sin(ga) * gs, r: 5, fuse: 1.2, kind: 'frag', team: 'D', who: e });
           if (Math.hypot(e.x - P.x, e.y - P.y) < 700) msg(ETYPES[e.type].name + ': "Grenade! Flush them out!"', '#c8a24a');
         }
       }
+    }
+  }
+  if (e.bodyguard) { // protect the operators with their lives: never leave them, stand between them and whoever is shooting
+    const op = (L.secOps || []).filter(o => L.enemies.includes(o) && o.hp > 0).sort((a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y))[0];
+    if (op) {
+      const th = e.target && alive(e.target) ? e.target : e.state === 'search' || e.state === 'suspicious' ? { x: e.invX, y: e.invY } : null;
+      let gx = e.hx, gy = e.hy;
+      if (th) { const a = Math.atan2(th.y - op.y, th.x - op.x); gx = op.x + Math.cos(a) * 34; gy = op.y + Math.sin(a) * 34; if (solidAt(gx, gy)) { gx = e.hx; gy = e.hy; } }
+      const d = Math.hypot(gx - e.x, gy - e.y);
+      if (e.state !== 'combat' || Math.hypot(e.x - op.x, e.y - op.y) > 90 || !(e.target && h === e.target)) { mvx = d > 6 ? (gx - e.x) / d : 0; mvy = d > 6 ? (gy - e.y) / d : 0; }
+      if (th && e.state !== 'combat') e.angle = turnTo(e.angle, Math.atan2(th.y - e.y, th.x - e.x), 4 * dt);
+      if (e.state === 'search') e.searchT = Math.min(e.searchT, 10);
     }
   }
   if (T.post && e.state !== 'combat') { mvx = 0; mvy = 0; }
@@ -3108,6 +3149,9 @@ function drawGuard(e, now) {
   }
   if (e.type === 'guard' || e.type === 'officer') {
     drawTrooper(e.x, e.y, e.angle, { body: '#55623a', head: e.type === 'officer' ? '#c8a07a' : '#46512f', beret: e.type === 'officer' ? '#8a1f1f' : null, vest: e.type === 'guard' ? '#3f4a2b' : null, flash: fl, muzzle: e.flash2 > 0, gunLen: 18, walk: e.walk }, now);
+  } else if (e.type === 'secop') { // security operator: grey shirt, headset, sidearm
+    drawTrooper(e.x, e.y, e.angle, { body: '#5b6672', head: '#c8a07a', flash: fl, muzzle: e.flash2 > 0, gunLen: 12, walk: e.walk }, now);
+    if (!fl) { ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.angle); ctx.strokeStyle = '#111'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, 6, -1.2, 1.2); ctx.stroke(); ctx.fillStyle = '#3fb6ff'; ctx.fillRect(4, -2, 2, 4); ctx.restore(); }
   } else if (e.type === 'spec') {
     drawTrooper(e.x, e.y, e.angle, { body: '#2b3540', head: '#141a1f', vest: '#1c242b', visor: '#ff5a3d', flash: fl, muzzle: e.flash2 > 0, gunLen: 22, walk: e.walk }, now);
     if (!fl) { ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.angle); ctx.fillStyle = '#ff5a3d'; ctx.fillRect(-3, -10, 2, 2); ctx.fillRect(-3, 8, 2, 2); ctx.restore(); }
