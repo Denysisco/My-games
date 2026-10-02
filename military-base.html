@@ -122,7 +122,7 @@ const ALERTS = {
 // noise = how far guards hear it (silenced guns barely make a sound)
 const WEAPONS = {
   sdpistol: { name: 'SD PISTOL',  short: 'SDP', rate: .3,  dmg: 34, spread: .03,  pellets: 1, speed: 860,  ammo: null,      noise: 70,  kick: 2,   len: 16, silenced: true },
-  smgsd:    { name: 'MP5-SD',     short: 'MP5', rate: .075, dmg: 18, spread: .065, pellets: 1, speed: 880,  ammo: 'smg',     noise: 150, kick: 1.9, len: 19, silenced: true },
+  smgsd:    { name: 'MP5-SD',     short: 'MP5', rate: .075, dmg: 15, spread: .065, pellets: 1, speed: 880,  ammo: 'smg',     noise: 150, kick: 1.9, len: 19, silenced: true },
   rifle:    { name: 'M4 RIFLE',   short: 'M4',  rate: .11, dmg: 21, spread: .05,  pellets: 1, speed: 980,  ammo: 'rifle',   noise: 560, kick: 3,   len: 23 },
   shotgun:  { name: 'SHOTGUN',    short: 'SG',  rate: .75, dmg: 14, spread: .28,  pellets: 8, speed: 740,  ammo: 'shells',  noise: 600, kick: 7,   len: 20 },
   sniper:   { name: 'SNIPER',     short: 'SNP', rate: 1.2, dmg: 140, spread: .004, pellets: 1, speed: 1700, ammo: 'sniper', noise: 90,  kick: 9,   len: 31, pierce: 1, scope: true, silenced: true }, // suppressed: guards barely hear it
@@ -357,7 +357,7 @@ let bullets = [], particles = [], grenades = [], floaters = [], lights = [], smo
 
 function newStats() { return { kills: 0, shots: 0, hits: 0, dmg: 0, time: 0, takedowns: 0, alarms: 0 }; }
 function defaultCarry() {
-  return { hp: 100, armor: 25, weapons: { sdpistol: true, smgsd: true }, weapon: 'smgsd', ammo: { smg: 300, rifle: 0, shells: 0, sniper: 0, rockets: 0 }, gadgets: { frag: 1, smoke: 1, flash: 1 }, gadget: 'frag' };
+  return { hp: 100, armor: 25, weapons: { sdpistol: true, smgsd: true }, weapon: 'smgsd', ammo: { smg: 400, rifle: 0, shells: 0, sniper: 0, rockets: 0 }, gadgets: { frag: 1, smoke: 1, flash: 1 }, gadget: 'frag' };
 }
 
 /* ---------------- LEVEL BUILD ---------------- */
@@ -1184,7 +1184,7 @@ function useConsole(c) {
   msg('SECURITY CONSOLE: every camera on this floor is OFFLINE', '#3ddc84'); sfx('ok');
 }
 /* ---------------- ARMOURY: take any ONE weapon (your SD pistol stays as a sidearm) ---------------- */
-const ARMOURY = [['smgsd', 'silenced, quiet', 300], ['rifle', 'loud, all-round', 210], ['shotgun', 'loud, close range', 28], ['sniper', 'silenced, one-shot, 5 rounds', SNIPER_MAX], ['lmg', 'loud, huge mag', 320]];
+const ARMOURY = [['smgsd', 'silenced, quiet', 400], ['rifle', 'loud, all-round', 210], ['shotgun', 'loud, close range', 28], ['sniper', 'silenced, one-shot, 5 rounds', SNIPER_MAX], ['lmg', 'loud, huge mag', 320]];
 function openArmoury(c) {
   if (c.used) { msg('The armoury is empty — you already took your weapon', '#86907a'); return; }
   if (G.cmdOpen) closeCmd();
