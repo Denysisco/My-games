@@ -286,7 +286,7 @@ const LEVELS = [
   ],
   items: [[29,18,'r'],[44,15,'N'],[42,22,'n'],[37,3,'W'],[31,2,'g'],[33,32,'b'],[45,31,'a'],[2,19,'H'],[17,13,'H'],[18,33,'H'],[30,26,'a'],[56,10,'H'],[56,26,'s'],[13,22,'k'],[47,32,'f']],
   enemies: [[9,9,'camera',0],[24,27,'camera',180],[49,9,'camera',90],[57,2,'camera',180],[33,13,'camera',180],[53,23,'camera',90],
-            [16,3,'guard',180],[28,2,'officer',0],[25,5,'secop',270],[30,5,'secop',270],[22,5,'spec','bodyguard'],[32,5,'spec','bodyguard'],[19,3,'guard',180],[19,5,'guard',180],[34,3,'guard',0],[34,5,'guard',0],[26,8,'guard',90],[28,8,'guard',90],[41,4,'guard',180],[49,5,'guard',180],[20,9,'guard',[[12,9],[45,9]]],[30,26,'guard',[[12,26],[45,26]]],[9,24,'guard',90],
+            [16,3,'guard',180],[30,2,'officer',90],[27,3,'secop',90],[26,3,'spec','bodyguard'],[28,3,'spec','bodyguard'],[21,3,'guard',0],[21,5,'guard',0],[32,3,'guard',180],[32,5,'guard',180],[26,6,'guard',270],[28,6,'guard',270],[41,4,'guard',180],[49,5,'guard',180],[20,9,'guard',[[12,9],[45,9]]],[30,26,'guard',[[12,26],[45,26]]],[9,24,'guard',90],
             [15,15,'guard',0],[17,20,'dog',[[13,18],[18,18]]],[25,17,'guard',0],[35,17,'guard',180],[29,22,'heavy',270],[43,20,'guard',270],
             [10,30,'guard',0],[25,31,'guard','sleep'],[32,32,'guard',180],[40,32,'guard',0],[47,30,'heavy',180],[49,18,'guard',[[49,12],[49,23]]],
             [55,12,'heavy',90],[57,4,'sniper',180],[53,16,'guard',[[53,16],[57,16],[57,6],[53,6]]],[57,24,'turret',180],[57,31,'guard',180],[8,27,'camera',315],[50,27,'camera',225],[55,28,'guard',[[53,28],[57,28]]],[17,5,'guard',180],[42,31,'guard',[[37,31],[49,31]]]],
@@ -320,13 +320,13 @@ const LEVELS = [
   name: 'SECTOR 5', sub: 'MISSILE SILO', theme: 'base', base: 'YELLOW', w: 64, h: 40,
   rooms: [[1,30,8,8],[10,1,3,31],[10,29,44,3],[14,1,20,6],[35,1,13,6],[14,8,34,20],[14,33,16,5],[31,33,23,5],[49,12,5,10],[55,2,8,30]],
   walls: [[10,12,3,1],[10,22,3,1],[40,29,1,3]],
-  deco: [[29,15,4,6,'missile'],[20,11,2,2,'pillar'],[40,11,2,2,'pillar'],[20,23,2,2,'pillar'],[40,23,2,2,'pillar'],[16,4,6,1,'desk'],[25,4,6,1,'desk'],
+  deco: [[29,15,4,6,'missile'],[37,15,3,3,'holo'],[22,1,8,1,'monitors'],[47,1,1,3,'rack'],[13,33,1,3,'rack'],[57,10,2,1,'crate'],[60,20,2,1,'crate'],[20,11,2,2,'pillar'],[40,11,2,2,'pillar'],[20,23,2,2,'pillar'],[40,23,2,2,'pillar'],[16,4,6,1,'desk'],[25,4,6,1,'desk'],
          [17,16,1,4,'sandbag'],[44,16,1,4,'sandbag'],[25,12,3,1,'sandbag'],[35,12,3,1,'sandbag'],[25,23,3,1,'sandbag'],[35,23,3,1,'sandbag'],
          [16,34,3,3,'gen'],[23,34,3,3,'gen'],[33,34,2,1,'bunk'],[37,34,2,1,'bunk'],[45,36,2,1,'bunk'],[36,5,2,1,'crate'],
          [56,3,6,6,'helipad'],[55,2,8,30,'tarmac'],[56,24,2,2,'crate'],[60,14,2,2,'crate']],
   doors: [[9,30,'D'],[13,3,'D'],[34,3,'D'],[24,7,'Y'],[42,7,'h'],[29,28,'B',0],[30,28,'B',0],[22,32,'D'],[42,32,'D'],[48,16,'B',1],[48,17,'B',1],[54,16,'D'],
           [11,12,'D'],[11,22,'D'],[40,30,'D']],
-  player: [4,34], exit: [59,6], exitName: 'EXTRACTION HELI', exitNeedsBlack: true, core: true, coreKey: [31,35], specRoom: 5, // the silo itself: only Spec-Ops patrol in there
+  player: [4,34], exit: [59,6], exitName: 'EXTRACTION HELI', exitNeedsBlack: true, core: true, coreKey: [31,35], secRoom: [14, 1, 20, 6], specRoom: 5, // the silo itself: only Spec-Ops patrol in there
   terminals: [[27,30,0]],
   notes: [
     [31,2,'LAUNCH CONTROL — LOG','Silo gate code (first half):\n\n{c0a} _ _\n\nIRONCLAD is guarding the silo. If it goes down, the base self-destruct arms automatically.'],
@@ -336,7 +336,7 @@ const LEVELS = [
   items: [[16,2,'G'],[18,2,'a'],[20,5,'p'],[44,4,'y'],[38,5,'W'],[3,36,'H'],[11,2,'H'],[11,30,'q'],[21,37,'H'],[28,36,'k'],[51,18,'H'],[43,10,'a'],[17,24,'n'],[42,25,'H'],[16,10,'f']],
   enemies: [[11,6,'guard',[[11,2],[11,28]]],[12,17,'dog'],[20,3,'guard',180],[30,5,'officer',180],[33,1,'camera',135],[15,2,'turret',0],
             [40,3,'guard',0],[46,5,'guard',180],[38,18,'boss'],[26,13,'spec',[[26,13],[36,13],[36,22],[26,22]]],[18,10,'spec',[[18,10],[18,25]]],[43,25,'spec',[[43,25],[43,10]]],[24,26,'spec',[[16,26],[46,26]]],[24,9,'spec',90],
-            [30,30,'guard',[[14,30],[52,30]]],[42,31,'guard',180],[27,34,'heavy',180],[36,35,'guard','sleep'],[48,35,'guard',180],
+            [30,30,'spec',[[14,30],[52,30]]],[27,3,'secop',90],[26,3,'spec','bodyguard'],[28,3,'spec','bodyguard'],[14,8,'camera',45],[47,8,'camera',135],[14,27,'camera',315],[47,27,'camera',225],[52,17,'turret',180],[12,30,'spec',[[12,30],[12,24]]],[62,22,'spec',[[62,16],[62,27]]],[10,17,'spec',[[10,14],[10,20]]],[55,2,'camera',45],[34,8,'camera',90],[42,31,'guard',180],[27,34,'heavy',180],[36,35,'guard','sleep'],[48,35,'guard',180],
             [51,15,'guard',180],[57,20,'sniper',270],[10,1,'camera',90],[53,31,'camera',180],[62,31,'camera',225],[60,28,'guard',180],[58,13,'guard',[[56,13],[61,13]]],[24,6,'guard',[[17,6],[32,6]]],[44,34,'guard',[[44,34],[52,34]]]],
   spawns: [[4,31],[11,1],[12,31],[60,30]],
 },
@@ -409,7 +409,7 @@ function buildLevel(def, codes, gd) {
   // extra security: Spec-Ops posts and roaming patrols in rooms away from where you come in
   { const li = Math.max(0, LEVELS.indexOf(def)); let seed = 777 + li * 97; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     const nearSec = e => def.secRoom && e.x / TS > def.secRoom[0] - 3 && e.x / TS < def.secRoom[0] + def.secRoom[2] + 3 && e.y / TS < def.secRoom[1] + def.secRoom[3] + 3;
-    for (const e of L.enemies) if (e.type === 'guard' && !nearSec(e) && rnd() < .25 + li * .03) { const s = makeEnemy('spec', e.x, e.y, null, gd); Object.assign(e, { type: 'spec', hp: s.hp, maxhp: s.maxhp, r: s.r }); } // a quarter of the soldiers are swapped for Spec-Ops (a few more in deeper sectors)
+    for (const e of L.enemies) if (e.type === 'guard' && !nearSec(e) && rnd() < (li >= 4 ? .75 : .25 + li * .03)) { const s = makeEnemy('spec', e.x, e.y, null, gd); Object.assign(e, { type: 'spec', hp: s.hp, maxhp: s.maxhp, r: s.r }); } // a quarter of the soldiers are swapped for Spec-Ops (a few more in deeper sectors)
     const rd = new Uint16Array(w * h).fill(65535); { const q = [def.player[1] * w + def.player[0]]; rd[q[0]] = 0; for (let qh = 0; qh < q.length; qh++) { const i = q[qh], x = i % w; for (const n of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w]) if (n >= 0 && n < w * h && rd[n] === 65535 && t[n] !== 0) { rd[n] = rd[i] + 1; q.push(n); } } }
     const segD = (px, py, a, b) => { const dx = b.x - a.x, dy = b.y - a.y, l = dx * dx + dy * dy || 1, u = clamp(((px - a.x) * dx + (py - a.y) * dy) / l, 0, 1); return Math.hypot(px - a.x - dx * u, py - a.y - dy * u); };
     const onRoute = (x, y) => L.enemies.some(e => e.route && e.route.some((p, k) => segD((x + .5) * TS, (y + .5) * TS, p, e.route[(k + 1) % e.route.length]) < TS * 2.2));
@@ -428,6 +428,12 @@ function buildLevel(def, codes, gd) {
     const inSpec = (x, y) => { const r = def.rooms[def.specRoom]; return r && x >= r[0] && x < r[0] + r[2] && y >= r[1] && y < r[1] + r[3]; };
     roam.forEach(([x, y], k) => L.enemies.push(makeEnemy(inSpec(x, y) ? 'spec' : rovers[k], (x + .5) * TS, (y + .5) * TS, 'rover', gd)));
     rest.slice(0, posts).forEach(([x, y]) => L.enemies.push(makeEnemy('spec', (x + .5) * TS, (y + .5) * TS, Math.floor(rnd() * 4) * 90, gd)));
+    for (const e of L.enemies) if (!ETYPES[e.type].stat && e.type !== 'dog' && e.type !== 'boss' && !e.route && !e.rover && !e.sleep && (e.bodyguard || e.type === 'secop' || nearSec(e))) e.station = true; // the security room team holds its ground, even at CODE RED
+    if (li >= 1 && li <= 3) { // sectors 2-4: three fewer regular soldiers (never the exit / control-room guards)
+      const cut = L.enemies.filter(e => e.type === 'guard' && !e.station && !e.rover && !e.sleep).sort((a, b) => (a.route ? 1 : 0) - (b.route ? 1 : 0) || Math.hypot(b.x - (def.player[0] + .5) * TS, b.y - (def.player[1] + .5) * TS) - Math.hypot(a.x - (def.player[0] + .5) * TS, a.y - (def.player[1] + .5) * TS)).slice(-3);
+      L.enemies = L.enemies.filter(e => !cut.includes(e));
+    }
+    if (li === 4) for (const e of L.enemies) { e.hp = e.maxhp = e.maxhp * 1.04; e.dmgMul = (e.dmgMul || 1) * 1.04; } // the silo's garrison: everyone 4% tougher and harder-hitting
     L.roomVisit = def.rooms.map(() => 0); L.hot = null; L.zones = []; for (const [rx, ry, rw, rh] of def.rooms) { const nx = Math.ceil(rw / 10), ny = Math.ceil(rh / 10); for (let a = 0; a < nx; a++) for (let b = 0; b < ny; b++) { const x0 = rx + Math.floor(a * rw / nx), y0 = ry + Math.floor(b * rh / ny); L.zones.push([x0, y0, rx + Math.floor((a + 1) * rw / nx) - x0, ry + Math.floor((b + 1) * rh / ny) - y0]); } } // big yards are swept in chunks
     L.teamVisit = { A: L.zones.map(() => -999), D: L.zones.map(() => -999) }; L.sweep = {};
   }
@@ -446,7 +452,7 @@ function makeEnemy(type, x, y, extra, gd) {
   else if (typeof extra === 'number') e.angle = extra * Math.PI / 180;
   else if (extra === 'sleep') { e.sleep = true; e.angle = Math.PI / 2; }
   else if (extra === 'rover') e.rover = true;
-  else if (extra === 'bodyguard') { e.bodyguard = true; e.hp = e.maxhp = e.maxhp * 1.15; e.dmgMul = 1.15; } // a bit tougher than a regular Spec-Op // the patrol director plans this one's routes
+  else if (extra === 'bodyguard') { e.bodyguard = true; e.angle = Math.PI / 2; e.hp = e.maxhp = e.maxhp * 1.15; e.dmgMul = 1.15; } // a bit tougher than a regular Spec-Op // the patrol director plans this one's routes
   e.baseA = e.angle;
   if (T.cam) e.sweep = Math.random() * TAU;
   return e;
@@ -461,7 +467,7 @@ function prerender() {
   const at = (x, y) => (x < 0 || y < 0 || x >= L.w || y >= L.h) ? 0 : L.t[y * L.w + x];
   g.fillStyle = out ? '#0a1109' : '#050605'; g.fillRect(0, 0, c.width, c.height);
   // every room gets its own floor: corridors with painted lane lines, big halls with steel deck plate, rooms with tiles or concrete
-  const ACC = ['#c9a227', '#c9a227', '#3f8fd0', '#c0392b', '#e0b020'][G.level] || '#c9a227';
+  const ACC = ['#c9a227', '#c9a227', '#3f8fd0', '#c0392b', '#d0342c'][G.level] || '#c9a227';
   const roomOf = new Int16Array(L.w * L.h).fill(-1), styleOf = [];
   L.def.rooms.forEach(([rx, ry, rw, rh], r) => {
     for (let y = ry; y < ry + rh; y++) for (let x = rx; x < rx + rw; x++) if (x >= 0 && y >= 0 && x < L.w && y < L.h) roomOf[y * L.w + x] = r;
@@ -971,6 +977,7 @@ function setAlert(a, reason, x, y) {
   if (a === 'RED') {
     banner('CODE RED', reason || 'ALARM RAISED — BASE LOCKDOWN', A.c, 3.5); sfx('alarm'); shake(8); G.spawnT = 6; G.stats.alarms++;
     const ax = x === undefined ? (L.focus ? L.focus.x : P.x) : x, ay = y === undefined ? (L.focus ? L.focus.y : P.y) : y;
+    if (L.enemies.some(e => e.station && !e.bodyguard && e.type !== 'secop' && e.hp > 0)) msg('GUARDS: "Control room team — hold your posts, protect the operators!"', '#c8a24a');
     for (const e of L.enemies) {
       if (ETYPES[e.type].cam) continue;
       e.sleep = false;
@@ -1386,6 +1393,12 @@ function hurtOp(o, d, src) {
 }
 function damageEnemy(e, dmg, src, silent) {
   if (e.hp <= 0) return;
+  if (e.type === 'secop' && src && src.who) { // the bodyguards protect the operators with their lives: they come running and take the bullets
+    const who = src.who;
+    for (const b of L.enemies) if (b.bodyguard && b.hp > 0 && alive(who)) enterCombat(b, who);
+    const bg = L.enemies.filter(b => b.bodyguard && b.hp > 0 && !(b.stun > 0) && Math.hypot(b.x - e.x, b.y - e.y) < 130).sort((a, c) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(c.x - e.x, c.y - e.y))[0];
+    if (bg && Math.random() < .65) { floater(bg.x, bg.y - bg.r - 16, 'TOOK THE BULLET', '#ff8a3d'); damageEnemy(bg, dmg, src, silent); return; }
+  }
   if (e.type === 'boss' && e.pat === 'charge') dmg *= .6;
   if (ETYPES[e.type].armor) { // armour: soaks part of each hit but cracks as it takes damage
     if (e.plate === undefined) e.plate = 1;
@@ -1443,9 +1456,10 @@ function watched(x, y, skip) {
   return false;
 }
 function hideBody(b, killer) {
-  if (G.spottedA || ALERTS[G.alert].lvl >= 2) return;
-  // nobody would walk past it anyway? leave it
-  if (!watched(b.x, b.y) && !L.enemies.some(w => !w.sleep && w.hp > 0 && !ETYPES[w.type].stat && (w.route ? w.route.some(p => Math.hypot(p.x - b.x, p.y - b.y) < 200) : Math.hypot(w.x - b.x, w.y - b.y) < 260))) return;
+  const armyDef = G.mode === 'def' && killer && killer.team === 'A';
+  if (armyDef ? (G.spottedSq && G.spottedSq[killer.sq]) : (G.spottedA || ALERTS[G.alert].lvl >= 2)) return;
+  // nobody would walk past it anyway? leave it (the army in Defend always hides them: you're out there hunting)
+  if (!armyDef && !watched(b.x, b.y) && !L.enemies.some(w => !w.sleep && w.hp > 0 && !ETYPES[w.type].stat && (w.route ? w.route.some(p => Math.hypot(p.x - b.x, p.y - b.y) < 200) : Math.hypot(w.x - b.x, w.y - b.y) < 260))) return;
   const free = OPS.filter(o => o.team === 'A' && o.state === 'ok' && !o.drag && (!o.claim || o === killer) && !o.target && Math.hypot(o.x - b.x, o.y - b.y) < 360 && !(o.team === P.team && (G.cmd.kind === 'hold' || G.cmd.kind === 'move')));
   const o = killer.op && free.includes(killer) ? killer : free.sort((a, c) => Math.hypot(a.x - b.x, a.y - b.y) - Math.hypot(c.x - b.x, c.y - b.y))[0];
   if (!o) return;
@@ -1457,6 +1471,7 @@ function hideBody(b, killer) {
     if (w.route) w.route.forEach((p, i) => { const q = w.route[(i + 1) % w.route.length]; for (let k = 0; k < 1; k += .25) eyes.push({ x: p.x + (q.x - p.x) * k, y: p.y + (q.y - p.y) * k, r }); });
     else eyes.push({ x: w.hx, y: w.hy, r }, { x: w.x, y: w.y, r });
   }
+  if (G.mode === 'def') for (const sn of L.aSeen || []) if (G.time - sn.t < 30) eyes.push({ x: sn.x, y: sn.y, r: sn.r }); // ...and out of your sight
   const tx = Math.floor(b.x / TS), ty = Math.floor(b.y / TS); let best = null, bs = 1e9;
   for (let y = ty - 6; y <= ty + 6; y++) for (let x = tx - 6; x <= tx + 6; x++) {
     if (x < 1 || y < 1 || x >= L.w - 1 || y >= L.h - 1 || L.t[y * L.w + x] !== 1) continue;
@@ -1719,7 +1734,7 @@ function updateGuard(e, dt) {
       const dx = t.x - e.x, dy = t.y - e.y, dist = Math.hypot(dx, dy) || 1, toA = Math.atan2(dy, dx);
       if (T.melee) {
         mvx = dx / dist; mvy = dy / dist; e.angle = toA; spd *= 1.05;
-        if (dist < e.r + t.r + 8 && e.cd <= 0) { hurtAny(t, T.dmg * (G.mode === 'op' ? D.dmg : 1), { team: 'D', who: e, x: e.x, y: e.y }); e.cd = .7; sfx('bark', shotVol(e.x, e.y)); e.lunge = .15; }
+        if (dist < e.r + t.r + 8 && e.cd <= 0) { hurtAny(t, T.dmg * (e.dmgMul || 1) * (G.mode === 'op' ? D.dmg : 1), { team: 'D', who: e, x: e.x, y: e.y }); e.cd = .7; sfx('bark', shotVol(e.x, e.y)); e.lunge = .15; }
       } else if (T.sniper) {
         e.angle = turnTo(e.angle, toA, 3 * dt);
         if (e.cd <= 0) { e.aimT += dt; if (e.aimT > 1.1) { guardFire(e, t); e.cd = T.rate; e.aimT = 0; } }
@@ -1810,6 +1825,14 @@ function updateGuard(e, dt) {
       if (e.state === 'search') e.searchT = Math.min(e.searchT, 10);
     }
   }
+  if (e.station && !e.bodyguard && !T.post) { // guarding the exit or the security room: they stay put even at CODE RED
+    const hd = Math.hypot(e.hx - e.x, e.hy - e.y), sees = e.state === 'combat' && e.target && h === e.target;
+    if (e.state === 'search' || e.state === 'suspicious') {
+      mvx = mvy = 0; if (hd > 10) goTo(e.hx, e.hy, .7);
+      else { e.lookT -= dt; if (e.lookT <= 0) { e.lookT = rand(.8, 1.6); e.lookA = Math.atan2(e.invY - e.y, e.invX - e.x) + rand(-.7, .7); } e.angle = turnTo(e.angle, e.lookA === undefined ? e.angle : e.lookA, 2.5 * dt); }
+      e.searchT = Math.min(e.searchT, 8);
+    } else if (e.state === 'combat' && (!sees && hd > 12 || hd > 220)) { mvx = mvy = 0; goTo(e.hx, e.hy, 1); if (sees) e.angle = turnTo(e.angle, Math.atan2(e.target.y - e.y, e.target.x - e.x), 8 * dt); } // lost you, or you're pulling him away: back to the post
+  }
   if (T.post && e.state !== 'combat') { mvx = 0; mvy = 0; }
   if (T.post && Math.hypot(e.hx - e.x, e.hy - e.y) > 6) { const d = Math.hypot(e.hx - e.x, e.hy - e.y); mvx = (e.hx - e.x) / d * .5; mvy = (e.hy - e.y) / d * .5; }
   if (inSmoke(e.x, e.y)) spd *= .6; // coughing, can't see a thing
@@ -1837,7 +1860,7 @@ function bossAI(e, dt) {
   const T = ETYPES.boss, rage = e.hp < e.maxhp * .5, t = e.target;
   const dx = t.x - e.x, dy = t.y - e.y, dist = Math.hypot(dx, dy) || 1, toA = Math.atan2(dy, dx);
   const see = sightLine(e.x, e.y, t.x, t.y);
-  const D = gd(), dmul = G.mode === 'op' ? D.dmg / .8 : 1;
+  const D = gd(), dmul = (G.mode === 'op' ? D.dmg / .8 : 1) * (e.dmgMul || 1);
   const src = { team: 'D', who: e, x: e.x, y: e.y };
   e.patT -= dt; e.summonT -= dt;
   if (!e.awakeMsg) { e.awakeMsg = true; banner('WARNING', 'IRONCLAD ENGAGED', '#c8a24a', 3); sfx('bosswake'); shake(10); }
@@ -1922,6 +1945,15 @@ function coneMap() {
       if (sightLine(e.x, e.y, px, py)) m[y * L.w + x] = T.cam ? 2 : Math.max(m[y * L.w + x], 1);
     }
   }
+  if (G.mode === 'def') for (const sn of L.aSeen || []) { // the army remembers where it last saw you and your troops, and keeps out of their sight
+    if (G.time - sn.t > 15) continue;
+    const r = Math.ceil(sn.r / TS), cx = Math.floor(sn.x / TS), cy = Math.floor(sn.y / TS);
+    for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) {
+      if (x < 0 || y < 0 || x >= L.w || y >= L.h || L.t[y * L.w + x] === 0 || m[y * L.w + x] >= 2) continue;
+      const px = (x + .5) * TS, py = (y + .5) * TS; if (Math.hypot(px - sn.x, py - sn.y) > sn.r) continue;
+      if (sightLine(sn.x, sn.y, px, py)) m[y * L.w + x] = 3;
+    }
+  }
   return m;
 }
 // a path that goes around the cones when it can (each lit tile costs a lot), straight through only if there's no other way
@@ -1940,7 +1972,7 @@ function stealthPath(o, x, y) {
     const xx = i % w;
     for (const nb of [xx > 0 ? i - 1 : -1, xx < w - 1 ? i + 1 : -1, i - w, i + w]) {
       if (nb < 0 || nb >= n || !pass(nb)) continue;
-      const nd = d + 1 + (cm[nb] === 2 ? 40 : cm[nb] ? 14 : 0); // walking through a camera's view costs the most
+      const nd = d + 1 + (cm[nb] === 2 ? (G.mode === 'def' ? 80 : 40) : cm[nb] === 3 ? 34 : cm[nb] ? (G.mode === 'def' ? 18 : 14) : 0); // walking through a camera's view costs the most (the army treats cameras like a minefield)
       if (nd < dist[nb] && nd < 65000) { dist[nb] = nd; push(nb, nd); }
     }
   }
@@ -2218,7 +2250,10 @@ function updateOp(o, dt) {
       if (!o.smokeUsed && (o.lastHit < 3 || (spotted && ALERTS[G.alert].lvl >= 2))) popSmoke(o, downed.x, downed.y); // cover the revive
       if (o.reviveT > 1.8) { downed.state = 'ok'; downed.hp = downed.maxhp * .45; o.reviveT = 0; msg(o.name + ' revived ' + downed.name, '#4fd8ff'); sfx('ok'); }
     }
-  } else if (o.role === 'lead') { gx = o.goal ? o.goal.x : L.exit.x; gy = o.goal ? o.goal.y : L.exit.y; }
+  } else if (o.role === 'lead') {
+    gx = o.goal ? o.goal.x : L.exit.x; gy = o.goal ? o.goal.y : L.exit.y;
+    if (o.assist && G.time < o.assist.until && alive(o.assist.t) && !spotted) { gx = o.assist.x; gy = o.assist.y; if (Math.hypot(gx - o.x, gy - o.y) < 40) o.assist.until = 0; } // coming round to hit them from the side
+  }
   else if (o.cmdr && G.bravoMode === 'hold') { gx = G.bravoHold.x; gy = G.bravoHold.y; if (Math.hypot(gx - o.x, gy - o.y) < 20) mode = 'hold'; }
   else if (o.cmdr && G.bravoMode === 'retreat') { gx = L.camp.x - 40; gy = L.camp.y; if (solidAt(gx, gy)) { gx = L.camp.x; gy = L.camp.y; } }
   else if (o.cmdr && G.bravoMode === 'assault') {
@@ -2329,10 +2364,10 @@ function updateOp(o, dt) {
       if (!near && !o.rush && !here && ahead && (o.waitT || 0) < 5) { o.waitT = (o.waitT || 0) + dt; f = { x: 0, y: 0 }; o.crouch = true; }
       else if (!ahead) o.waitT = Math.max(0, (o.waitT || 0) - dt * .5);
     } else if (toGoal < 70 && los(o.x, o.y, gx, gy)) f = { x: (gx - o.x) / toGoal, y: (gy - o.y) / toGoal };
-    else if (stealthy && !o.drag && ((!friendly && o.role === 'lead') || (o.cmdr && !G.allyJoin) || (o.ally2 && !o.cmdr))) { // BRAVO's soldiers pick their own way around the flashlights too
+    else if (stealthy && !o.drag && ((!friendly && (o.role === 'lead' || toGoal > 70)) || (o.cmdr && !G.allyJoin) || (o.ally2 && !o.cmdr))) { // BRAVO's soldiers pick their own way around the flashlights too
       f = stealthPath(o, gx, gy) || opPath(o, gx, gy) || { x: (gx - o.x) / toGoal, y: (gy - o.y) / toGoal };
       const cm = coneMap(), here = cm[tileIdx(o)], ahead = cm[tileIdx({ x: o.x + f.x * 26, y: o.y + f.y * 26 })];
-      if (!here && ahead && (o.lwaitT || 0) < 3.5) { o.lwaitT = (o.lwaitT || 0) + dt; f = { x: 0, y: 0 }; o.crouch = true; } // let him look away first
+      if (!here && ahead && ahead !== 3 && (o.lwaitT || 0) < (G.mode === 'def' ? 5 : 3.5)) { o.lwaitT = (o.lwaitT || 0) + dt; f = { x: 0, y: 0 }; o.crouch = true; } // let him look away first
       else if (!ahead) o.lwaitT = Math.max(0, (o.lwaitT || 0) - dt * .5);
     }
     else f = opPath(o, gx, gy) || { x: (gx - o.x) / toGoal, y: (gy - o.y) / toGoal };
@@ -2362,6 +2397,7 @@ function updateOp(o, dt) {
   if (o.rush) spd = T.speed * 1.1;
   if (o.drag && o.drag.carry) spd *= .55;
   if (mine && G.cmd.kind === 'retreat') spd *= 1.25;
+  if (G.mode === 'def' && o.team === 'A' && G.spottedSq && !G.spottedSq[o.sq] && G.spottedSq[1 - o.sq]) spd *= 1.15; // the other squad has your attention: this one pushes the objective
   if (L.camp && friendly && Math.hypot(L.camp.x - o.x, L.camp.y - o.y) < 120 && (G.cmd.kind === 'retreat' || o.ally2 && G.bravoMode === 'retreat')) { o.crouch = true; } // hiding in camp
   // ---- fight
   const intel = INTEL[o.team], fresh = intel && G.time - intel.time < 4;
@@ -2448,6 +2484,13 @@ function intruderOrders(lead) {
   const mates = OPS.filter(o => o.team === 'A' && o.sq === lead.sq && o.role === 'follow' && o.state === 'ok');
   const setOrder = v => { SQ.orders[lead.sq] = v; }, cur = SQ.orders[lead.sq];
   if (!mates.length) { setOrder(null); return; }
+  if (G.mode === 'def' && G.spottedSq && !G.spottedSq[lead.sq] && G.spottedSq[1 - lead.sq] && !(lead.assist && G.time < lead.assist.until)) { // the other squad is in a firefight nearby: swing round and hit the defenders from behind
+    const other = OPS.find(x => x.team === 'A' && x.sq !== lead.sq && x.role === 'lead' && x.state === 'ok'), th = other && other.target && alive(other.target) ? other.target : null;
+    if (th && Math.hypot(th.x - lead.x, th.y - lead.y) < 700) {
+      const a = Math.atan2(th.y - other.y, th.x - other.x);
+      for (const off of [1.3, -1.3, Math.PI]) { const x = th.x + Math.cos(a + off) * 150, y = th.y + Math.sin(a + off) * 150; if (!solidAt(x, y)) { lead.assist = { t: th, x, y, until: G.time + 12 }; if (G.time - (SQ.sayT || -9) > 5) { SQ.sayT = G.time; msg(lead.name + ': "' + other.name + ', hold them there — we\'re coming round the side!"', '#ff8a3d'); } break; } }
+    }
+  }
   const say = txt => { if (G.time - (SQ.sayT || -9) > 5) { SQ.sayT = G.time; msg(lead.name + ': "' + txt + '"', '#ff8a3d'); } };
   const nameOf = t => t === P ? 'the officer' : t.op ? t.name : 'that ' + ETYPES[t.type].name.toLowerCase();
   const seen = [lead, ...mates].map(o => o.target).filter(t => t && alive(t));
@@ -2456,7 +2499,7 @@ function intruderOrders(lead) {
   const loud = G.spottedSq ? G.spottedSq[lead.sq] : G.spottedA;
   if (loud && seen.length) {
     const t = seen.sort((a, b) => a.hp / a.maxhp - b.hp / b.maxhp)[0];
-    if (mates.length >= 2 && Math.random() < .35) {
+    if (mates.length >= 2 && Math.random() < (G.mode === 'def' ? .6 : .35)) {
       const by = mates[1], side = Math.random() < .5 ? 1 : -1;
       for (const r of [170, 120]) {
         const a = Math.atan2(t.y - lead.y, t.x - lead.x) + Math.PI + side * 1.4, x = t.x + Math.cos(a) * r, y = t.y + Math.sin(a) * r;
@@ -2497,8 +2540,25 @@ function sweepGoal(o) {
   return best;
 }
 // intruder squad leader: keycards first, then the exit if it's open, otherwise hunt for code notes and crack keypads
+// distance from a unit to everywhere, where every tile a guard, camera or defender can see costs extra
+function dangerDist(o) {
+  const w = L.w, n = w * L.h, dist = o.pDist || (o.pDist = new Uint16Array(n)), cm = coneMap(), pass = unitPass(o), key = tileIdx(o);
+  dist.fill(65535); dist[key] = 0;
+  const q = [[0, key]]; // small binary heap
+  const push = (d, i) => { q.push([d, i]); let k = q.length - 1; while (k > 0) { const pk = (k - 1) >> 1; if (q[pk][0] <= q[k][0]) break; [q[pk], q[k]] = [q[k], q[pk]]; k = pk; } };
+  const pop = () => { const top = q[0], last = q.pop(); if (q.length) { q[0] = last; let k = 0; for (;;) { const l = k * 2 + 1, r = l + 1; let m = k; if (l < q.length && q[l][0] < q[m][0]) m = l; if (r < q.length && q[r][0] < q[m][0]) m = r; if (m === k) break; [q[m], q[k]] = [q[k], q[m]]; k = m; } } return top; };
+  while (q.length) {
+    const [d, i] = pop(); if (d > dist[i]) continue; const xx = i % w;
+    for (const nb of [xx > 0 ? i - 1 : -1, xx < w - 1 ? i + 1 : -1, i - w, i + w]) {
+      if (nb < 0 || nb >= n || !pass(nb)) continue;
+      const nd = d + 1 + (cm[nb] === 2 ? 30 : cm[nb] === 3 ? 14 : cm[nb] ? 6 : 0);
+      if (nd < dist[nb] && nd < 65000) { dist[nb] = nd; push(nd, nb); }
+    }
+  }
+  return dist;
+}
 function planIntruder(o) {
-  const reach = L.tmp; bfs(tileIdx(o), unitPass(o), reach);
+  const reach = G.mode === 'def' ? dangerDist(o) : (bfs(tileIdx(o), unitPass(o), L.tmp), L.tmp);
   const other = OPS.find(x => x !== o && x.team === 'A' && x.role === 'lead' && x.state === 'ok'), taken = other && other.goal && !other.goal.exit ? other.goal : null;
   const pickGoal = avoid => {
     let goal = null, gdist = 65535;
@@ -2694,6 +2754,18 @@ function update(dt) {
   }
   for (let i = smokes.length - 1; i >= 0; i--) { const s = smokes[i]; s.life -= dt; s.r = Math.min(s.maxr, s.r + dt * 160); if (s.life <= 0) smokes.splice(i, 1); }
   if (G.state !== 'play') return;
+  // what the army knows: where it last saw you and your troops
+  if (G.mode === 'def' && (L.aSeenT = (L.aSeenT || 0) - dt) <= 0) {
+    L.aSeenT = .25; L.aSeen = L.aSeen || [];
+    const army = OPS.filter(o => o.team === 'A' && o.state === 'ok');
+    for (const d of [P, ...OPS.filter(o => o.team === 'D' && o.state === 'ok')]) {
+      if (d === P && P.dead) continue;
+      if (army.some(a => Math.hypot(a.x - d.x, a.y - d.y) < 640 && sightLine(a.x, a.y, d.x, d.y))) {
+        const r = d === P ? 520 : TIERS[d.tier].sight, sn = L.aSeen.find(z => z.who === d);
+        if (sn) Object.assign(sn, { x: d.x, y: d.y, t: G.time, r }); else L.aSeen.push({ who: d, x: d.x, y: d.y, t: G.time, r });
+      }
+    }
+  }
   // who has eyes on the intruders (Defend HUD)
   if (G.mode === 'def') for (const o of OPS) if (o.team === 'A' && o.state === 'ok') {
     if ((!P.dead && Math.hypot(o.x - P.x, o.y - P.y) < 520 && sightLine(P.x, P.y, o.x, o.y)) || L.enemies.some(e => e.seen === o) || OPS.some(r => r.team === 'D' && r.target === o)) { o.spottedT = G.time; SQ.seenT = G.time; SQ.lastX = o.x; SQ.lastY = o.y;
@@ -2914,6 +2986,7 @@ function startDef(i, diff, carry) {
       const o = makeOp(m.name, 'A', m.lead ? 'lead' : 'follow', tier, (tile % L.w + .5) * TS, ((tile / L.w | 0) + .5) * TS, 'smgsd');
       o.sq = m.sq; o.maxhp = o.hp = Math.round(o.maxhp * (m.lead ? LEADER_HP * 2 : TROOP_HP)); if (m.lead) o.dmgX = 2; // the two original leaders: twice as tough and twice the punch // plate carriers: leaders wear the heavy stuff
       if (prev && prev[k]) { const p = prev[k]; o.state = p.state === 'ok' ? 'ok' : 'dead'; o.role = p.role; if (p.role === 'lead' && !m.lead) { o.maxhp = o.hp = Math.round(o.maxhp * 1.3); o.dmgX = 1.3; } } // survivors come into each new sector fully healed
+      o.maxhp = o.hp = Math.round(o.maxhp * 1.1); o.dmgX = (o.dmgX || 1) * 1.08; // a little tougher and harder-hitting across the board
       collide(o); OPS.push(o);
     });
   }
@@ -3149,7 +3222,8 @@ function drawGuard(e, now) {
   }
   if (e.type === 'guard' || e.type === 'officer') {
     drawTrooper(e.x, e.y, e.angle, { body: '#55623a', head: e.type === 'officer' ? '#c8a07a' : '#46512f', beret: e.type === 'officer' ? '#8a1f1f' : null, vest: e.type === 'guard' ? '#3f4a2b' : null, flash: fl, muzzle: e.flash2 > 0, gunLen: 18, walk: e.walk }, now);
-  } else if (e.type === 'secop') { // security operator: grey shirt, headset, sidearm
+  } else if (e.type === 'secop') { // security operator: sits in a chair behind the desk (grey shirt, headset, sidearm)
+    if (e.state !== 'combat' && Math.hypot(e.x - e.hx, e.y - e.hy) < 6) { ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.angle); ctx.fillStyle = '#1d2226'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-15, -12, 10, 24, 3) : ctx.rect(-15, -12, 10, 24); ctx.fill(); ctx.fillStyle = '#2c3338'; ctx.fillRect(-9, -13, 12, 4); ctx.fillRect(-9, 9, 12, 4); ctx.restore(); }
     drawTrooper(e.x, e.y, e.angle, { body: '#5b6672', head: '#c8a07a', flash: fl, muzzle: e.flash2 > 0, gunLen: 12, walk: e.walk }, now);
     if (!fl) { ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.angle); ctx.strokeStyle = '#111'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, 6, -1.2, 1.2); ctx.stroke(); ctx.fillStyle = '#3fb6ff'; ctx.fillRect(4, -2, 2, 4); ctx.restore(); }
   } else if (e.type === 'spec') {
