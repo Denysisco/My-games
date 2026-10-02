@@ -1201,7 +1201,7 @@ function squadHold() {
 const CMD_NAME = { follow: 'FOLLOW ME', hold: 'HOLD POSITION', move: 'GO THERE', attack: 'ATTACK TARGET', kill: 'TAKE HIM DOWN', guard: 'GUARD THE EXIT', hunt: 'HUNT INTRUDERS', retreat: 'RETREAT', cover: 'COVER ME', heal: 'HEAL UP', assault: 'ATTACK ALL' };
 function cmdList() {
   return G.mode === 'op'
-    ? [['follow', 'Follow me'], ['hold', 'Hold position'], ['move', 'Go there'], ['attack', 'Attack target'], ['assault', 'ATTACK ALL'], ['kill', 'Take him down (knife)'], ['stance', G.stance === 'stealth' ? 'Weapons free' : 'Back to stealth'], ['retreat', 'Retreat!'], ['cover', 'Cover me'], ['heal', 'Heal up'], ['grenade', 'Throw a grenade there'], ['bodies', 'Hide bodies next to me']]
+    ? [['follow', 'Follow me'], ['hold', 'Hold position'], ['move', 'Go there'], ['attack', 'Attack target'], ['assault', 'ATTACK ALL'], ['kill', 'Take him down (knife)'], ['stance', G.stance === 'stealth' ? 'Weapons free' : 'Back to stealth'], ['retreat', 'Retreat!'], ['cover', 'Cover me'], ['heal', 'Heal up'], ['grenade', 'Throw a grenade there'], ['bodies', 'Move bodies to me (click them)']]
     : [['follow', 'Follow me'], ['hold', 'Hold position'], ['move', 'Go there'], ['attack', 'Attack target'], ['assault', 'ATTACK ALL'], ['guard', 'Guard the exit'], ['hunt', 'Hunt intruders'], ['retreat', 'Retreat!'], ['reinforce', G.reinfT > 0 ? 'Respawn troops (' + Math.ceil(G.reinfT) + 's)' : 'Respawn troops'], ['alarm', G.alarmUsed ? 'Alarm used' : 'Sound the alarm'], ['heal', 'Heal up'], ['grenade', 'Throw a grenade there']];
 }
 // the spot you're pointing at, and whoever is standing closest to it
@@ -1263,19 +1263,8 @@ function runCmd(i) {
     case 'cover': giveOrder({ kind: 'cover' }); return;
     case 'assault': giveOrder({ kind: 'assault' }); return;
     case 'heal': giveOrder({ kind: 'heal' }); return;
-    case 'bodies': { // each free squadmate grabs the nearest body and drags it to a spot right next to you
-      const squad = myOps().filter(o => o.state === 'ok'); for (const o of squad) o.drag = null; const taken = new Set(OPS.filter(o => o.drag).map(o => o.drag.b));
-      let n = 0;
-      for (const o of squad) {
-        const b = L.bodies.filter(b => !taken.has(b) && !b.found && Math.hypot(b.x - P.x, b.y - P.y) < 900).sort((a, c) => Math.hypot(a.x - o.x, a.y - o.y) - Math.hypot(c.x - o.x, c.y - o.y))[0];
-        if (!b) break;
-        let spot = null;
-        for (let pass = 0; pass < 2 && !spot; pass++) for (let k = 0; k < 16 && !spot; k++) { const a = (n * 2.1 + k * .8) % TAU, r = 26 + (k % 2) * 12, x = P.x + Math.cos(a) * r, y = P.y + Math.sin(a) * r; if (!solidAt(x, y) && los(P.x, P.y, x, y) && (pass || !watched(x, y))) spot = { x, y }; } // out of sight if we can, otherwise just next to you
-        if (!spot) spot = { x: P.x, y: P.y };
-        taken.add(b); o.claim = null; o.drag = { b, x: spot.x, y: spot.y, t: 0, ordered: true }; n++;
-      }
-      msg(n ? 'SQUAD: "Moving ' + (n > 1 ? n + ' bodies' : 'the body') + ' to you."' : 'SQUAD: "No bodies near you to move."', n ? '#7fe0d0' : '#9aa58e');
-      return; }
+    case 'bodies': G.pick = { kind: 'body' }; mouse.down = false;
+      msg((touch.on ? 'TAP' : 'CLICK') + ' each body you want moved next to you' + (touch.on ? '' : ' · right-click / ESC when done'), '#ffd23f'); sfx('beep'); return;
     case 'grenade': {
       const tw = myOps().filter(o => o.state === 'ok' && o.nadesUsed < TIERS[o.tier].nades + 1).sort((a, b) => Math.hypot(a.x - pt.x, a.y - pt.y) - Math.hypot(b.x - pt.x, b.y - pt.y))[0];
       if (!tw) { msg('Nobody has a grenade left', '#86907a'); return; }
@@ -1296,6 +1285,10 @@ function runCmd(i) {
 }
 // target picking: whoever is under the cursor (or your finger)
 function pickHover(x, y) {
+  if (G.pick && G.pick.kind === 'body') { // picking bodies to move
+    let best = null, bd = 40; for (const b of L.bodies) { const d = Math.hypot(b.x - x, b.y - y); if (d < bd) { bd = d; best = b; } }
+    return best && { t: best, ok: !OPS.some(o => o.drag && o.drag.b === best), body: true };
+  }
   const kill = G.pick && (G.pick.kind === 'kill' || G.pick.kind === 'bkill');
   let best = null, bd = 46;
   for (const h of hostilesOf(P.team)) {
@@ -1307,6 +1300,20 @@ function pickHover(x, y) {
 function pickAt(x, y) {
   const k = G.pick && G.pick.kind; if (!k) return;
   const hv = pickHover(x, y);
+  if (k === 'body') {
+    if (!hv) { msg('No body there — ' + (touch.on ? 'tap' : 'click') + ' right on one', '#86907a'); return; }
+    if (!hv.ok) { msg('Someone is already moving that one', '#86907a'); return; }
+    const free = myOps().filter(o => o.state === 'ok' && !(o.drag && o.drag.ordered)).sort((a, c) => Math.hypot(a.x - hv.t.x, a.y - hv.t.y) - Math.hypot(c.x - hv.t.x, c.y - hv.t.y));
+    if (!free.length) { G.pick = null; msg('SQUAD: "Our hands are full — give us a second."', '#86907a'); return; }
+    const o = free[0], n = myOps().filter(x => x.drag && x.drag.ordered).length;
+    let spot = null;
+    for (let pass = 0; pass < 2 && !spot; pass++) for (let q = 0; q < 16 && !spot; q++) { const a = (n * 2.1 + q * .8) % TAU, r = 26 + (q % 2) * 12, sx = P.x + Math.cos(a) * r, sy = P.y + Math.sin(a) * r; if (!solidAt(sx, sy) && los(P.x, P.y, sx, sy) && (pass || !watched(sx, sy))) spot = { x: sx, y: sy }; } // out of sight if we can, otherwise just next to you
+    if (!spot) spot = { x: P.x, y: P.y };
+    o.claim = null; o.drag = { b: hv.t, x: spot.x, y: spot.y, t: 0, ordered: true };
+    msg(o.name + ': "Got it — bringing that body to you."', '#7fe0d0'); sfx('ok');
+    if (free.length === 1) G.pick = null; // everyone's busy now
+    return;
+  }
   if (!hv) { msg('No enemy there — ' + (touch.on ? 'tap' : 'click') + ' right on one', '#86907a'); return; }
   if (!hv.ok) { msg("Can't knife that — pick a soldier, officer, sniper or heavy", '#86907a'); return; }
   G.pick = null;
@@ -3221,11 +3228,11 @@ function drawMarks(now, inView) {
   if (G.pick && !touch.on) {
     const hv = pickHover(mouse.wx, mouse.wy);
     if (hv) {
-      const t = hv.t, col = hv.ok ? (G.pick.kind === 'bkill' ? '#b8e07a' : G.pick.kind === 'kill' ? '#4fd8ff' : '#ff3b3b') : '#777';
-      ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(t.x, t.y, t.r + 10 + Math.sin(now * 8) * 2, 0, TAU); ctx.stroke();
-      for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + now; ctx.beginPath(); ctx.moveTo(t.x + Math.cos(a) * (t.r + 14), t.y + Math.sin(a) * (t.r + 14)); ctx.lineTo(t.x + Math.cos(a) * (t.r + 22), t.y + Math.sin(a) * (t.r + 22)); ctx.stroke(); }
+      const t = hv.t, col = hv.body ? (hv.ok ? '#7fe0d0' : '#777') : hv.ok ? (G.pick.kind === 'bkill' ? '#b8e07a' : G.pick.kind === 'kill' ? '#4fd8ff' : '#ff3b3b') : '#777';
+      ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(t.x, t.y, (t.r || 12) + 10 + Math.sin(now * 8) * 2, 0, TAU); ctx.stroke();
+      for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + now; ctx.beginPath(); ctx.moveTo(t.x + Math.cos(a) * ((t.r || 12) + 14), t.y + Math.sin(a) * ((t.r || 12) + 14)); ctx.lineTo(t.x + Math.cos(a) * ((t.r || 12) + 22), t.y + Math.sin(a) * ((t.r || 12) + 22)); ctx.stroke(); }
       ctx.fillStyle = col; ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center';
-      ctx.fillText(hv.ok ? (G.pick.kind === 'bkill' ? 'BRAVO: TAKE DOWN' : G.pick.kind === 'kill' ? 'TAKE DOWN' : 'ATTACK') : "CAN'T KNIFE", t.x, t.y + t.r + 30);
+      if (hv.body) ctx.fillText(hv.ok ? 'MOVE BODY TO ME' : 'ALREADY MOVING', t.x, t.y + 42); else ctx.fillText(hv.ok ? (G.pick.kind === 'bkill' ? 'BRAVO: TAKE DOWN' : G.pick.kind === 'kill' ? 'TAKE DOWN' : 'ATTACK') : "CAN'T KNIFE", t.x, t.y + t.r + 30);
     }
   }
   if ((G.cmd.kind === 'kill' || G.cmd.kind === 'attack') && G.cmd.t && alive(G.cmd.t)) {
@@ -3649,7 +3656,7 @@ function menu() {
       <b>1–7 / WHEEL</b><span>weapons: SD pistol, MP5-SD, M4, shotgun, sniper, LMG, RPG</span>
       <b>E</b><span>takedown · revive · keypad · note</span>
       <b>Q · Z</b><span>throw grenade · switch frag / smoke / flashbang</span>
-      <b>R</b><span>orders menu: follow, hold, go there, attack, ATTACK ALL, knife, retreat, cover me, heal up, grenade, hide bodies next to you, guard exit, hunt, respawn troops, alarm (keys 1–9, 0, -, =)</span>
+      <b>R</b><span>orders menu: follow, hold, go there, attack, ATTACK ALL, knife, retreat, cover me, heal up, grenade, hide bodies (click the ones to move), guard exit, hunt, respawn troops, alarm (keys 1–9, 0, -, =)</span>
       <b>F · V</b><span>quick orders: hold / follow · stealth / weapons free</span>
       <b>T</b><span>radio SGT. KANE of BRAVO (Infiltrate): stick with me / go on without me, quiet / loud, fall back to camp, quiet takedown, hold position</span>
       <b>TAB · ESC</b><span>datapad · pause (M mutes)</span>
