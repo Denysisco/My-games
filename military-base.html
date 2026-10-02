@@ -149,7 +149,7 @@ const ETYPES = {
   camera:  { name: 'CAMERA',       hp: 25,   r: 9,  speed: 0,   stat: true, cam: true,                                        sight: 1.25, cone: .4,  alarm: 0,   color: '#9aa7b3' },
   turret:  { name: 'SENTRY GUN',   hp: 160,  r: 14, speed: 0,   dmg: 8,  ranged: true, rate: .3,  range: 450, bspeed: 620,  sight: 1.3,  cone: .6,  alarm: 1.5, stat: true, color: '#ff8a3d' },
   drone:   { name: 'RECON DRONE',  hp: 35,   r: 9,  speed: 150, dmg: 5,  ranged: true, rate: .7,  range: 260, bspeed: 440,  sight: 1.2,  cone: 1.2, alarm: 1.5, fly: true, color: '#5cc8ff' },
-  boss:    { name: 'IRONCLAD',     hp: 1600, r: 26, speed: 62,  dmg: 11, ranged: true, rate: .85, range: 720, bspeed: 480,  sight: 1.5,  cone: 3.2, alarm: 0,   boss: true, color: '#c8a24a' },
+  boss:    { name: 'IRONCLAD',     hp: 2100, r: 26, speed: 68,  dmg: 13, ranged: true, rate: .85, range: 720, bspeed: 480,  sight: 1.5,  cone: 3.2, alarm: 0,   boss: true, color: '#c8a24a' },
 };
 const NOBODY = new Set(['camera', 'turret', 'drone']); // these leave wreckage, not bodies
 
@@ -325,7 +325,7 @@ const LEVELS = [
          [56,3,6,6,'helipad'],[55,2,8,30,'tarmac'],[56,24,2,2,'crate'],[60,14,2,2,'crate']],
   doors: [[9,30,'D'],[13,3,'D'],[34,3,'D'],[24,7,'Y'],[42,7,'h'],[29,28,'B',0],[30,28,'B',0],[22,32,'D'],[42,32,'D'],[48,16,'B',1],[48,17,'B',1],[54,16,'D'],
           [11,12,'D'],[11,22,'D'],[40,30,'D']],
-  player: [4,34], exit: [59,6], exitName: 'EXTRACTION HELI', exitNeedsBlack: true, core: true, coreKey: [31,35],
+  player: [4,34], exit: [59,6], exitName: 'EXTRACTION HELI', exitNeedsBlack: true, core: true, coreKey: [31,35], specRoom: 5, // the silo itself: only Spec-Ops patrol in there
   terminals: [[27,30,0]],
   notes: [
     [31,2,'LAUNCH CONTROL — LOG','Silo gate code (first half):\n\n{c0a} _ _\n\nIRONCLAD is guarding the silo. If it goes down, the base self-destruct arms automatically.'],
@@ -334,7 +334,7 @@ const LEVELS = [
   ],
   items: [[16,2,'G'],[18,2,'a'],[20,5,'p'],[44,4,'y'],[38,5,'W'],[3,36,'H'],[11,2,'H'],[11,30,'q'],[21,37,'H'],[28,36,'k'],[51,18,'H'],[43,10,'a'],[17,24,'n'],[42,25,'H'],[16,10,'f']],
   enemies: [[11,6,'guard',[[11,2],[11,28]]],[12,17,'dog'],[20,3,'guard',180],[30,5,'officer',180],[33,1,'camera',135],[15,2,'turret',0],
-            [40,3,'guard',0],[46,5,'guard',180],[38,18,'boss'],[22,10,'heavy',0],[40,26,'guard',180],[18,26,'guard',[[16,26],[26,26]]],
+            [40,3,'guard',0],[46,5,'guard',180],[38,18,'boss'],[26,13,'spec',[[26,13],[36,13],[36,22],[26,22]]],[18,10,'spec',[[18,10],[18,25]]],[43,25,'spec',[[43,25],[43,10]]],[24,26,'spec',[[16,26],[46,26]]],[24,9,'spec',90],
             [30,30,'guard',[[14,30],[52,30]]],[42,31,'guard',180],[27,34,'heavy',180],[36,35,'guard','sleep'],[48,35,'guard',180],
             [51,15,'guard',180],[57,20,'sniper',270],[10,1,'camera',90],[53,31,'camera',180],[62,31,'camera',225],[60,28,'guard',180],[58,13,'guard',[[56,13],[61,13]]],[24,6,'guard',[[17,6],[32,6]]],[44,34,'guard',[[44,34],[52,34]]]],
   spawns: [[4,31],[11,1],[12,31],[60,30]],
@@ -421,7 +421,8 @@ function buildLevel(def, codes, gd) {
     const posts = 2 + (li >= 2 ? 1 : 0) + (li >= 4 ? 1 : 0), rovers = ['guard', 'spec', 'guard', li >= 3 ? 'spec' : 'guard'];
     // roamers need a big open area to walk; the rest become Spec-Ops posts
     const roam = spots.filter(p => p[2] >= Math.min(4, def.rooms.length - 1)).slice(0, rovers.length), rest = spots.filter(p => !roam.includes(p));
-    roam.forEach(([x, y], k) => L.enemies.push(makeEnemy(rovers[k], (x + .5) * TS, (y + .5) * TS, 'rover', gd)));
+    const inSpec = (x, y) => { const r = def.rooms[def.specRoom]; return r && x >= r[0] && x < r[0] + r[2] && y >= r[1] && y < r[1] + r[3]; };
+    roam.forEach(([x, y], k) => L.enemies.push(makeEnemy(inSpec(x, y) ? 'spec' : rovers[k], (x + .5) * TS, (y + .5) * TS, 'rover', gd)));
     rest.slice(0, posts).forEach(([x, y]) => L.enemies.push(makeEnemy('spec', (x + .5) * TS, (y + .5) * TS, Math.floor(rnd() * 4) * 90, gd)));
     L.roomVisit = def.rooms.map(() => 0); L.hot = null; L.zones = []; for (const [rx, ry, rw, rh] of def.rooms) { const nx = Math.ceil(rw / 10), ny = Math.ceil(rh / 10); for (let a = 0; a < nx; a++) for (let b = 0; b < ny; b++) { const x0 = rx + Math.floor(a * rw / nx), y0 = ry + Math.floor(b * rh / ny); L.zones.push([x0, y0, rx + Math.floor((a + 1) * rw / nx) - x0, ry + Math.floor((b + 1) * rh / ny) - y0]); } } // big yards are swept in chunks
     L.teamVisit = { A: L.zones.map(() => -999), D: L.zones.map(() => -999) }; L.sweep = {};
@@ -1462,7 +1463,7 @@ function planRover(e) {
   const rooms = L.def.rooms, w = L.w, rd = e.rpf || (e.rpf = new Uint16Array(L.w * L.h)); bfs(tileIdx(e), enemyPassable, rd);
   const hot = L.hot && ALERTS[G.alert].lvl >= 1 && G.time - L.hot.t < 90 ? L.hot : null;
   const cand = [];
-  rooms.forEach(([rx, ry, rw, rh], r) => { for (let s = 0, ns = rw * rh >= 150 ? 3 : 1; s < ns; s++) { // big yards get several checkpoints
+  rooms.forEach(([rx, ry, rw, rh], r) => { if (r === L.def.specRoom && e.type !== 'spec') return; for (let s = 0, ns = rw * rh >= 150 ? 3 : 1; s < ns; s++) { // big yards get several checkpoints
     let cx = -1, cy = -1; for (let k = 0; k < 8; k++) { const x = rx + 1 + Math.floor(Math.random() * Math.max(1, rw - 2)), y = ry + 1 + Math.floor(Math.random() * Math.max(1, rh - 2)), j = y * w + x; if (L.t[j] === 1 && rd[j] >= 4 && rd[j] <= 85) { cx = x; cy = y; break; } }
     if (cx < 0) continue; const i = cy * w + cx;
     let sc = Math.min(120, G.time - (L.roomVisit[r] || 0)) - rd[i] * .4 + Math.random() * 15;
@@ -1772,12 +1773,12 @@ function bossAI(e, dt) {
   if (e.pat === 'walk') {
     const f = flowDir(e); if (f && dist > 160) { mvx = f.x; mvy = f.y; } else if (see && dist > 160) { mvx = dx / dist; mvy = dy / dist; }
     e.angle = turnTo(e.angle, toA, 3 * dt);
-    if (see && e.cd <= 0) { enemyFire(e, toA + rand(-.08, .08), T.bspeed, T.dmg * dmul); e.cd = rage ? .6 : .85; sfx('eshot'); }
+    if (see && e.cd <= 0) { enemyFire(e, toA + rand(-.08, .08), T.bspeed, T.dmg * dmul); e.cd = rage ? .5 : .75; sfx('eshot'); }
     if (e.patT <= 0) {
       const opts = ['burst', 'rockets', 'charge']; if (rage) opts.push('rockets', 'charge');
       e.pat = see ? pick(opts) : 'walk'; e.patT = e.pat === 'burst' ? 1.6 : e.pat === 'rockets' ? 1.3 : 1.1;
       if (e.pat === 'charge') { e.chargeT = .75; sfx('charge'); msg('IRONCLAD IS CHARGING!', '#ff3b3b'); }
-      if (e.pat === 'burst') e.burst = rage ? 12 : 8;
+      if (e.pat === 'burst') e.burst = rage ? 14 : 10;
       if (e.pat === 'rockets') e.burst = rage ? 4 : 3;
       e.burstT = 0;
     }
@@ -1809,8 +1810,8 @@ function bossAI(e, dt) {
     }
   }
   if (rage && e.summonT <= 0) {
-    e.summonT = 13;
-    if (L.enemies.filter(o => o.type === 'drone').length < 4) { const d = makeEnemy('drone', e.x + rand(-30, 30), e.y + rand(-30, 30), null, gd()); d.state = 'combat'; d.target = t; L.enemies.push(d); msg('IRONCLAD LAUNCHED A DRONE', '#5cc8ff'); }
+    e.summonT = 10;
+    if (L.enemies.filter(o => o.type === 'drone').length < 5) { const d = makeEnemy('drone', e.x + rand(-30, 30), e.y + rand(-30, 30), null, gd()); d.state = 'combat'; d.target = t; L.enemies.push(d); msg('IRONCLAD LAUNCHED A DRONE', '#5cc8ff'); }
   }
   if (dist < e.r + t.r + 4 && e.cd <= 0) { hurtAny(t, 14 * dmul, src); e.cd = .8; }
   moveCircle(e, mvx * spd * dt, mvy * spd * dt);
