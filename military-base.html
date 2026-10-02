@@ -122,7 +122,7 @@ const ALERTS = {
 // noise = how far guards hear it (silenced guns barely make a sound)
 const WEAPONS = {
   sdpistol: { name: 'SD PISTOL',  short: 'SDP', rate: .3,  dmg: 34, spread: .03,  pellets: 1, speed: 860,  ammo: null,      noise: 70,  kick: 2,   len: 16, silenced: true },
-  smgsd:    { name: 'MP5-SD',     short: 'MP5', rate: .08, dmg: 13, spread: .08,  pellets: 1, speed: 880,  ammo: 'smg',     noise: 150, kick: 2.2, len: 19, silenced: true },
+  smgsd:    { name: 'MP5-SD',     short: 'MP5', rate: .075, dmg: 15, spread: .065, pellets: 1, speed: 880,  ammo: 'smg',     noise: 150, kick: 1.9, len: 19, silenced: true },
   rifle:    { name: 'M4 RIFLE',   short: 'M4',  rate: .11, dmg: 21, spread: .05,  pellets: 1, speed: 980,  ammo: 'rifle',   noise: 560, kick: 3,   len: 23 },
   shotgun:  { name: 'SHOTGUN',    short: 'SG',  rate: .75, dmg: 14, spread: .28,  pellets: 8, speed: 740,  ammo: 'shells',  noise: 600, kick: 7,   len: 20 },
   sniper:   { name: 'SNIPER',     short: 'SNP', rate: 1.2, dmg: 140, spread: .004, pellets: 1, speed: 1700, ammo: 'sniper', noise: 90,  kick: 9,   len: 31, pierce: 1, scope: true, silenced: true }, // suppressed: guards barely hear it
@@ -1424,6 +1424,11 @@ function killEnemy(e, src) {
   const byP = src && src.who === P;
   if (byP) G.stats.kills++;
   if (G.cmd && G.cmd.t === e) { G.cmd = { kind: 'follow' }; if (src && src.who && src.who.op && src.who.team === P.team) msg(src.who.name + ': "Target down."', G.mode === 'op' ? '#7fe0d0' : '#d6d0a0'); }
+  if (e.type === 'secop') msg(G.mode === 'def' ? 'The intruders killed the security operator — the cameras are unmanned!' : 'Security operator down — nobody is watching the cameras', G.mode === 'def' ? '#ff3b3b' : '#3ddc84');
+  if (T.cam && (L.secOps || []).some(x => x !== e && L.enemies.includes(x) && x.hp > 0)) { // the operator sees a feed go dark and sends someone to look
+    msg('SECURITY: "Camera ' + (L.enemies.filter(c => ETYPES[c.type].cam).indexOf(e) + 1) + ' just went dark — somebody check it!"', '#ff8a3d');
+    let n = 0; for (const o of L.enemies.filter(o => !ETYPES[o.type].stat && !ETYPES[o.type].post && !o.station && o.state !== 'combat' && !o.sleep).sort((a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y))) { if (n++ >= 2) break; o.state = 'search'; o.searchT = 0; o.sus = 1; o.invX = e.x; o.invY = e.y; guardPathTo(o, e.x, e.y); }
+  }
   if (NOBODY.has(e.type)) { burst(e.x, e.y, '#ffb347', 20, 220, .5, 4); burst(e.x, e.y, '#888', 12, 140, .8, 4); if (!(src && src.silent)) sfx('boom', .6); scorch(e.x, e.y, 22); }
   else {
     burst(e.x, e.y, '#9b1026', src && src.silent ? 8 : 22, 200, .6, 4); splat(e.x, e.y, '#5a0a12', src && src.silent ? 4 : 9);
@@ -1945,6 +1950,16 @@ function coneMap() {
       if (sightLine(e.x, e.y, px, py)) m[y * L.w + x] = T.cam ? 2 : Math.max(m[y * L.w + x], 1);
     }
   }
+  if (G.mode === 'def') { // value 4: places the army knows guards stand or walk (memory), and the space right round any guard
+    const mark = (i) => { if (m[i] === 0) m[i] = 4; };
+    const disc = (x0, y0, rt) => { const cx = Math.floor(x0 / TS), cy = Math.floor(y0 / TS); for (let y = cy - rt; y <= cy + rt; y++) for (let x = cx - rt; x <= cx + rt; x++) if (x >= 0 && y >= 0 && x < L.w && y < L.h && L.t[y * L.w + x] !== 0 && Math.hypot(x - cx, y - cy) <= rt) mark(y * L.w + x); };
+    for (const e of L.enemies) if (!ETYPES[e.type].stat && !ETYPES[e.type].boss && !e.sleep && e.hp > 0 && !(e.stun > 0)) disc(e.x, e.y, 2);
+    for (const [e, mm] of L.aMem || []) {
+      if (ETYPES[e.type].cam) continue;
+      disc(mm.hx ?? mm.x, mm.hy ?? mm.y, 3);
+      if (mm.route) mm.route.forEach((p, k) => { const q = mm.route[(k + 1) % mm.route.length], n = Math.ceil(Math.hypot(q.x - p.x, q.y - p.y) / TS); for (let j = 0; j <= n; j++) disc(p.x + (q.x - p.x) * j / Math.max(1, n), p.y + (q.y - p.y) * j / Math.max(1, n), 1); });
+    }
+  }
   if (G.mode === 'def') for (const sn of L.aSeen || []) { // the army remembers where it last saw you and your troops, and keeps out of their sight
     if (G.time - sn.t > 15) continue;
     const r = Math.ceil(sn.r / TS), cx = Math.floor(sn.x / TS), cy = Math.floor(sn.y / TS);
@@ -1972,7 +1987,7 @@ function stealthPath(o, x, y) {
     const xx = i % w;
     for (const nb of [xx > 0 ? i - 1 : -1, xx < w - 1 ? i + 1 : -1, i - w, i + w]) {
       if (nb < 0 || nb >= n || !pass(nb)) continue;
-      const nd = d + 1 + (cm[nb] === 2 ? (G.mode === 'def' ? 80 : 40) : cm[nb] === 3 ? 34 : cm[nb] ? (G.mode === 'def' ? 18 : 14) : 0); // walking through a camera's view costs the most (the army treats cameras like a minefield)
+      const nd = d + 1 + (cm[nb] === 2 ? (G.mode === 'def' ? 80 : 40) : cm[nb] === 3 ? 34 : cm[nb] === 4 ? 5 : cm[nb] ? (G.mode === 'def' ? 18 : 14) : 0); // walking through a camera's view costs the most (the army treats cameras like a minefield)
       if (nd < dist[nb] && nd < 65000) { dist[nb] = nd; push(nb, nd); }
     }
   }
@@ -2029,16 +2044,25 @@ function exposedTo(o) {
   return null;
 }
 // the most urgent visible enemy for an operator
+const segPtDist = (px, py, ax, ay, bx, by) => { const dx = bx - ax, dy = by - ay, l = dx * dx + dy * dy || 1, u = clamp(((px - ax) * dx + (py - ay) * dy) / l, 0, 1); return Math.hypot(px - ax - dx * u, py - ay - dy * u); };
 function opScan(o, stealth) {
   const T = TIERS[o.tier];
   let best = null, bs = 1e9;
   for (const h of hostilesOf(o.team)) {
-    if (ETYPES[h.type] && ETYPES[h.type].cam && stealth && !(G.mode === 'op' && o.team === 'A' && !h.off && (o.ally2 && Math.hypot(h.x - o.x, h.y - o.y) < 420 || (h.seen && h.seen.team === o.team) || h.sus > .08))) continue; // BRAVO quietly shoots out cameras it can see // in stealth, only shoot out a camera that has started watching us
+    if (ETYPES[h.type] && ETYPES[h.type].cam && stealth) { // shooting out cameras quietly: only with a clear line (no guard in the way), and only when it's worth it
+      const dc = Math.hypot(h.x - o.x, h.y - o.y), watching = (h.seen && h.seen.team === o.team) || h.sus > .02, opAlive = (L.secOps || []).some(x => L.enemies.includes(x) && x.hp > 0);
+      const clear = !L.enemies.some(g => g !== h && !ETYPES[g.type].stat && g.hp > 0 && segPtDist(g.x, g.y, o.x, o.y, h.x, h.y) < 34);
+      const want = o.team === 'A' && !h.off && clear && dc < 440 && (watching || (!opAlive && (G.mode === 'def' || (o.ally2 && dc < 420)))); // nobody watching the feeds: take them all out; otherwise only one that's picking us up
+      if (!want) continue;
+    }
     const d = Math.hypot(h.x - o.x, h.y - o.y); if (d > T.sight) continue;
     let w = d;
     if (isGuard(h)) {
       const threat = (h.state === 'combat' && h.target && h.target.team === o.team) || (h.susOn && h.susOn.team === o.team && h.sus > .45);
-      if (stealth && !threat) continue;           // in stealth we only shoot someone who is about to blow our cover
+      const opTarget = G.mode === 'def' && o.team === 'A' && h.type === 'secop' && d < 440;
+      const camShot = ETYPES[h.type] && ETYPES[h.type].cam; // a camera that made it past the check above is one we mean to shoot out
+      if (stealth && !threat && !opTarget && !camShot) continue;           // in stealth we only shoot someone who is about to blow our cover (the army always takes a shot at the camera operator)
+      if (opTarget) w *= .15;
       if (threat) w *= .5;
       if (h.state === 'combat' && ETYPES[h.type].alarm && h.alarmT > .3 && ALERTS[G.alert].lvl < 2) w *= .3; // stop him before he gets on the radio
     }
@@ -2203,6 +2227,8 @@ function updateOp(o, dt) {
       for (const [g, part] of n.gives) { SQ.know[g] = SQ.know[g] || {}; SQ.know[g][part] = true; }
       msg('Intruders found a note: "' + n.title + '"' + (n.gives.some(([g]) => knows(g)) ? ' — they have the code!' : ''), '#ff8a3d'); o.planT = 0;
     }
+    if (o.goal && o.goal.console && Math.hypot(o.goal.console.x - o.x, o.goal.console.y - o.y) < 36) { if (!o.goal.console.used) { useConsole(o.goal.console); msg('The intruders shut down every camera at the security console!', '#ff3b3b'); } o.planT = 0; }
+    if (o.goal && o.goal.op) { const op = o.goal.op; if (!L.enemies.includes(op) || op.hp <= 0) o.planT = 0; else { o.goal.x = op.x; o.goal.y = op.y; } }
     if (o.goal && o.goal.term && !o.goal.term.solved && Math.hypot(o.goal.term.x - o.x, o.goal.term.y - o.y) < 30) {
       o.typing = [3.5, 3.5, 3, 2.2, 1.4][o.tier]; msg('The intruders are typing a code at a keypad — STOP THEM!', '#ff3b3b'); sfx('beep'); return;
     }
@@ -2361,13 +2387,13 @@ function updateOp(o, dt) {
       f = near || (o.rush && los(o.x, o.y, gx, gy)) ? { x: (o.claim.x - o.x) / Math.max(1, Math.hypot(o.claim.x - o.x, o.claim.y - o.y)), y: (o.claim.y - o.y) / Math.max(1, Math.hypot(o.claim.x - o.x, o.claim.y - o.y)) } : (stealthPath(o, gx, gy) || { x: (gx - o.x) / toGoal, y: (gy - o.y) / toGoal });
       // about to step into a lit cone? crouch and wait for the guard to look away (up to 5s), then go anyway
       const cm = coneMap(), here = cm[tileIdx(o)], ahead = cm[tileIdx({ x: o.x + f.x * 26, y: o.y + f.y * 26 })];
-      if (!near && !o.rush && !here && ahead && (o.waitT || 0) < 5) { o.waitT = (o.waitT || 0) + dt; f = { x: 0, y: 0 }; o.crouch = true; }
+      if (!near && !o.rush && !(here && here < 3) && ahead && ahead < 3 && (o.waitT || 0) < 5) { o.waitT = (o.waitT || 0) + dt; f = { x: 0, y: 0 }; o.crouch = true; }
       else if (!ahead) o.waitT = Math.max(0, (o.waitT || 0) - dt * .5);
     } else if (toGoal < 70 && los(o.x, o.y, gx, gy)) f = { x: (gx - o.x) / toGoal, y: (gy - o.y) / toGoal };
     else if (stealthy && !o.drag && ((!friendly && (o.role === 'lead' || toGoal > 70)) || (o.cmdr && !G.allyJoin) || (o.ally2 && !o.cmdr))) { // BRAVO's soldiers pick their own way around the flashlights too
       f = stealthPath(o, gx, gy) || opPath(o, gx, gy) || { x: (gx - o.x) / toGoal, y: (gy - o.y) / toGoal };
       const cm = coneMap(), here = cm[tileIdx(o)], ahead = cm[tileIdx({ x: o.x + f.x * 26, y: o.y + f.y * 26 })];
-      if (!here && ahead && ahead !== 3 && (o.lwaitT || 0) < (G.mode === 'def' ? 5 : 3.5)) { o.lwaitT = (o.lwaitT || 0) + dt; f = { x: 0, y: 0 }; o.crouch = true; } // let him look away first
+      if (!(here && here < 3) && ahead && ahead < 3 && (o.lwaitT || 0) < (G.mode === 'def' ? 5 : 3.5)) { o.lwaitT = (o.lwaitT || 0) + dt; f = { x: 0, y: 0 }; o.crouch = true; } // let him look away first
       else if (!ahead) o.lwaitT = Math.max(0, (o.lwaitT || 0) - dt * .5);
     }
     else f = opPath(o, gx, gy) || { x: (gx - o.x) / toGoal, y: (gy - o.y) / toGoal };
@@ -2484,6 +2510,11 @@ function intruderOrders(lead) {
   const mates = OPS.filter(o => o.team === 'A' && o.sq === lead.sq && o.role === 'follow' && o.state === 'ok');
   const setOrder = v => { SQ.orders[lead.sq] = v; }, cur = SQ.orders[lead.sq];
   if (!mates.length) { setOrder(null); return; }
+  if (lead.goal && lead.goal.op && L.enemies.includes(lead.goal.op) && lead.goal.op.hp > 0 && Math.hypot(lead.goal.op.x - lead.x, lead.goal.op.y - lead.y) < 440 && sightLine(lead.x, lead.y, lead.goal.op.x, lead.goal.op.y)) {
+    setOrder({ kind: 'attack', t: lead.goal.op }); lead.target = lead.goal.op;
+    if (G.time - (SQ.sayT || -9) > 5) { SQ.sayT = G.time; msg(lead.name + ': "Operator in sight — drop him, blind their cameras!"', '#ff8a3d'); }
+    return;
+  }
   if (G.mode === 'def' && G.spottedSq && !G.spottedSq[lead.sq] && G.spottedSq[1 - lead.sq] && !(lead.assist && G.time < lead.assist.until)) { // the other squad is in a firefight nearby: swing round and hit the defenders from behind
     const other = OPS.find(x => x.team === 'A' && x.sq !== lead.sq && x.role === 'lead' && x.state === 'ok'), th = other && other.target && alive(other.target) ? other.target : null;
     if (th && Math.hypot(th.x - lead.x, th.y - lead.y) < 700) {
@@ -2551,7 +2582,7 @@ function dangerDist(o) {
     const [d, i] = pop(); if (d > dist[i]) continue; const xx = i % w;
     for (const nb of [xx > 0 ? i - 1 : -1, xx < w - 1 ? i + 1 : -1, i - w, i + w]) {
       if (nb < 0 || nb >= n || !pass(nb)) continue;
-      const nd = d + 1 + (cm[nb] === 2 ? 30 : cm[nb] === 3 ? 14 : cm[nb] ? 6 : 0);
+      const nd = d + 1 + (cm[nb] === 2 ? 30 : cm[nb] === 3 ? 14 : cm[nb] === 4 ? 3 : cm[nb] ? 6 : 0);
       if (nd < dist[nb] && nd < 65000) { dist[nb] = nd; push(nd, nb); }
     }
   }
@@ -2563,6 +2594,11 @@ function planIntruder(o) {
   const pickGoal = avoid => {
     let goal = null, gdist = 65535;
     const free = (x, y) => !(avoid && taken && Math.hypot(taken.x - x, taken.y - y) < 4);
+    if (G.mode === 'def') { // blind the base first: kill the camera operator, then shut the cameras off at the console
+      const op = (L.secOps || []).find(x => L.enemies.includes(x) && x.hp > 0);
+      if (op && free(op.x, op.y) && reach[tileIdx(op)] !== 65535) return { x: op.x, y: op.y, op };
+      if (!L.camsOff && L.enemies.some(e => ETYPES[e.type].cam && !e.off)) for (const c of L.consoles) if (c.kind === 'cams' && !c.used && free(c.x, c.y) && reach[tileIdx(c)] !== 65535) return { x: c.x, y: c.y, console: c };
+    }
     for (const it of L.items) if (ITEMS[it.k].key && !SQ.keys[ITEMS[it.k].key] && free(it.x, it.y)) { const d = reach[tileIdx(it)]; if (d < gdist) { gdist = d; goal = { x: it.x, y: it.y, key: true }; } }
     if (!goal && reach[tileIdx(L.exit)] === 65535) {
       for (const t of L.terminals) if (!t.solved && knows(t.gate) && free(t.x, t.y)) { const d = reach[tileIdx(t)]; if (d < gdist) { gdist = d; goal = { x: t.x, y: t.y, term: t }; } }
@@ -2754,10 +2790,17 @@ function update(dt) {
   }
   for (let i = smokes.length - 1; i >= 0; i--) { const s = smokes[i]; s.life -= dt; s.r = Math.min(s.maxr, s.r + dt * 160); if (s.life <= 0) smokes.splice(i, 1); }
   if (G.state !== 'play') return;
-  // what the army knows: where it last saw you and your troops
+  // what the army knows: where it last saw you and your troops, and every guard and camera it has laid eyes on
   if (G.mode === 'def' && (L.aSeenT = (L.aSeenT || 0) - dt) <= 0) {
-    L.aSeenT = .25; L.aSeen = L.aSeen || [];
+    L.aSeenT = .25; L.aSeen = L.aSeen || []; L.aMem = L.aMem || new Map();
     const army = OPS.filter(o => o.team === 'A' && o.state === 'ok');
+    for (const e of L.enemies) {
+      if (e.hp <= 0 || ETYPES[e.type].boss) continue;
+      if (army.some(a => Math.hypot(a.x - e.x, a.y - e.y) < 640 && sightLine(a.x, a.y, e.x, e.y))) {
+        L.aMem.set(e, { x: e.x, y: e.y, hx: e.hx, hy: e.hy, t: G.time, route: e.route || null });
+      }
+    }
+    for (const e of L.aMem.keys()) if (!L.enemies.includes(e) || e.hp <= 0) L.aMem.delete(e);
     for (const d of [P, ...OPS.filter(o => o.team === 'D' && o.state === 'ok')]) {
       if (d === P && P.dead) continue;
       if (army.some(a => Math.hypot(a.x - d.x, a.y - d.y) < 640 && sightLine(a.x, a.y, d.x, d.y))) {
@@ -2768,7 +2811,7 @@ function update(dt) {
   }
   // who has eyes on the intruders (Defend HUD)
   if (G.mode === 'def') for (const o of OPS) if (o.team === 'A' && o.state === 'ok') {
-    if ((!P.dead && Math.hypot(o.x - P.x, o.y - P.y) < 520 && sightLine(P.x, P.y, o.x, o.y)) || L.enemies.some(e => e.seen === o) || OPS.some(r => r.team === 'D' && r.target === o)) { o.spottedT = G.time; SQ.seenT = G.time; SQ.lastX = o.x; SQ.lastY = o.y;
+    if ((!P.dead && Math.hypot(o.x - P.x, o.y - P.y) < 520 && sightLine(P.x, P.y, o.x, o.y)) || L.enemies.some(e => e.seen === o && (e.state === 'combat' || (e.sus || 0) > .6)) || OPS.some(r => r.team === 'D' && r.target === o)) { // a guard or camera only gives them away once it has properly clocked them, not on a glance o.spottedT = G.time; SQ.seenT = G.time; SQ.lastX = o.x; SQ.lastY = o.y;
       if (G.time - (o.radioT || -9) > 2) { o.radioT = G.time; for (const e of L.enemies) if (!ETYPES[e.type].stat && e.state !== 'combat' && !e.sleep && Math.hypot(e.x - o.x, e.y - o.y) < 650) { e.state = 'search'; e.searchT = 0; e.sus = 1; e.invX = o.x; e.invY = o.y; guardPathTo(e, o.x, o.y); } } }
   }
   // reinforcements during an alarm
