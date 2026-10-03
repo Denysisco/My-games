@@ -3029,7 +3029,7 @@ function startDef(i, diff, carry) {
       const o = makeOp(m.name, 'A', m.lead ? 'lead' : 'follow', tier, (tile % L.w + .5) * TS, ((tile / L.w | 0) + .5) * TS, 'smgsd');
       o.sq = m.sq; o.maxhp = o.hp = Math.round(o.maxhp * (m.lead ? LEADER_HP * 2 : TROOP_HP)); if (m.lead) o.dmgX = 2; // the two original leaders: twice as tough and twice the punch // plate carriers: leaders wear the heavy stuff
       if (prev && prev[k]) { const p = prev[k]; o.state = p.state === 'ok' ? 'ok' : 'dead'; o.role = p.role; if (p.role === 'lead' && !m.lead) { o.maxhp = o.hp = Math.round(o.maxhp * 1.3); o.dmgX = 1.3; } } // survivors come into each new sector fully healed
-      o.maxhp = o.hp = Math.round(o.maxhp * 1.1 * (diff <= 2 ? 1.15 : 1)); o.dmgX = (o.dmgX || 1) * 1.08 * (diff >= 4 ? .85 : 1); // a little tougher across the board; extra HP on EASY/MID, 15% less punch on ELITE (balance)
+      o.maxhp = o.hp = Math.round(o.maxhp * 1.1 * (diff <= 2 ? 1.15 : diff >= 4 ? .945 : 1)); o.dmgX = (o.dmgX || 1) * 1.08 * (diff >= 4 ? .85 : 1); // a little tougher across the board; extra HP on EASY/MID, 15% less punch on ELITE (balance)
       collide(o); OPS.push(o);
     });
   }
