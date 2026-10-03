@@ -150,7 +150,7 @@ const ETYPES = {
   camera:  { name: 'CAMERA',       hp: 25,   r: 9,  speed: 0,   stat: true, cam: true,                                        sight: 1.25, cone: .4,  alarm: 0,   color: '#9aa7b3' },
   turret:  { name: 'SENTRY GUN',   hp: 160,  r: 14, speed: 0,   dmg: 8,  ranged: true, rate: .3,  range: 450, bspeed: 620,  sight: 1.3,  cone: .6,  alarm: 1.5, stat: true, color: '#ff8a3d' },
   drone:   { name: 'RECON DRONE',  hp: 35,   r: 9,  speed: 150, dmg: 5,  ranged: true, rate: .7,  range: 260, bspeed: 440,  sight: 1.2,  cone: 1.2, alarm: 1.5, fly: true, color: '#5cc8ff' },
-  boss:    { name: 'GENERAL VOSS', hp: 1150, r: 14, speed: 78,  dmg: 12, ranged: true, rate: .1,  range: 560, bspeed: 720,  sight: 1.4,  cone: 1.3, alarm: 0,   boss: true, armor: .25, color: '#3f4a33' }, // the base commander: dress uniform over body armour
+  boss:    { name: 'GENERAL VOSS', hp: 2000, r: 14, speed: 78,  dmg: 12, ranged: true, rate: .1,  range: 560, bspeed: 720,  sight: 1.4,  cone: 1.3, alarm: 0,   boss: true, armor: .25, color: '#3f4a33' }, // the base commander: dress uniform over body armour
 };
 const NOBODY = new Set(['camera', 'turret', 'drone']); // these leave wreckage, not bodies
 
@@ -318,22 +318,24 @@ const LEVELS = [
 },
 {
   name: 'SECTOR 5', sub: "THE GENERAL'S OFFICE", theme: 'base', base: 'YELLOW', w: 64, h: 40,
-  rooms: [[1,30,8,8],[10,1,3,31],[10,29,44,3],[14,1,20,6],[35,1,13,6],[14,8,34,20],[14,33,16,5],[31,33,23,5],[49,12,5,10],[55,2,8,30]],
-  // the command floor wraps round the General's walled office in the middle
-  walls: [[10,12,3,1],[10,22,3,1],[40,29,1,3],[23,12,16,1],[23,23,16,1],[23,12,1,12],[38,12,1,12]],
-  deco: [[24,13,14,10,'rug'],[27,15,7,1,'desk'],[28,19,5,2,'holo'],[24,14,1,3,'rack'],[37,14,1,3,'rack'],
+  rooms: [[1,30,8,8],[10,1,3,31],[10,29,44,3],[14,1,20,6],[35,1,13,6],[14,8,34,20],[14,33,16,5],[31,33,23,5],[49,12,5,10],[55,4,8,24]],
+  walls: [[10,12,3,1],[10,22,3,1],[40,29,1,3]],
+  deco: [[55,4,8,24,'rug'],[57,4,4,1,'monitors'],[57,8,4,1,'desk'],[57,18,4,3,'holo'],[62,10,1,4,'rack'],
+         [29,15,4,6,'missile'],[37,15,3,3,'holo'],[20,11,2,2,'pillar'],[40,11,2,2,'pillar'],[20,23,2,2,'pillar'],[40,23,2,2,'pillar'],
+         [17,16,1,4,'sandbag'],[44,16,1,4,'sandbag'],[25,12,3,1,'sandbag'],[35,12,3,1,'sandbag'],[25,23,3,1,'sandbag'],[35,23,3,1,'sandbag'],
          [22,1,8,1,'monitors'],[16,4,6,1,'desk'],[25,4,6,1,'desk'],[38,1,8,1,'monitors'],[38,4,6,1,'desk'],[47,1,1,3,'rack'],[36,5,2,1,'crate'],
-         [20,11,2,2,'pillar'],[40,11,2,2,'pillar'],[20,23,2,2,'pillar'],[40,23,2,2,'pillar'],[17,16,1,4,'sandbag'],[44,16,1,4,'sandbag'],
-         [13,33,1,3,'rack'],[16,34,3,3,'gen'],[23,34,3,3,'gen'],[33,34,2,1,'bunk'],[37,34,2,1,'bunk'],[45,36,2,1,'bunk'],
-         [56,3,6,6,'helipad'],[55,2,8,30,'tarmac'],[56,24,2,2,'crate'],[60,14,2,2,'crate'],[57,10,2,1,'crate'],[60,20,2,1,'crate']],
-  doors: [[9,30,'D'],[13,3,'D'],[34,3,'D'],[24,7,'Y'],[42,7,'h'],[29,28,'B',0],[30,28,'B',0],[22,32,'D'],[42,32,'D'],[48,16,'B',1],[48,17,'B',1],[54,16,'D'],
-          [11,12,'D'],[11,22,'D'],[40,30,'D'],[30,12,'D'],[30,23,'D']],
-  player: [4,34], exit: [59,6], exitName: 'EXTRACTION HELI', exitNeedsBlack: true, core: true, coreKey: [31,35], secRooms: [[14, 1, 20, 6], [35, 1, 13, 6]], smartSec: true, specRoom: 5, // only Spec-Ops patrol the command floor
-  terminals: [[27,30,0]],
+         [13,33,1,3,'rack'],[16,34,3,3,'gen'],[23,34,3,3,'gen'],[33,34,2,1,'bunk'],[37,34,2,1,'bunk'],[45,36,2,1,'bunk'],[50,20,2,1,'crate']],
+  doors: [[9,30,'D'],[13,3,'D'],[34,3,'D'],[24,7,'Y'],[42,7,'h'],[29,28,'B',0],[30,28,'B',0],[22,32,'D'],[42,32,'D'],[48,16,'D'],[54,16,'B',1,'red'],
+          [11,12,'D'],[11,22,'D'],[40,30,'D']],
+  // the General's office is the room behind the silo: red door, keypad, password split between the two security rooms
+  player: [4,34], exit: [61,6], exitName: "GENERAL'S COMPUTER", bossEnd: true, secRooms: [[14, 1, 20, 6], [35, 1, 13, 6]], smartSec: true, specRoom: 5,
+  terminals: [[27,30,0],[53,13,1]],
   notes: [
-    [31,2,'WEST SECURITY — LOG','Command floor gate code (first half):\n\n{c0a} _ _\n\nGeneral Voss is in his office in the middle of the command floor. Two Spec-Ops on each office door, two more at his shoulder.'],
-    [45,2,'EAST SECURITY — LOG','Command floor gate code (second half):\n\n_ _ {c0b}\n\nThe YELLOW keycard opens the north door onto the command floor. Log every camera glitch — the General wants to know.'],
-    [6,32,'RADIO — VIPER','"The General\'s office is dead centre of the command floor. South gate needs the code, the north door needs the YELLOW card, and the east security room has a hatch that only opens in an alarm. Take out the General and the heli comes in on the east pad."'],
+    [31,2,'WEST SECURITY — LOG','General\'s office door, password (first half):\n\n{c1a} _ _\n\nThe General works late at his computer. Two Spec-Ops on his door, two more at his shoulder.'],
+    [45,2,'EAST SECURITY — LOG','General\'s office door, password (second half):\n\n_ _ {c1b}\n\nThe YELLOW keycard opens the north door into the silo. Log every camera glitch — the General wants to know.'],
+    [20,34,'GENERATOR ROOM — NOTE','Silo gate code (first half):\n\n{c0a} _ _'],
+    [50,36,'BARRACKS — LOCKER','Silo gate code (second half):\n\n_ _ {c0b}'],
+    [6,32,'RADIO — VIPER','"The General\'s office is behind the silo on the east side — red door with a keypad, and the password is split between the two security rooms up north. Silo gate code is down in the generators and the barracks, or use the YELLOW door from the west security room. Take out the General and we\'re done."'],
   ],
   items: [[16,2,'G'],[18,2,'a'],[20,5,'p'],[44,4,'y'],[38,5,'W'],[3,36,'H'],[11,2,'H'],[11,30,'q'],[21,37,'H'],[28,36,'k'],[51,18,'H'],[43,10,'a'],[17,24,'n'],[42,25,'H'],[16,10,'f']],
   enemies: [[11,6,'guard',[[11,2],[11,28]]],[12,17,'dog'],[10,17,'spec',[[10,14],[10,20]]],[10,1,'camera',90],
@@ -341,15 +343,17 @@ const LEVELS = [
             [15,2,'turret',0],[33,1,'camera',135],[20,3,'guard',180],[30,5,'officer',180],[27,3,'secop',90],[26,3,'spec','bodyguard'],[28,3,'spec','bodyguard'],[14,2,'guard',0],[14,4,'guard',0],[23,6,'guard',90],[25,6,'guard',90],
             // east security room
             [41,3,'secop',90],[40,3,'spec','bodyguard'],[42,3,'spec','bodyguard'],[35,2,'guard',180],[35,4,'guard',180],[41,6,'guard',90],[43,6,'guard',90],
-            // command floor
+            // the silo
             [14,8,'camera',45],[47,8,'camera',135],[14,27,'camera',315],[47,27,'camera',225],[34,8,'camera',90],
-            [16,10,'spec',[[16,10],[45,10],[45,25],[16,25]]],[45,25,'spec',[[45,25],[16,25],[16,10],[45,10]]],[18,18,'heavy',0],[43,18,'heavy',180],
-            [29,11,'spec',{ a: 270, station: true }],[31,11,'spec',{ a: 270, station: true }],[29,24,'spec',{ a: 90, station: true }],[31,24,'spec',{ a: 90, station: true }],
-            // the General's office
-            [30,16,'boss',270],[29,16,'spec','genguard'],[31,16,'spec','genguard'],[24,13,'camera',45],[37,13,'camera',135],[24,22,'camera',315],[37,22,'camera',225],
-            // south + east
+            [26,13,'spec',[[26,13],[36,13],[36,22],[26,22]]],[18,10,'spec',[[18,10],[18,25]]],[43,25,'spec',[[43,25],[43,10]]],[24,26,'spec',[[16,26],[46,26]]],[24,9,'spec',90],
+            // south
             [30,30,'spec',[[14,30],[52,30]]],[12,30,'spec',[[12,30],[12,24]]],[42,31,'guard',180],[27,34,'heavy',180],[36,35,'guard','sleep'],[48,35,'guard',180],[44,34,'guard',[[44,34],[52,34]]],[53,31,'camera',180],
-            [51,15,'guard',180],[52,17,'turret',180],[57,20,'sniper',270],[62,31,'camera',225],[60,28,'guard',180],[58,13,'guard',[[56,13],[61,13]]],[62,22,'spec',[[62,16],[62,27]]],[55,2,'camera',45]],
+            // the lobby outside his office: two Spec-Ops on the red door
+            [51,15,'guard',180],[52,17,'turret',180],[53,15,'spec',{ a: 180, station: true }],[53,17,'spec',{ a: 180, station: true }],[49,13,'camera',45],
+            // the General's office: him at his computer, his bodyguards at his shoulders
+            [58,7,'boss',90],[57,7,'spec','genguard'],[59,7,'spec','genguard'],[56,14,'spec',{ a: 0, station: true }],[58,23,'spec',[[56,23],[61,23]]],
+            [55,4,'camera',45],[62,4,'camera',135],[55,27,'camera',315],[62,27,'camera',225]],
+  spawns: [[4,31],[11,1],[12,31],[51,13]],
 },
 ];
 
@@ -392,8 +396,8 @@ function buildLevel(def, codes, gd) {
   for (const r of def.carve2 || []) fill(r, 1);
   for (const d of decos) if (SOLID_DECO.has(d.kind)) fill([d.x, d.y, d.w, d.h], 0, decoMask); // props inside carved huts stay solid
   const doors = new Map(), doorList = [];
-  for (const [x, y, type, arg] of def.doors) {
-    const d = { x, y, type, open: 0, locked: type !== 'D', gate: type === 'B' ? arg : null, sealable: arg === 'lock', sealed: false, perm: false, horiz: true, warnT: 0 };
+  for (const [x, y, type, arg, look] of def.doors) {
+    const d = { red: look === 'red', x, y, type, open: 0, locked: type !== 'D', gate: type === 'B' ? arg : null, sealable: arg === 'lock', sealed: false, perm: false, horiz: true, warnT: 0 };
     t[y * w + x] = 2; fence[y * w + x] = 0; doors.set(y * w + x, d); doorList.push(d);
   }
   for (const d of doorList) {
@@ -445,7 +449,7 @@ function buildLevel(def, codes, gd) {
       const cut = L.enemies.filter(e => e.type === 'guard' && !e.station && !e.rover && !e.sleep).sort((a, b) => (a.route ? 1 : 0) - (b.route ? 1 : 0) || Math.hypot(b.x - (def.player[0] + .5) * TS, b.y - (def.player[1] + .5) * TS) - Math.hypot(a.x - (def.player[0] + .5) * TS, a.y - (def.player[1] + .5) * TS)).slice(-3);
       L.enemies = L.enemies.filter(e => !cut.includes(e));
     }
-    if (li === 4) for (const e of L.enemies) { e.hp = e.maxhp = e.maxhp * 1.04; e.dmgMul = (e.dmgMul || 1) * 1.04; } // the silo's garrison: everyone 4% tougher and harder-hitting
+    if (li === 4) for (const e of L.enemies) if (e.type !== 'boss') { e.hp = e.maxhp = e.maxhp * 1.04; e.dmgMul = (e.dmgMul || 1) * 1.04; } // the silo's garrison: everyone 4% tougher and harder-hitting
     L.roomVisit = def.rooms.map(() => 0); L.hot = null; L.zones = []; for (const [rx, ry, rw, rh] of def.rooms) { const nx = Math.ceil(rw / 10), ny = Math.ceil(rh / 10); for (let a = 0; a < nx; a++) for (let b = 0; b < ny; b++) { const x0 = rx + Math.floor(a * rw / nx), y0 = ry + Math.floor(b * rh / ny); L.zones.push([x0, y0, rx + Math.floor((a + 1) * rw / nx) - x0, ry + Math.floor((b + 1) * rh / ny) - y0]); } } // big yards are swept in chunks
     L.teamVisit = { A: L.zones.map(() => -999), D: L.zones.map(() => -999) }; L.sweep = {};
   }
@@ -465,7 +469,7 @@ function makeEnemy(type, x, y, extra, gd) {
   else if (extra === 'sleep') { e.sleep = true; e.angle = Math.PI / 2; }
   else if (extra === 'rover') e.rover = true;
   else if (extra && typeof extra === 'object') { e.angle = (extra.a || 0) * Math.PI / 180; if (extra.station) e.station = true; } // a post that is held even at CODE RED
-  else if (extra === 'genguard') { e.bodyguard = true; e.ward = 'boss'; e.angle = -Math.PI / 2; e.hp = e.maxhp = e.maxhp * 1.15; e.dmgMul = 1.15; } // the General's own bodyguards
+  else if (extra === 'genguard') { e.bodyguard = true; e.ward = 'boss'; e.angle = Math.PI / 2; e.hp = e.maxhp = e.maxhp * 1.15; e.dmgMul = 1.15; } // the General's own bodyguards
   else if (extra === 'bodyguard') { e.bodyguard = true; e.angle = Math.PI / 2; e.hp = e.maxhp = e.maxhp * 1.15; e.dmgMul = 1.15; } // a bit tougher than a regular Spec-Op // the patrol director plans this one's routes
   e.baseA = e.angle;
   if (T.cam) e.sweep = Math.random() * TAU;
@@ -587,7 +591,7 @@ function prerender() {
   } else if (L.def.exitName === 'BASE ENTRANCE') {
     g.fillStyle = '#1b2215'; g.fillRect(ex - 34, ey - 28, 68, 56);
     g.strokeStyle = '#d6a93c'; g.lineWidth = 2; g.strokeRect(ex - 34, ey - 28, 68, 56);
-  } else {
+  } else if (!L.def.bossEnd) { // (the General's computer gets no exit pad)
     g.fillStyle = '#16200f'; g.fillRect(ex - 30, ey - 30, 60, 60);
     g.strokeStyle = '#d6a93c'; g.lineWidth = 2; g.strokeRect(ex - 30, ey - 30, 60, 60);
     for (let i = -30; i < 30; i += 10) { g.fillStyle = (i / 10) % 2 ? '#ffd23f' : '#111'; g.fillRect(ex + i, ey - 34, 10, 4); g.fillRect(ex + i, ey + 30, 10, 4); }
@@ -1461,7 +1465,8 @@ function killEnemy(e, src) {
     const lvl = L;
     msg('GENERAL VOSS IS DOWN', '#c8a24a');
     L.boss = null;
-    if (G.mode === 'op') {
+    if (G.mode === 'op' && L.def.bossEnd) { banner('GENERAL VOSS IS DOWN', 'FORT IRONGATE HAS NO COMMANDER — MISSION COMPLETE', '#c8a24a', 3); sfx('gate'); setTimeout(() => { if (L === lvl && (G.state === 'play' || G.state === 'panel' || G.state === 'paused')) levelComplete(); }, 2600); }
+    else if (G.mode === 'op') {
       for (const d of L.doorList) if (d.type === 'B' && d.gate === 1) { d.locked = false; d.perm = true; }
       setTimeout(() => { if (L === lvl && (G.state === 'play' || G.state === 'panel' || G.state === 'paused')) { setAlert('BLACK', 'THE GENERAL IS DOWN — SELF-DESTRUCT ARMED'); sfx('gate'); msg('EAST GATE OPENING — GET TO THE HELI', '#c070ff'); } }, 1200);
     }
@@ -2135,7 +2140,7 @@ const HAWK_BRIEF = [
   'Barracks. YELLOW keycard is in the officers\' quarters, north-east. Freight elevator is south-east in the motor pool. Don\'t wake the dorms.',
   'Security HQ. Cell block is in the middle — the RED keycard is in there. GREEN key in the monitoring room opens the east wing. Kill the cameras if you can.',
   'Command center. Vault is off the generator hall, code halves in comms and the barracks. The lift is behind a RED door on the east corridor.',
-  'The General\'s office. Code halves in the two security rooms, YELLOW key in the east one. Kill Voss and we fly out east.',
+  'The General\'s office is behind the silo. Red door, password halves in the two security rooms. Kill Voss and it\'s over.',
 ];
 const hawk = () => OPS.find(o => o.cmdr && o.state === 'ok');
 function hawkSay(t) { msg(HAWK_NAME + ': "' + t + '"', HAWK_COL); sfx('radio'); }
@@ -2649,7 +2654,7 @@ function updateDoors(dt) {
       d.warnT = 2.5; sfx('deny');
       if (d.sealed) msg('SEALED BY LOCKDOWN — find another way', '#ff3b3b');
       else if (DOORKEY[d.type]) msg(DOORKEY[d.type].toUpperCase() + ' KEYCARD REQUIRED' + (d.codeGate !== undefined ? ' + DOOR CODE' : ''), KEYCOL[DOORKEY[d.type]]);
-      else if (d.type === 'B') msg(L.def.core && d.gate === 1 ? 'BLAST GATE — opens when the GENERAL goes down' : 'BLAST GATE LOCKED — use the keypad next to it', '#ff8a3d');
+      else if (d.type === 'B') msg(d.red ? 'OFFICE DOOR LOCKED — enter the password on the keypad beside it' : 'BLAST GATE LOCKED — use the keypad next to it', '#ff8a3d');
       else if (d.type === 'h') msg('EMERGENCY HATCH — only opens during an alarm (CODE RED)', '#ff8a3d');
     }
     let want = 0;
@@ -2860,7 +2865,7 @@ function update(dt) {
     if (G.meltdown <= 0) { G.meltdown = 0; G.state = 'dying'; G.dieT = 1.6; G.dieReason = 'CAUGHT IN THE BLAST'; return; }
   }
   if (G.mode === 'op') {
-    if (Math.hypot(L.exit.x - P.x, L.exit.y - P.y) < 26 && (!L.def.exitNeedsBlack || G.alert === 'BLACK')) { levelComplete(); return; }
+    if (Math.hypot(L.exit.x - P.x, L.exit.y - P.y) < 26 && (!L.def.exitNeedsBlack || G.alert === 'BLACK') && !(L.def.bossEnd && L.boss)) { levelComplete(); return; }
   } else if (defChecks()) return;
   fxTick(dt);
 }
@@ -2966,8 +2971,8 @@ function statsHTML(s) {
   return `<div class="stats"><span>TIME</span><b>${Math.floor(tm / 60)}:${String(tm % 60).padStart(2, '0')}</b><span>KILLS</span><b>${s.kills}</b><span>SILENT TAKEDOWNS</span><b>${s.takedowns}</b><span>ALARMS RAISED</span><b>${s.alarms}</b><span>ACCURACY</span><b>${acc}%</b><span>DAMAGE TAKEN</span><b>${Math.round(s.dmg)}</b></div>`;
 }
 function winScreen() {
-  showScreen(`<div class="card"><h1 style="font-size:clamp(34px,9vw,64px)">EXTRACTED<span style="color:#4fd8ff">FORT IRONGATE IS GONE</span></h1>
-    <p class="sub">The heli lifts off as the command floor goes up behind you. VIPER whistles. GHOST doesn't say a word.<br>Mission complete.</p>
+  showScreen(`<div class="card"><h1 style="font-size:clamp(34px,9vw,64px)">GENERAL DOWN<span style="color:#4fd8ff">FORT IRONGATE HAS NO COMMANDER</span></h1>
+    <p class="sub">General Voss slumps over his own desk. VIPER pockets his access card. GHOST doesn't say a word.<br>Mission complete.</p>
     ${statsHTML(G.totalStats)}<button class="btn" data-act="newop">Play Again</button><button class="btn alt" data-act="menu">Main Menu</button></div>`, ACTIONS.newop);
 }
 function deathScreen() {
@@ -3088,7 +3093,7 @@ function defChecks() {
   const lead = ints.find(o => o.role === 'lead' && o.state === 'ok' && Math.hypot(L.exit.x - o.x, L.exit.y - o.y) < 26);
   if (lead) {
     if (G.level < LEVELS.length - 1) { sfx('alarm'); startDef(G.level + 1, G.diff, { intr: ints.map(o => ({ state: o.state === 'ok' ? 'ok' : 'dead', hp: o.hp, role: o.role })), php: P.dead ? 100 : P.hp }); return true; }
-    defEnd(false, 'The intruders reached the ' + L.def.exitName.toLowerCase() + ' and flew out with everything.'); return true;
+    defEnd(false, 'The intruders reached the ' + L.def.exitName.toLowerCase() + (L.def.bossEnd ? ' and stole everything on it.' : ' and flew out with everything.')); return true;
   }
   if (G.htime <= 0) { defEnd(true, 'You held them off until the quick reaction force arrived.'); return true; }
   return false;
@@ -3128,9 +3133,9 @@ function render() {
     ctx.fillStyle = '#20261a'; ctx.beginPath(); ctx.arc(0, -12, 5, 0, TAU); ctx.fill();
     ctx.restore();
   }
-  // exit
-  {
-    const ex = L.exit.x, ey = L.exit.y, act = !L.def.exitNeedsBlack || G.alert === 'BLACK' || G.mode === 'def', p = (now * 1.2) % 1;
+  // exit (no exit pad in the General's office in Infiltrate: taking him out ends the mission)
+  if (!(G.mode === 'op' && L.def.bossEnd)) {
+    const ex = L.exit.x, ey = L.exit.y, act = (!L.def.exitNeedsBlack || G.alert === 'BLACK' || G.mode === 'def') && !(G.mode === 'op' && L.def.bossEnd && L.boss), p = (now * 1.2) % 1;
     ctx.strokeStyle = act ? `rgba(214,169,60,${1 - p})` : 'rgba(214,169,60,.25)'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.arc(ex, ey, 8 + p * 22, 0, TAU); ctx.stroke();
     if (L.def.exitName === 'EXTRACTION HELI' && act) drawHeli(ex, ey, now);
@@ -3237,13 +3242,14 @@ function drawItem(it, now) {
 }
 function drawDoor(d, now) {
   const px = d.x * TS, py = d.y * TS, o = d.open;
-  const base = d.sealed ? '#7a1010' : d.type === 'D' ? '#5c6350' : d.type === 'B' ? '#6a5a2a' : d.type === 'h' ? '#8a4a12' : KEYCOL[DOORKEY[d.type]];
+  const base = d.sealed ? '#7a1010' : d.red ? '#9a1c1c' : d.type === 'D' ? '#5c6350' : d.type === 'B' ? '#6a5a2a' : d.type === 'h' ? '#8a4a12' : KEYCOL[DOORKEY[d.type]];
   ctx.save(); ctx.beginPath(); ctx.rect(px, py, TS, TS); ctx.clip();
   const half = TS / 2 * (1 - o);
   const drawHalf = (x, y, w, h) => {
     ctx.fillStyle = base; ctx.fillRect(x, y, w, h);
     ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
-    if (d.type === 'B' || d.type === 'h') { ctx.fillStyle = '#ffd23f'; for (let i = -TS; i < TS * 2; i += 10) { ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); ctx.beginPath(); ctx.moveTo(px + i, py); ctx.lineTo(px + i + 5, py); ctx.lineTo(px + i + 5 - TS, py + TS); ctx.lineTo(px + i - TS, py + TS); ctx.fill(); ctx.restore(); } ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(x, y, w, h); }
+    if (d.red) { ctx.fillStyle = d.locked ? '#ff3b3b' : '#3ddc84'; ctx.fillRect(x + w / 2 - 3, y + h / 2 - 3, 6, 6); } // keypad light
+    else if (d.type === 'B' || d.type === 'h') { ctx.fillStyle = '#ffd23f'; for (let i = -TS; i < TS * 2; i += 10) { ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); ctx.beginPath(); ctx.moveTo(px + i, py); ctx.lineTo(px + i + 5, py); ctx.lineTo(px + i + 5 - TS, py + TS); ctx.lineTo(px + i - TS, py + TS); ctx.fill(); ctx.restore(); } ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(x, y, w, h); }
   };
   if (d.type === 'h') { const sz = TS * (1 - o) * .9; if (sz > 1) drawHalf(px + (TS - sz) / 2, py + (TS - sz) / 2, sz, sz); if (o > .5) { ctx.fillStyle = '#000'; ctx.fillRect(px + 4, py + 4, TS - 8, TS - 8); ctx.strokeStyle = '#ff8a3d'; ctx.lineWidth = 2; ctx.strokeRect(px + 4, py + 4, TS - 8, TS - 8); } }
   else if (d.horiz) { drawHalf(px - (TS / 2 - half), py + 4, TS / 2, TS - 8); drawHalf(px + TS / 2 + (TS / 2 - half), py + 4, TS / 2, TS - 8); }
@@ -3701,7 +3707,7 @@ function objective() {
   }
   if (sub === 'COMMAND CENTER') return !k.red ? 'Open the VAULT off the generator hall (code halves: comms + barracks) and take the RED keycard' : 'Reach the COMMAND LIFT behind the RED door (east corridor)';
   if (G.alert === 'BLACK') return 'SELF-DESTRUCT! Get to the EXTRACTION HELI on the east pad';
-  return 'Take out GENERAL VOSS in his office (command floor: gate code, YELLOW door, or the east hatch)';
+  return L.boss ? 'Take out GENERAL VOSS in his office behind the silo (red door: password halves in the two security rooms)' : 'General Voss is down';
 }
 
 /* ---------------- PANELS (codepad / notes / datapad) ---------------- */
