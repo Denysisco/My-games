@@ -321,21 +321,21 @@ const LEVELS = [
   rooms: [[1,30,8,8],[10,1,3,31],[10,29,44,3],[14,1,20,6],[35,1,13,6],[14,8,34,20],[14,33,16,5],[31,33,23,5],[49,12,5,10],[55,4,8,24]],
   walls: [[10,12,3,1],[10,22,3,1],[40,29,1,3]],
   deco: [[55,4,8,24,'rug'],[57,4,4,1,'monitors'],[57,8,4,1,'desk'],[57,18,4,3,'holo'],[62,10,1,4,'rack'],
-         [29,15,4,6,'missile'],[37,15,3,3,'holo'],[20,11,2,2,'pillar'],[40,11,2,2,'pillar'],[20,23,2,2,'pillar'],[40,23,2,2,'pillar'],
+         [28,16,6,4,'holo'],[27,9,6,1,'desk'],[37,15,3,3,'holo'],[20,11,2,2,'pillar'],[40,11,2,2,'pillar'],[20,23,2,2,'pillar'],[40,23,2,2,'pillar'],
          [17,16,1,4,'sandbag'],[44,16,1,4,'sandbag'],[25,12,3,1,'sandbag'],[35,12,3,1,'sandbag'],[25,23,3,1,'sandbag'],[35,23,3,1,'sandbag'],
          [22,1,8,1,'monitors'],[16,4,6,1,'desk'],[25,4,6,1,'desk'],[38,1,8,1,'monitors'],[38,4,6,1,'desk'],[47,1,1,3,'rack'],[36,5,2,1,'crate'],
          [13,33,1,3,'rack'],[16,34,3,3,'gen'],[23,34,3,3,'gen'],[33,34,2,1,'bunk'],[37,34,2,1,'bunk'],[45,36,2,1,'bunk'],[50,20,2,1,'crate']],
   doors: [[9,30,'D'],[13,3,'D'],[34,3,'D'],[24,7,'Y'],[42,7,'h'],[29,28,'B',0],[30,28,'B',0],[22,32,'D'],[42,32,'D'],[48,16,'D'],[54,16,'B',1,'red'],
           [11,12,'D'],[11,22,'D'],[40,30,'D']],
-  // the General's office is the room behind the silo: red door, keypad, password split between the two security rooms
+  // the operations hall in the middle; the General's office is the room behind it: red door, keypad, password split between the two security rooms
   player: [4,34], exit: [61,6], exitName: "GENERAL'S COMPUTER", bossEnd: true, secRooms: [[14, 1, 20, 6], [35, 1, 13, 6]], smartSec: true, specRoom: 5,
   terminals: [[27,30,0],[53,13,1]],
   notes: [
     [31,2,'WEST SECURITY — LOG','General\'s office door, password (first half):\n\n{c1a} _ _\n\nThe General works late at his computer. Two Spec-Ops on his door, two more at his shoulder.'],
-    [45,2,'EAST SECURITY — LOG','General\'s office door, password (second half):\n\n_ _ {c1b}\n\nThe YELLOW keycard opens the north door into the silo. Log every camera glitch — the General wants to know.'],
-    [20,34,'GENERATOR ROOM — NOTE','Silo gate code (first half):\n\n{c0a} _ _'],
-    [50,36,'BARRACKS — LOCKER','Silo gate code (second half):\n\n_ _ {c0b}'],
-    [6,32,'RADIO — VIPER','"The General\'s office is behind the silo on the east side — red door with a keypad, and the password is split between the two security rooms up north. Silo gate code is down in the generators and the barracks, or use the YELLOW door from the west security room. Take out the General and we\'re done."'],
+    [45,2,'EAST SECURITY — LOG','General\'s office door, password (second half):\n\n_ _ {c1b}\n\nThe YELLOW keycard opens the north door into the operations hall. Log every camera glitch — the General wants to know.'],
+    [20,34,'GENERATOR ROOM — NOTE','Operations hall gate code (first half):\n\n{c0a} _ _'],
+    [50,36,'BARRACKS — LOCKER','Operations hall gate code (second half):\n\n_ _ {c0b}'],
+    [6,32,'RADIO — VIPER','"The General\'s office is behind the operations hall on the east side — red door with a keypad, and the password is split between the two security rooms up north. The operations hall gate code is down in the generators and the barracks, or use the YELLOW door from the west security room. Take out the General and we\'re done."'],
   ],
   items: [[16,2,'G'],[18,2,'a'],[20,5,'p'],[44,4,'y'],[38,5,'W'],[3,36,'H'],[11,2,'H'],[11,30,'q'],[21,37,'H'],[28,36,'k'],[51,18,'H'],[43,10,'a'],[17,24,'n'],[42,25,'H'],[16,10,'f']],
   enemies: [[11,6,'guard',[[11,2],[11,28]]],[12,17,'dog'],[10,17,'spec',[[10,14],[10,20]]],[10,1,'camera',90],
@@ -343,7 +343,7 @@ const LEVELS = [
             [15,2,'turret',0],[33,1,'camera',135],[20,3,'guard',180],[30,5,'officer',180],[27,3,'secop',90],[26,3,'spec','bodyguard'],[28,3,'spec','bodyguard'],[14,2,'guard',0],[14,4,'guard',0],[23,6,'guard',90],[25,6,'guard',90],
             // east security room
             [41,3,'secop',90],[40,3,'spec','bodyguard'],[42,3,'spec','bodyguard'],[35,2,'guard',180],[35,4,'guard',180],[41,6,'guard',90],[43,6,'guard',90],
-            // the silo
+            // the operations hall
             [14,8,'camera',45],[47,8,'camera',135],[14,27,'camera',315],[47,27,'camera',225],[34,8,'camera',90],
             [26,13,'spec',[[26,13],[36,13],[36,22],[26,22]]],[18,10,'spec',[[18,10],[18,25]]],[43,25,'spec',[[43,25],[43,10]]],[24,26,'spec',[[16,26],[46,26]]],[24,9,'spec',90],
             // south
@@ -449,7 +449,7 @@ function buildLevel(def, codes, gd) {
       const cut = L.enemies.filter(e => e.type === 'guard' && !e.station && !e.rover && !e.sleep).sort((a, b) => (a.route ? 1 : 0) - (b.route ? 1 : 0) || Math.hypot(b.x - (def.player[0] + .5) * TS, b.y - (def.player[1] + .5) * TS) - Math.hypot(a.x - (def.player[0] + .5) * TS, a.y - (def.player[1] + .5) * TS)).slice(-3);
       L.enemies = L.enemies.filter(e => !cut.includes(e));
     }
-    if (li === 4) for (const e of L.enemies) if (e.type !== 'boss') { e.hp = e.maxhp = e.maxhp * 1.04; e.dmgMul = (e.dmgMul || 1) * 1.04; } // the silo's garrison: everyone 4% tougher and harder-hitting
+    if (li === 4) for (const e of L.enemies) if (e.type !== 'boss') { e.hp = e.maxhp = e.maxhp * 1.04; e.dmgMul = (e.dmgMul || 1) * 1.04; } // the General's garrison: everyone 4% tougher and harder-hitting
     L.roomVisit = def.rooms.map(() => 0); L.hot = null; L.zones = []; for (const [rx, ry, rw, rh] of def.rooms) { const nx = Math.ceil(rw / 10), ny = Math.ceil(rh / 10); for (let a = 0; a < nx; a++) for (let b = 0; b < ny; b++) { const x0 = rx + Math.floor(a * rw / nx), y0 = ry + Math.floor(b * rh / ny); L.zones.push([x0, y0, rx + Math.floor((a + 1) * rw / nx) - x0, ry + Math.floor((b + 1) * rh / ny) - y0]); } } // big yards are swept in chunks
     L.teamVisit = { A: L.zones.map(() => -999), D: L.zones.map(() => -999) }; L.sweep = {};
   }
@@ -2140,7 +2140,7 @@ const HAWK_BRIEF = [
   'Barracks. YELLOW keycard is in the officers\' quarters, north-east. Freight elevator is south-east in the motor pool. Don\'t wake the dorms.',
   'Security HQ. Cell block is in the middle — the RED keycard is in there. GREEN key in the monitoring room opens the east wing. Kill the cameras if you can.',
   'Command center. Vault is off the generator hall, code halves in comms and the barracks. The lift is behind a RED door on the east corridor.',
-  'The General\'s office is behind the silo. Red door, password halves in the two security rooms. Kill Voss and it\'s over.',
+  'The General\'s office is behind the operations hall. Red door, password halves in the two security rooms. Kill Voss and it\'s over.',
 ];
 const hawk = () => OPS.find(o => o.cmdr && o.state === 'ok');
 function hawkSay(t) { msg(HAWK_NAME + ': "' + t + '"', HAWK_COL); sfx('radio'); }
@@ -3707,7 +3707,7 @@ function objective() {
   }
   if (sub === 'COMMAND CENTER') return !k.red ? 'Open the VAULT off the generator hall (code halves: comms + barracks) and take the RED keycard' : 'Reach the COMMAND LIFT behind the RED door (east corridor)';
   if (G.alert === 'BLACK') return 'SELF-DESTRUCT! Get to the EXTRACTION HELI on the east pad';
-  return L.boss ? 'Take out GENERAL VOSS in his office behind the silo (red door: password halves in the two security rooms)' : 'General Voss is down';
+  return L.boss ? 'Take out GENERAL VOSS in his office behind the operations hall (red door: password halves in the two security rooms)' : 'General Voss is down';
 }
 
 /* ---------------- PANELS (codepad / notes / datapad) ---------------- */
