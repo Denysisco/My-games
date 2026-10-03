@@ -150,7 +150,7 @@ const ETYPES = {
   camera:  { name: 'CAMERA',       hp: 25,   r: 9,  speed: 0,   stat: true, cam: true,                                        sight: 1.25, cone: .4,  alarm: 0,   color: '#9aa7b3' },
   turret:  { name: 'SENTRY GUN',   hp: 160,  r: 14, speed: 0,   dmg: 8,  ranged: true, rate: .3,  range: 450, bspeed: 620,  sight: 1.3,  cone: .6,  alarm: 1.5, stat: true, color: '#ff8a3d' },
   drone:   { name: 'RECON DRONE',  hp: 35,   r: 9,  speed: 150, dmg: 5,  ranged: true, rate: .7,  range: 260, bspeed: 440,  sight: 1.2,  cone: 1.2, alarm: 1.5, fly: true, color: '#5cc8ff' },
-  boss:    { name: 'IRONCLAD',     hp: 1750, r: 26, speed: 64,  dmg: 12, ranged: true, rate: .85, range: 720, bspeed: 480,  sight: 1.5,  cone: 3.2, alarm: 0,   boss: true, color: '#c8a24a' },
+  boss:    { name: 'GENERAL VOSS', hp: 1150, r: 14, speed: 78,  dmg: 12, ranged: true, rate: .1,  range: 560, bspeed: 720,  sight: 1.4,  cone: 1.3, alarm: 0,   boss: true, armor: .25, color: '#3f4a33' }, // the base commander: dress uniform over body armour
 };
 const NOBODY = new Set(['camera', 'turret', 'drone']); // these leave wreckage, not bodies
 
@@ -317,28 +317,39 @@ const LEVELS = [
   spawns: [[4,33],[56,2],[2,8],[24,35]],
 },
 {
-  name: 'SECTOR 5', sub: 'MISSILE SILO', theme: 'base', base: 'YELLOW', w: 64, h: 40,
+  name: 'SECTOR 5', sub: "THE GENERAL'S OFFICE", theme: 'base', base: 'YELLOW', w: 64, h: 40,
   rooms: [[1,30,8,8],[10,1,3,31],[10,29,44,3],[14,1,20,6],[35,1,13,6],[14,8,34,20],[14,33,16,5],[31,33,23,5],[49,12,5,10],[55,2,8,30]],
-  walls: [[10,12,3,1],[10,22,3,1],[40,29,1,3]],
-  deco: [[29,15,4,6,'missile'],[37,15,3,3,'holo'],[22,1,8,1,'monitors'],[47,1,1,3,'rack'],[13,33,1,3,'rack'],[57,10,2,1,'crate'],[60,20,2,1,'crate'],[20,11,2,2,'pillar'],[40,11,2,2,'pillar'],[20,23,2,2,'pillar'],[40,23,2,2,'pillar'],[16,4,6,1,'desk'],[25,4,6,1,'desk'],
-         [17,16,1,4,'sandbag'],[44,16,1,4,'sandbag'],[25,12,3,1,'sandbag'],[35,12,3,1,'sandbag'],[25,23,3,1,'sandbag'],[35,23,3,1,'sandbag'],
-         [16,34,3,3,'gen'],[23,34,3,3,'gen'],[33,34,2,1,'bunk'],[37,34,2,1,'bunk'],[45,36,2,1,'bunk'],[36,5,2,1,'crate'],
-         [56,3,6,6,'helipad'],[55,2,8,30,'tarmac'],[56,24,2,2,'crate'],[60,14,2,2,'crate']],
+  // the command floor wraps round the General's walled office in the middle
+  walls: [[10,12,3,1],[10,22,3,1],[40,29,1,3],[23,12,16,1],[23,23,16,1],[23,12,1,12],[38,12,1,12]],
+  deco: [[24,13,14,10,'rug'],[27,15,7,1,'desk'],[28,19,5,2,'holo'],[24,14,1,3,'rack'],[37,14,1,3,'rack'],
+         [22,1,8,1,'monitors'],[16,4,6,1,'desk'],[25,4,6,1,'desk'],[38,1,8,1,'monitors'],[38,4,6,1,'desk'],[47,1,1,3,'rack'],[36,5,2,1,'crate'],
+         [20,11,2,2,'pillar'],[40,11,2,2,'pillar'],[20,23,2,2,'pillar'],[40,23,2,2,'pillar'],[17,16,1,4,'sandbag'],[44,16,1,4,'sandbag'],
+         [13,33,1,3,'rack'],[16,34,3,3,'gen'],[23,34,3,3,'gen'],[33,34,2,1,'bunk'],[37,34,2,1,'bunk'],[45,36,2,1,'bunk'],
+         [56,3,6,6,'helipad'],[55,2,8,30,'tarmac'],[56,24,2,2,'crate'],[60,14,2,2,'crate'],[57,10,2,1,'crate'],[60,20,2,1,'crate']],
   doors: [[9,30,'D'],[13,3,'D'],[34,3,'D'],[24,7,'Y'],[42,7,'h'],[29,28,'B',0],[30,28,'B',0],[22,32,'D'],[42,32,'D'],[48,16,'B',1],[48,17,'B',1],[54,16,'D'],
-          [11,12,'D'],[11,22,'D'],[40,30,'D']],
-  player: [4,34], exit: [59,6], exitName: 'EXTRACTION HELI', exitNeedsBlack: true, core: true, coreKey: [31,35], secRoom: [14, 1, 20, 6], specRoom: 5, // the silo itself: only Spec-Ops patrol in there
+          [11,12,'D'],[11,22,'D'],[40,30,'D'],[30,12,'D'],[30,23,'D']],
+  player: [4,34], exit: [59,6], exitName: 'EXTRACTION HELI', exitNeedsBlack: true, core: true, coreKey: [31,35], secRooms: [[14, 1, 20, 6], [35, 1, 13, 6]], smartSec: true, specRoom: 5, // only Spec-Ops patrol the command floor
   terminals: [[27,30,0]],
   notes: [
-    [31,2,'LAUNCH CONTROL — LOG','Silo gate code (first half):\n\n{c0a} _ _\n\nIRONCLAD is guarding the silo. If it goes down, the base self-destruct arms automatically.'],
-    [45,2,'FUEL STORAGE — TAG','Silo gate code (second half):\n\n_ _ {c0b}\n\nThe YELLOW keycard opens the north silo door (from launch control).'],
-    [6,32,'RADIO — VIPER','"Silo gate is off the south corridor, the YELLOW door is north from launch control, and fuel storage has a hatch that only opens in an alarm. Kill IRONCLAD and the heli comes in on the east pad."'],
+    [31,2,'WEST SECURITY — LOG','Command floor gate code (first half):\n\n{c0a} _ _\n\nGeneral Voss is in his office in the middle of the command floor. Two Spec-Ops on each office door, two more at his shoulder.'],
+    [45,2,'EAST SECURITY — LOG','Command floor gate code (second half):\n\n_ _ {c0b}\n\nThe YELLOW keycard opens the north door onto the command floor. Log every camera glitch — the General wants to know.'],
+    [6,32,'RADIO — VIPER','"The General\'s office is dead centre of the command floor. South gate needs the code, the north door needs the YELLOW card, and the east security room has a hatch that only opens in an alarm. Take out the General and the heli comes in on the east pad."'],
   ],
   items: [[16,2,'G'],[18,2,'a'],[20,5,'p'],[44,4,'y'],[38,5,'W'],[3,36,'H'],[11,2,'H'],[11,30,'q'],[21,37,'H'],[28,36,'k'],[51,18,'H'],[43,10,'a'],[17,24,'n'],[42,25,'H'],[16,10,'f']],
-  enemies: [[11,6,'guard',[[11,2],[11,28]]],[12,17,'dog'],[20,3,'guard',180],[30,5,'officer',180],[33,1,'camera',135],[15,2,'turret',0],
-            [40,3,'guard',0],[46,5,'guard',180],[38,18,'boss'],[26,13,'spec',[[26,13],[36,13],[36,22],[26,22]]],[18,10,'spec',[[18,10],[18,25]]],[43,25,'spec',[[43,25],[43,10]]],[24,26,'spec',[[16,26],[46,26]]],[24,9,'spec',90],
-            [30,30,'spec',[[14,30],[52,30]]],[27,3,'secop',90],[26,3,'spec','bodyguard'],[28,3,'spec','bodyguard'],[14,8,'camera',45],[47,8,'camera',135],[14,27,'camera',315],[47,27,'camera',225],[52,17,'turret',180],[12,30,'spec',[[12,30],[12,24]]],[62,22,'spec',[[62,16],[62,27]]],[10,17,'spec',[[10,14],[10,20]]],[55,2,'camera',45],[34,8,'camera',90],[42,31,'guard',180],[27,34,'heavy',180],[36,35,'guard','sleep'],[48,35,'guard',180],
-            [51,15,'guard',180],[57,20,'sniper',270],[10,1,'camera',90],[53,31,'camera',180],[62,31,'camera',225],[60,28,'guard',180],[58,13,'guard',[[56,13],[61,13]]],[24,6,'guard',[[17,6],[32,6]]],[44,34,'guard',[[44,34],[52,34]]]],
-  spawns: [[4,31],[11,1],[12,31],[60,30]],
+  enemies: [[11,6,'guard',[[11,2],[11,28]]],[12,17,'dog'],[10,17,'spec',[[10,14],[10,20]]],[10,1,'camera',90],
+            // west security room
+            [15,2,'turret',0],[33,1,'camera',135],[20,3,'guard',180],[30,5,'officer',180],[27,3,'secop',90],[26,3,'spec','bodyguard'],[28,3,'spec','bodyguard'],[14,2,'guard',0],[14,4,'guard',0],[23,6,'guard',90],[25,6,'guard',90],
+            // east security room
+            [41,3,'secop',90],[40,3,'spec','bodyguard'],[42,3,'spec','bodyguard'],[35,2,'guard',180],[35,4,'guard',180],[41,6,'guard',90],[43,6,'guard',90],
+            // command floor
+            [14,8,'camera',45],[47,8,'camera',135],[14,27,'camera',315],[47,27,'camera',225],[34,8,'camera',90],
+            [16,10,'spec',[[16,10],[45,10],[45,25],[16,25]]],[45,25,'spec',[[45,25],[16,25],[16,10],[45,10]]],[18,18,'heavy',0],[43,18,'heavy',180],
+            [29,11,'spec',{ a: 270, station: true }],[31,11,'spec',{ a: 270, station: true }],[29,24,'spec',{ a: 90, station: true }],[31,24,'spec',{ a: 90, station: true }],
+            // the General's office
+            [30,16,'boss',270],[29,16,'spec','genguard'],[31,16,'spec','genguard'],[24,13,'camera',45],[37,13,'camera',135],[24,22,'camera',315],[37,22,'camera',225],
+            // south + east
+            [30,30,'spec',[[14,30],[52,30]]],[12,30,'spec',[[12,30],[12,24]]],[42,31,'guard',180],[27,34,'heavy',180],[36,35,'guard','sleep'],[48,35,'guard',180],[44,34,'guard',[[44,34],[52,34]]],[53,31,'camera',180],
+            [51,15,'guard',180],[52,17,'turret',180],[57,20,'sniper',270],[62,31,'camera',225],[60,28,'guard',180],[58,13,'guard',[[56,13],[61,13]]],[62,22,'spec',[[62,16],[62,27]]],[55,2,'camera',45]],
 },
 ];
 
@@ -364,6 +375,7 @@ function defaultCarry() {
 const SOLID_DECO = new Set(['monitors', 'truck', 'jeep', 'crate', 'container', 'sandbag', 'tree', 'barrier', 'table', 'bunk', 'rack', 'gunrack', 'desk', 'gen', 'missile', 'pillar', 'holo']);
 function genCode() { return String(Math.floor(1000 + Math.random() * 9000)); }
 
+const secRoomsOf = def => def.secRooms || (def.secRoom ? [def.secRoom] : []);
 function buildLevel(def, codes, gd) {
   const w = def.w, h = def.h, t = new Uint8Array(w * h), fence = new Uint8Array(w * h), decoMask = new Uint8Array(w * h), ground = new Uint8Array(w * h);
   const fill = (r, v, mark) => { const [x, y, rw, rh] = r; for (let yy = y; yy < y + rh; yy++) for (let xx = x; xx < x + rw; xx++) if (xx >= 0 && yy >= 0 && xx < w && yy < h) { t[yy * w + xx] = v; if (mark) mark[yy * w + xx] = 1; else if (v === 1) { fence[yy * w + xx] = 0; decoMask[yy * w + xx] = 0; } } };
@@ -408,7 +420,7 @@ function buildLevel(def, codes, gd) {
   L.secOps = L.enemies.filter(e => e.type === 'secop'); // the people watching the camera feeds
   // extra security: Spec-Ops posts and roaming patrols in rooms away from where you come in
   { const li = Math.max(0, LEVELS.indexOf(def)); let seed = 777 + li * 97; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-    const nearSec = e => def.secRoom && e.x / TS > def.secRoom[0] - 3 && e.x / TS < def.secRoom[0] + def.secRoom[2] + 3 && e.y / TS < def.secRoom[1] + def.secRoom[3] + 3;
+    const nearSec = e => secRoomsOf(def).some(r => e.x / TS > r[0] - 3 && e.x / TS < r[0] + r[2] + 3 && e.y / TS < r[1] + r[3] + 3);
     for (const e of L.enemies) if (e.type === 'guard' && !nearSec(e) && rnd() < (li >= 4 ? .55 : .25 + li * .03)) { const s = makeEnemy('spec', e.x, e.y, null, gd); Object.assign(e, { type: 'spec', hp: s.hp, maxhp: s.maxhp, r: s.r }); } // a quarter of the soldiers are swapped for Spec-Ops (a few more in deeper sectors)
     const rd = new Uint16Array(w * h).fill(65535); { const q = [def.player[1] * w + def.player[0]]; rd[q[0]] = 0; for (let qh = 0; qh < q.length; qh++) { const i = q[qh], x = i % w; for (const n of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w]) if (n >= 0 && n < w * h && rd[n] === 65535 && t[n] !== 0) { rd[n] = rd[i] + 1; q.push(n); } } }
     const segD = (px, py, a, b) => { const dx = b.x - a.x, dy = b.y - a.y, l = dx * dx + dy * dy || 1, u = clamp(((px - a.x) * dx + (py - a.y) * dy) / l, 0, 1); return Math.hypot(px - a.x - dx * u, py - a.y - dy * u); };
@@ -452,6 +464,8 @@ function makeEnemy(type, x, y, extra, gd) {
   else if (typeof extra === 'number') e.angle = extra * Math.PI / 180;
   else if (extra === 'sleep') { e.sleep = true; e.angle = Math.PI / 2; }
   else if (extra === 'rover') e.rover = true;
+  else if (extra && typeof extra === 'object') { e.angle = (extra.a || 0) * Math.PI / 180; if (extra.station) e.station = true; } // a post that is held even at CODE RED
+  else if (extra === 'genguard') { e.bodyguard = true; e.ward = 'boss'; e.angle = -Math.PI / 2; e.hp = e.maxhp = e.maxhp * 1.15; e.dmgMul = 1.15; } // the General's own bodyguards
   else if (extra === 'bodyguard') { e.bodyguard = true; e.angle = Math.PI / 2; e.hp = e.maxhp = e.maxhp * 1.15; e.dmgMul = 1.15; } // a bit tougher than a regular Spec-Op // the patrol director plans this one's routes
   e.baseA = e.angle;
   if (T.cam) e.sweep = Math.random() * TAU;
@@ -626,6 +640,12 @@ function drawDeco(g, d, rnd) {
     case 'gunrack':
       g.fillStyle = '#3a2e1e'; g.fillRect(X + 2, Y + 1, W - 4, H - 2); g.fillStyle = '#4e3e28'; g.fillRect(X + 2, Y + 1, 3, H - 2);
       for (let yy = Y + 7; yy < Y + H - 5; yy += 9) { g.fillStyle = '#15181b'; g.fillRect(X + 7, yy, W - 12, 3); g.fillStyle = '#5a4630'; g.fillRect(X + 7, yy + 3, 6, 3); }
+      break;
+    case 'rug': // the General's carpet
+      g.fillStyle = '#3a1012'; g.fillRect(X + 4, Y + 4, W - 8, H - 8); g.strokeStyle = '#b8902a'; g.lineWidth = 2; g.strokeRect(X + 8, Y + 8, W - 16, H - 16);
+      g.strokeStyle = 'rgba(184,144,42,.45)'; g.lineWidth = 1; g.strokeRect(X + 14, Y + 14, W - 28, H - 28);
+      g.fillStyle = 'rgba(212,175,55,.35)'; g.beginPath(); g.arc(X + W / 2, Y + H * .43, 22, 0, TAU); g.fill(); g.fillStyle = '#3a1012'; g.beginPath(); g.arc(X + W / 2, Y + H * .43, 15, 0, TAU); g.fill();
+      g.fillStyle = 'rgba(212,175,55,.6)'; g.font = 'bold 16px monospace'; g.textAlign = 'center'; g.fillText('★', X + W / 2, Y + H * .43 + 6); g.textAlign = 'left';
       break;
     case 'monitors': // wall of camera feeds in the security room
       shadow(); g.fillStyle = '#16191c'; g.fillRect(X + 1, Y + 2, W - 2, H - 4);
@@ -1393,11 +1413,11 @@ function hurtOp(o, d, src) {
 }
 function damageEnemy(e, dmg, src, silent) {
   if (e.hp <= 0) return;
-  if (e.type === 'secop' && src && src.who) { // the bodyguards protect the operators with their lives: they come running and take the bullets
-    const who = src.who;
-    for (const b of L.enemies) if (b.bodyguard && b.hp > 0 && alive(who)) enterCombat(b, who);
-    const bg = L.enemies.filter(b => b.bodyguard && b.hp > 0 && !(b.stun > 0) && Math.hypot(b.x - e.x, b.y - e.y) < 130).sort((a, c) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(c.x - e.x, c.y - e.y))[0];
-    if (bg && Math.random() < .65) { floater(bg.x, bg.y - bg.r - 16, 'TOOK THE BULLET', '#ff8a3d'); damageEnemy(bg, dmg, src, silent); return; }
+  if ((e.type === 'secop' || e.type === 'boss') && src && src.who) { // the bodyguards protect the operators (and the General) with their lives: they come running and take the bullets
+    const who = src.who, ward = e.type === 'boss' ? 'boss' : undefined;
+    for (const b of L.enemies) if (b.bodyguard && b.ward === ward && b.hp > 0 && alive(who)) enterCombat(b, who);
+    const bg = L.enemies.filter(b => b.bodyguard && b.ward === ward && b.hp > 0 && !(b.stun > 0) && Math.hypot(b.x - e.x, b.y - e.y) < 130).sort((a, c) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(c.x - e.x, c.y - e.y))[0];
+    if (bg && Math.random() < (ward ? .45 : .65)) { floater(bg.x, bg.y - bg.r - 16, 'TOOK THE BULLET', '#ff8a3d'); damageEnemy(bg, dmg, src, silent); return; }
   }
   if (e.type === 'boss' && e.pat === 'charge') dmg *= .6;
   if (ETYPES[e.type].armor) { // armour: soaks part of each hit but cracks as it takes damage
@@ -1425,6 +1445,7 @@ function killEnemy(e, src) {
   if (byP) G.stats.kills++;
   if (G.cmd && G.cmd.t === e) { G.cmd = { kind: 'follow' }; if (src && src.who && src.who.op && src.who.team === P.team) msg(src.who.name + ': "Target down."', G.mode === 'op' ? '#7fe0d0' : '#d6d0a0'); }
   if (e.type === 'secop') msg(G.mode === 'def' ? 'The intruders killed the security operator — the cameras are unmanned!' : 'Security operator down — nobody is watching the cameras', G.mode === 'def' ? '#ff3b3b' : '#3ddc84');
+  if (T.cam) secIncident(e.x, e.y, 'Camera went dark');
   if (T.cam && (L.secOps || []).some(x => x !== e && L.enemies.includes(x) && x.hp > 0)) { // the operator sees a feed go dark and sends someone to look
     msg('SECURITY: "Camera ' + (L.enemies.filter(c => ETYPES[c.type].cam).indexOf(e) + 1) + ' just went dark — somebody check it!"', '#ff8a3d');
     let n = 0; for (const o of L.enemies.filter(o => !ETYPES[o.type].stat && !ETYPES[o.type].post && !o.station && o.state !== 'combat' && !o.sleep).sort((a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y))) { if (n++ >= 2) break; o.state = 'search'; o.searchT = 0; o.sus = 1; o.invX = e.x; o.invY = e.y; guardPathTo(o, e.x, e.y); }
@@ -1433,16 +1454,16 @@ function killEnemy(e, src) {
   else {
     burst(e.x, e.y, '#9b1026', src && src.silent ? 8 : 22, 200, .6, 4); splat(e.x, e.y, '#5a0a12', src && src.silent ? 4 : 9);
     if (!(src && src.silent)) sfx('die', .8);
-    if (e.type !== 'boss') { const b = { x: e.x, y: e.y, a: e.angle, type: e.type, found: false }; L.bodies.push(b); if (src && src.who && src.who.team === 'A') hideBody(b, src.who); }
+    { const b = { x: e.x, y: e.y, a: e.angle, type: e.type, found: false }; L.bodies.push(b); if (src && src.who && src.who.team === 'A') hideBody(b, src.who); }
   }
   if (G.mode === 'def') G.lost = (G.lost || 0) + 1;
   if (e.type === 'boss') {
     const lvl = L;
-    for (let i = 0; i < 6; i++) setTimeout(() => { if (L === lvl) explode(e.x + rand(-50, 50), e.y + rand(-50, 50), 60, 0, 'X'); }, i * 180);
+    msg('GENERAL VOSS IS DOWN', '#c8a24a');
     L.boss = null;
     if (G.mode === 'op') {
       for (const d of L.doorList) if (d.type === 'B' && d.gate === 1) { d.locked = false; d.perm = true; }
-      setTimeout(() => { if (L === lvl && (G.state === 'play' || G.state === 'panel' || G.state === 'paused')) { setAlert('BLACK', 'IRONCLAD IS DOWN — SELF-DESTRUCT ARMED'); sfx('gate'); msg('EAST GATE OPENING — GET TO THE HELI', '#c070ff'); } }, 1200);
+      setTimeout(() => { if (L === lvl && (G.state === 'play' || G.state === 'panel' || G.state === 'paused')) { setAlert('BLACK', 'THE GENERAL IS DOWN — SELF-DESTRUCT ARMED'); sfx('gate'); msg('EAST GATE OPENING — GET TO THE HELI', '#c070ff'); } }, 1200);
     }
   } else if (G.mode === 'op' && !T.stat && Math.random() < .35) {
     const k = pick(['b', 'b', 'a', 'H', 'a', P.weapons.shotgun ? 's' : 'b', P.weapons.sniper ? 'n' : 'a']);
@@ -1515,7 +1536,7 @@ function guardSees(e, h, range, cone) {
 // and once something is going on, through the rooms around the last place an intruder was seen
 function planRover(e) {
   const rooms = L.def.rooms, w = L.w, rd = e.rpf || (e.rpf = new Uint16Array(L.w * L.h)); bfs(tileIdx(e), enemyPassable, rd);
-  const hot = L.hot && ALERTS[G.alert].lvl >= 1 && G.time - L.hot.t < 90 ? L.hot : null;
+  const hot = L.hot && ALERTS[G.alert].lvl >= 1 && G.time - L.hot.t < 90 ? L.hot : L.secHot && G.time - L.secHot.t < 90 ? L.secHot : null;
   const cand = [];
   rooms.forEach(([rx, ry, rw, rh], r) => { if (r === L.def.specRoom && e.type !== 'spec') return; for (let s = 0, ns = rw * rh >= 150 ? 3 : 1; s < ns; s++) { // big yards get several checkpoints
     let cx = -1, cy = -1; for (let k = 0; k < 8; k++) { const x = rx + 1 + Math.floor(Math.random() * Math.max(1, rw - 2)), y = ry + 1 + Math.floor(Math.random() * Math.max(1, rh - 2)), j = y * w + x; if (L.t[j] === 1 && rd[j] >= 4 && rd[j] <= 85) { cx = x; cy = y; break; } }
@@ -1576,6 +1597,15 @@ function guardFire(e, t) {
   e.flash2 = .06; flashLight(e.x, e.y, T.sniper ? 160 : 90, .5);
   sfx(T.sniper ? 'sniper' : e.type === 'heavy' ? 'lmg' : 'eshot', shotVol(e.x, e.y));
 }
+// the security operators' memory: every incident (a flicker on a camera, a feed going dark, a body) is logged for about 90s.
+// recent incidents make nearby cameras quicker, pull the roaming patrols that way, and three close together put the base on edge.
+const secWatching = () => (L.secOps || []).some(o => L.enemies.includes(o) && o.hp > 0 && !(o.stun > 0));
+function secIncident(x, y, what) {
+  if (!secWatching()) return;
+  L.secLog = (L.secLog || []).filter(r => G.time - r.t < 90); L.secLog.push({ x, y, t: G.time, what });
+  if (L.def.smartSec) L.secHot = { x, y, t: G.time };
+  if (L.def.smartSec && G.alert === 'GREEN' && L.secLog.filter(r => G.time - r.t < 60).length >= 3) setAlert('YELLOW', 'SECURITY: TOO MANY INCIDENTS — EVERYONE ON EDGE');
+}
 function updateCamera(e, dt) {
   const T = ETYPES.camera, D = gd();
   if (e.off) { e.sus = 0; return; }
@@ -1591,7 +1621,12 @@ function updateCamera(e, dt) {
   if (h) {
     e.angle = turnTo(e.angle, Math.atan2(h.y - e.y, h.x - e.x), 1.2 * dt);
     if (e.sus < 1) {
-      e.sus += dt * (.7 + 1.5 * (1 - clamp(e.seenD / e.range, 0, 1))) * D.detect * (G.alert !== 'GREEN' ? 1.4 : 1);
+      e.sus += dt * (.7 + 1.5 * (1 - clamp(e.seenD / e.range, 0, 1))) * D.detect * (G.alert !== 'GREEN' ? 1.4 : 1) * (L.def.smartSec && secWatching() && (L.secLog || []).some(r => G.time - r.t < 90 && Math.hypot(r.x - e.x, r.y - e.y) < 600) ? 1.25 : 1);
+      if (L.def.smartSec && e.sus > .15 && e.sus < 1 && G.time - (e.sentT || -99) > 10 && secWatching()) { // the General's operators react to even a flicker on the monitors
+        e.sentT = G.time; secIncident(h.x, h.y, 'Movement on camera ' + (L.enemies.filter(c => ETYPES[c.type].cam).indexOf(e) + 1));
+        const g = L.enemies.filter(o => !ETYPES[o.type].stat && !ETYPES[o.type].post && !ETYPES[o.type].boss && !o.station && o.state !== 'combat' && o.state !== 'search' && !o.sleep).sort((a, b) => Math.hypot(a.x - h.x, a.y - h.y) - Math.hypot(b.x - h.x, b.y - h.y))[0];
+        if (g) { g.state = 'search'; g.searchT = 0; g.sus = .8; g.invX = h.x + rand(-30, 30); g.invY = h.y + rand(-30, 30); guardPathTo(g, g.invX, g.invY); msg('SECURITY: "Something moved on camera ' + (L.enemies.filter(c => ETYPES[c.type].cam).indexOf(e) + 1) + ' — sending a man to check."', '#ff8a3d'); }
+      }
       if (e.sus >= 1) {
         e.sus = 1; e.bang = 1.2; sfx('spot');
         const sec = L.secOps || [];
@@ -1600,7 +1635,7 @@ function updateCamera(e, dt) {
           e.sus = .6; return;
         }
         if (sec.length) { // operators call it in: every guard on the floor knows where you are
-          msg('SECURITY: "Camera ' + (L.enemies.filter(c => ETYPES[c.type].cam).indexOf(e) + 1) + ' has movement — ' + compass(h.x - L.def.secRoom[0] * TS, h.y - L.def.secRoom[1] * TS) + ' of the control room! All units!"', '#ff8a3d');
+          msg('SECURITY: "Camera ' + (L.enemies.filter(c => ETYPES[c.type].cam).indexOf(e) + 1) + ' has movement — ' + (r => compass(h.x - (r[0] + r[2] / 2) * TS, h.y - (r[1] + r[3] / 2) * TS))(secRoomsOf(L.def).slice().sort((a, b) => Math.hypot(h.x / TS - a[0], h.y / TS - a[1]) - Math.hypot(h.x / TS - b[0], h.y / TS - b[1]))[0]) + ' of the control room! All units!"', '#ff8a3d');
           for (const o of L.enemies) if (!ETYPES[o.type].stat && !ETYPES[o.type].post && o.state !== 'combat' && !o.sleep && Math.hypot(o.x - h.x, o.y - h.y) < 1000) { o.state = 'search'; o.searchT = 0; o.sus = 1; o.invX = h.x + rand(-40, 40); o.invY = h.y + rand(-40, 40); guardPathTo(o, o.invX, o.invY); }
         }
         if (ALERTS[G.alert].lvl < 2) setAlert('RED', sec.length ? 'SECURITY ROOM: INTRUDERS ON CAMERA' : 'A CAMERA SPOTTED INTRUDERS', h.x, h.y);
@@ -1632,7 +1667,7 @@ function updateGuard(e, dt) {
       const dx = b.x - e.x, dy = b.y - e.y, d = Math.hypot(dx, dy);
       if (d < range * (e.type === 'spec' ? 1 : .8) && Math.abs(angDiff(e.angle, Math.atan2(dy, dx))) < cone * (e.type === 'spec' ? 1.2 : 1) && sightLine(e.x, e.y, b.x, b.y)) {
         b.found = true; e.state = 'search'; e.searchT = 0; e.sus = 1; e.invX = b.x; e.invY = b.y; e.bang = 1; guardPathTo(e, b.x, b.y);
-        sfx('spot'); msg('A guard found a body!', '#ffd23f');
+        sfx('spot'); msg('A guard found a body!', '#ffd23f'); secIncident(b.x, b.y, 'Body found');
         if (G.alert === 'GREEN') setAlert('YELLOW', 'BODY FOUND — GUARDS ARE SEARCHING');
         else if (G.alert === 'YELLOW' && L.bodies.filter(x => x.found).length >= 3) setAlert('RED', 'TOO MANY BODIES — ALARM RAISED', b.x, b.y);
         break;
@@ -1819,7 +1854,7 @@ function updateGuard(e, dt) {
     }
   }
   if (e.bodyguard) { // protect the operators with their lives: never leave them, stand between them and whoever is shooting
-    const op = (L.secOps || []).filter(o => L.enemies.includes(o) && o.hp > 0).sort((a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y))[0];
+    const op = e.ward === 'boss' ? (L.boss && L.boss.hp > 0 ? L.boss : null) : (L.secOps || []).filter(o => L.enemies.includes(o) && o.hp > 0).sort((a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y))[0];
     if (op) {
       const th = e.target && alive(e.target) ? e.target : e.state === 'search' || e.state === 'suspicious' ? { x: e.invX, y: e.invY } : null;
       let gx = e.hx, gy = e.hy;
@@ -1861,59 +1896,44 @@ function guardHeal(e) {
   if (hd < 64 || los(e.x, e.y, hg.x, hg.y)) return { x: (hg.x - e.x) / hd, y: (hg.y - e.y) / hd };
   guardPathTo(e, hg.x, hg.y); return flowDir(e, e.pf);
 }
+// GENERAL VOSS: fights from behind his desk and his bodyguards, shoots in bursts, throws grenades, calls his guards in, and never strays far from his office
 function bossAI(e, dt) {
   const T = ETYPES.boss, rage = e.hp < e.maxhp * .5, t = e.target;
   const dx = t.x - e.x, dy = t.y - e.y, dist = Math.hypot(dx, dy) || 1, toA = Math.atan2(dy, dx);
   const see = sightLine(e.x, e.y, t.x, t.y);
   const D = gd(), dmul = (G.mode === 'op' ? D.dmg / .8 : 1) * (e.dmgMul || 1);
   const src = { team: 'D', who: e, x: e.x, y: e.y };
-  e.patT -= dt; e.summonT -= dt;
-  if (!e.awakeMsg) { e.awakeMsg = true; banner('WARNING', 'IRONCLAD ENGAGED', '#c8a24a', 3); sfx('bosswake'); shake(10); }
-  let mvx = 0, mvy = 0, spd = T.speed * (rage ? 1.25 : 1);
-  if (e.pat === 'walk') {
-    const f = flowDir(e); if (f && dist > 160) { mvx = f.x; mvy = f.y; } else if (see && dist > 160) { mvx = dx / dist; mvy = dy / dist; }
-    e.angle = turnTo(e.angle, toA, 3 * dt);
-    if (see && e.cd <= 0) { enemyFire(e, toA + rand(-.08, .08), T.bspeed, T.dmg * dmul); e.cd = rage ? .55 : .8; sfx('eshot'); }
-    if (e.patT <= 0) {
-      const opts = ['burst', 'rockets', 'charge']; if (rage) opts.push('rockets', 'charge');
-      e.pat = see ? pick(opts) : 'walk'; e.patT = e.pat === 'burst' ? 1.6 : e.pat === 'rockets' ? 1.3 : 1.1;
-      if (e.pat === 'charge') { e.chargeT = .75; sfx('charge'); msg('IRONCLAD IS CHARGING!', '#ff3b3b'); }
-      if (e.pat === 'burst') e.burst = rage ? 12 : 8;
-      if (e.pat === 'rockets') e.burst = rage ? 4 : 3;
-      e.burstT = 0;
-    }
-  } else if (e.pat === 'burst') { // minigun
-    e.angle = turnTo(e.angle, toA, 4 * dt); e.burstT -= dt;
-    if (e.burst > 0 && e.burstT <= 0) {
-      e.burstT = .1; e.burst--;
-      for (const s of [-1, 1]) enemyFire(e, e.angle + s * .12 + rand(-.06, .06), T.bspeed * 1.1, T.dmg * .7 * dmul, '#ffd23f', 4);
-      sfx('lmg', shotVol(e.x, e.y)); flashLight(e.x, e.y, 120, .6);
-    }
-    if (e.patT <= 0) { e.pat = 'walk'; e.patT = rand(1.8, 3); }
-  } else if (e.pat === 'rockets') { // rocket salvo: slow explosive shells
-    e.angle = turnTo(e.angle, toA, 3 * dt); e.burstT -= dt;
-    if (e.burst > 0 && e.burstT <= 0) {
-      e.burstT = .38; e.burst--;
-      enemyFire(e, toA + rand(-.25, .25), 330, 0, '#ff6b3d', 7, { rocket: true, life: 2.6, rdmg: 55 * dmul });
-      sfx('rpg', shotVol(e.x, e.y)); shake(3);
-    }
-    if (e.patT <= 0) { e.pat = 'walk'; e.patT = rand(1.8, 3); }
-  } else if (e.pat === 'charge') {
-    if (e.chargeT > 0) { e.chargeT -= dt; e.angle = turnTo(e.angle, toA, 6 * dt); e.cvx = Math.cos(e.angle); e.cvy = Math.sin(e.angle); burst(e.x, e.y, '#ff3b3b', 1, 60, .3, 3); }
-    else {
-      const ox = e.x, oy = e.y; spd = 420;
-      moveCircle(e, e.cvx * spd * dt, e.cvy * spd * dt);
-      if (Math.hypot(e.x - ox, e.y - oy) < spd * dt * .4) { e.patT = 0; shake(8); burst(e.x + e.cvx * e.r, e.y + e.cvy * e.r, '#aaa', 14, 200, .5, 4); }
-      for (const u of hostilesOf('D')) if (Math.hypot(u.x - e.x, u.y - e.y) < e.r + u.r + 6 && !(e.hitList || []).includes(u)) { (e.hitList = e.hitList || []).push(u); hurtAny(u, 24 * dmul, src); moveCircle(u, e.cvx * 36, e.cvy * 36); }
-      if (e.patT <= 0) { e.pat = 'walk'; e.patT = rand(2, 3); e.hitList = []; }
-      return;
-    }
+  if (!e.awakeMsg) { e.awakeMsg = true; banner('WARNING', 'GENERAL VOSS HAS SEEN YOU', '#c8a24a', 3); sfx('bosswake'); shake(6); msg('GENERAL VOSS: "' + pick(['You came all this way to die in my office?', 'Guards! Kill them!', 'Nobody walks into my office uninvited.']) + '"', '#c8a24a'); }
+  e.calls = e.calls || 0; // at 75%, 50% and 25% health he shouts for help: the closest free guards come running
+  if (e.calls < 3 && e.hp < e.maxhp * [.75, .5, .25][e.calls]) {
+    e.calls++; msg('GENERAL VOSS: "' + pick(['Guards! To me!', 'Get in here, now!', 'Protect your general!']) + '"', '#c8a24a');
+    let n = 0; for (const o of L.enemies.filter(o => o !== e && !ETYPES[o.type].stat && !ETYPES[o.type].boss && o.state !== 'combat' && !o.sleep).sort((a, b) => Math.hypot(a.x - e.x, a.y - e.y) - Math.hypot(b.x - e.x, b.y - e.y))) { if (n++ >= 3) break; enterCombat(o, t); }
   }
-  if (rage && e.summonT <= 0) {
-    e.summonT = 12;
-    if (L.enemies.filter(o => o.type === 'drone').length < 4) { const d = makeEnemy('drone', e.x + rand(-30, 30), e.y + rand(-30, 30), null, gd()); d.state = 'combat'; d.target = t; L.enemies.push(d); msg('IRONCLAD LAUNCHED A DRONE', '#5cc8ff'); }
+  let mvx = 0, mvy = 0, spd = T.speed * (rage ? 1.15 : 1);
+  const homeD = Math.hypot(e.hx - e.x, e.hy - e.y);
+  e.covCd = (e.covCd || 0) - dt;
+  if (!e.cov && see && G.time - (e.lastHitT || -9) < .5 && e.covCd <= 0) { const c = findCover(e, t); if (c && Math.hypot(c.x - e.hx, c.y - e.hy) < 200) e.cov = { x: c.x, y: c.y, px: e.x, py: e.y, t: .9, phase: 'hide' }; else e.covCd = 1.5; }
+  if (e.cov) { // duck behind the desk / a pillar, then pop back out
+    e.cov.t -= dt; const cx = e.cov.phase === 'hide' ? e.cov.x : e.cov.px, cy = e.cov.phase === 'hide' ? e.cov.y : e.cov.py, cd = Math.hypot(cx - e.x, cy - e.y);
+    if (cd > 6) { mvx = (cx - e.x) / cd; mvy = (cy - e.y) / cd; spd *= 1.3; }
+    if (e.cov.t <= 0) { if (e.cov.phase === 'hide') { e.cov.phase = 'peek'; e.cov.t = 1.4; } else { e.cov = null; e.covCd = 2.5; } }
+  } else if (homeD > 200) { guardPathTo(e, e.hx, e.hy); const f = flowDir(e, e.pf); if (f) { mvx = f.x; mvy = f.y; } } // never leaves his office for long
+  else if (dist < 150) { mvx = -dx / dist; mvy = -dy / dist; } // keeps his distance, lets the bodyguards close in
+  else if (see) { if (Math.random() < dt * .4) e.strafe *= -1; mvx = -dy / dist * e.strafe * .6; mvy = dx / dist * e.strafe * .6; }
+  e.angle = turnTo(e.angle, see ? toA : Math.atan2(mvy || dy, mvx || dx), 6 * dt);
+  if (see && e.cd <= 0 && dist < T.range && Math.abs(angDiff(e.angle, toA)) < .4) { // three-round bursts
+    enemyFire(e, toA + rand(-.05, .05), T.bspeed, T.dmg * dmul); sfx('eshot', shotVol(e.x, e.y)); e.flash2 = .06; flashLight(e.x, e.y, 90, .5);
+    e.burstN = (e.burstN || 0) + 1; e.cd = e.burstN >= 3 ? (e.burstN = 0, rage ? .65 : .95) : T.rate;
   }
-  if (dist < e.r + t.r + 4 && e.cd <= 0) { hurtAny(t, 14 * dmul, src); e.cd = .8; }
+  e.nadeT = (e.nadeT === undefined ? 4 : e.nadeT) - dt; // flushes you out of cover with a grenade
+  if (e.nadeT <= 0 && dist > 120 && dist < 360 && (!see || rage)) {
+    e.nadeT = rage ? 6 : 9; sfx('throw'); const gs = Math.min(460, dist * 1.6);
+    grenades.push({ x: e.x, y: e.y, vx: Math.cos(toA) * gs, vy: Math.sin(toA) * gs, r: 5, fuse: 1.2, kind: 'frag', team: 'D', who: e });
+    msg('GENERAL VOSS: "Grenade!"', '#c8a24a');
+  }
+  if (dist < e.r + t.r + 6 && e.cd <= 0) { hurtAny(t, 18 * dmul, src); e.cd = .8; } // pistol-whip at arm's length
+  for (const o of L.enemies) if (o !== e) { const ox = e.x - o.x, oy = e.y - o.y, d = Math.hypot(ox, oy), m = e.r + o.r + 2; if (d < m && d > 0) { mvx += ox / d * (m - d) / m * 1.5; mvy += oy / d * (m - d) / m * 1.5; } }
+  const ml = Math.hypot(mvx, mvy); if (ml > 1) { mvx /= ml; mvy /= ml; } if (ml > .01) e.walk = (e.walk || 0) + dt * 10 * ml;
   moveCircle(e, mvx * spd * dt, mvy * spd * dt);
 }
 
@@ -2115,7 +2135,7 @@ const HAWK_BRIEF = [
   'Barracks. YELLOW keycard is in the officers\' quarters, north-east. Freight elevator is south-east in the motor pool. Don\'t wake the dorms.',
   'Security HQ. Cell block is in the middle — the RED keycard is in there. GREEN key in the monitoring room opens the east wing. Kill the cameras if you can.',
   'Command center. Vault is off the generator hall, code halves in comms and the barracks. The lift is behind a RED door on the east corridor.',
-  'The silo. IRONCLAD is in there. Gate code halves in launch control and fuel storage, YELLOW key in fuel storage. Drop him and we fly out east.',
+  'The General\'s office. Code halves in the two security rooms, YELLOW key in the east one. Kill Voss and we fly out east.',
 ];
 const hawk = () => OPS.find(o => o.cmdr && o.state === 'ok');
 function hawkSay(t) { msg(HAWK_NAME + ': "' + t + '"', HAWK_COL); sfx('radio'); }
@@ -2125,7 +2145,7 @@ function hawkReads(n) {
   hawkSay('Found "' + n.title + '"' + (codes.length ? ' — code ' + codes.join(' / ') : '') + '. It\'s in your datapad (TAB).');
   for (const o of OPS) if (o.cmdr) o.planT = 0;
 }
-// what should we do next? keycards, then IRONCLAD, then codes (notes -> keypads), then the exit
+// what should we do next? keycards, then the General, then codes (notes -> keypads), then the exit
 function planHawk(o) {
   const reach = L.tmp; bfs(tileIdx(o), unitPass(o), reach);
   let goal = null, gd = 65535;
@@ -2629,7 +2649,7 @@ function updateDoors(dt) {
       d.warnT = 2.5; sfx('deny');
       if (d.sealed) msg('SEALED BY LOCKDOWN — find another way', '#ff3b3b');
       else if (DOORKEY[d.type]) msg(DOORKEY[d.type].toUpperCase() + ' KEYCARD REQUIRED' + (d.codeGate !== undefined ? ' + DOOR CODE' : ''), KEYCOL[DOORKEY[d.type]]);
-      else if (d.type === 'B') msg(L.def.core && d.gate === 1 ? 'BLAST GATE — opens when IRONCLAD goes down' : 'BLAST GATE LOCKED — use the keypad next to it', '#ff8a3d');
+      else if (d.type === 'B') msg(L.def.core && d.gate === 1 ? 'BLAST GATE — opens when the GENERAL goes down' : 'BLAST GATE LOCKED — use the keypad next to it', '#ff8a3d');
       else if (d.type === 'h') msg('EMERGENCY HATCH — only opens during an alarm (CODE RED)', '#ff8a3d');
     }
     let want = 0;
@@ -2947,7 +2967,7 @@ function statsHTML(s) {
 }
 function winScreen() {
   showScreen(`<div class="card"><h1 style="font-size:clamp(34px,9vw,64px)">EXTRACTED<span style="color:#4fd8ff">FORT IRONGATE IS GONE</span></h1>
-    <p class="sub">The heli lifts off as the silo goes up behind you. VIPER whistles. GHOST doesn't say a word.<br>Mission complete.</p>
+    <p class="sub">The heli lifts off as the command floor goes up behind you. VIPER whistles. GHOST doesn't say a word.<br>Mission complete.</p>
     ${statsHTML(G.totalStats)}<button class="btn" data-act="newop">Play Again</button><button class="btn alt" data-act="menu">Main Menu</button></div>`, ACTIONS.newop);
 }
 function deathScreen() {
@@ -3312,18 +3332,13 @@ function drawGuard(e, now) {
     for (let i = 0; i < 4; i++) { const a = i * TAU / 4 + Math.PI / 4, rx = Math.cos(a) * 11, ry = Math.sin(a) * 11; ctx.beginPath(); ctx.moveTo(rx - Math.cos(e.anim * 40 + i) * 5, ry - Math.sin(e.anim * 40 + i) * 5); ctx.lineTo(rx + Math.cos(e.anim * 40 + i) * 5, ry + Math.sin(e.anim * 40 + i) * 5); ctx.stroke(); }
     ctx.fillStyle = e.state === 'combat' ? '#ff3b3b' : '#5cc8ff'; ctx.beginPath(); ctx.arc(Math.cos(e.angle) * 3, Math.sin(e.angle) * 3, 3, 0, TAU); ctx.fill();
     ctx.restore();
-  } else if (e.type === 'boss') {
-    ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.angle);
-    if (e.pat === 'charge' && e.chargeT > 0) { ctx.strokeStyle = `rgba(255,59,59,${.5 + .5 * Math.sin(now * 40)})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, e.r + 8, 0, TAU); ctx.stroke(); }
-    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(4, 6, e.r * 1.1, e.r * 1.2, 0, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#1a1c18'; ctx.fillRect(10, -e.r + 2, 30, 9); ctx.fillRect(10, e.r - 11, 22, 11);
-    ctx.fillStyle = '#ff6b3d'; ctx.fillRect(30, e.r - 9, 4, 7);
-    ctx.fillStyle = fl ? '#fff' : '#5c5326'; ctx.beginPath(); ctx.ellipse(0, 0, e.r * .9, e.r * 1.15, 0, 0, TAU); ctx.fill();
-    ctx.fillStyle = fl ? '#fff' : '#7a6d32'; ctx.beginPath(); ctx.arc(0, 0, e.r * .75, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#ffd23f'; for (let i = -2; i <= 2; i++) ctx.fillRect(-e.r * .6, i * 6 - 1.5, 8, 3);
-    ctx.fillStyle = '#20231c'; ctx.beginPath(); ctx.arc(4, 0, 10, 0, TAU); ctx.fill();
-    ctx.fillStyle = e.hp < e.maxhp * .5 ? '#ff9f1a' : '#ff3b3b'; ctx.fillRect(9, -6, 4, 12);
-    ctx.restore();
+  } else if (e.type === 'boss') { // General Voss: dress uniform, peaked cap, gold braid, sidearm
+    drawTrooper(e.x, e.y, e.angle, { body: '#3f4a33', head: '#c8a07a', vest: '#2f3826', flash: fl, muzzle: e.flash2 > 0, gunLen: 14, walk: e.walk, big: true }, now);
+    if (!fl) { ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.angle);
+      ctx.fillStyle = '#d4af37'; ctx.fillRect(-4, -14, 7, 3); ctx.fillRect(-4, 11, 7, 3); // epaulettes
+      ctx.fillStyle = '#c0392b'; ctx.fillRect(-7, -5, 2, 4); ctx.fillStyle = '#3fb6ff'; ctx.fillRect(-7, 0, 2, 4); // ribbons
+      ctx.fillStyle = '#26301f'; ctx.beginPath(); ctx.arc(0, 0, 6.5, 0, TAU); ctx.fill(); ctx.fillStyle = '#d4af37'; ctx.fillRect(3, -4, 3, 8); // peaked cap
+      ctx.restore(); }
   }
   if (e.hp < e.maxhp && e.type !== 'boss') {
     ctx.fillStyle = '#000'; ctx.fillRect(e.x - 13, e.y - e.r - 9, 26, 4);
@@ -3566,7 +3581,7 @@ function drawHUD(now) {
     if (boss) {
       const bw = Math.min(W - 40, 520), by = small ? 300 : H - 60;
       ctx.fillStyle = 'rgba(0,0,0,.75)'; ctx.fillRect(W / 2 - bw / 2 - 4, by - 18, bw + 8, 34);
-      ctx.fillStyle = '#c8a24a'; ctx.font = 'bold 12px "Share Tech Mono",monospace'; ctx.fillText('IRONCLAD — SILO GUARDIAN', W / 2, by - 5);
+      ctx.fillStyle = '#c8a24a'; ctx.font = 'bold 12px "Share Tech Mono",monospace'; ctx.fillText('GENERAL VOSS — BASE COMMANDER', W / 2, by - 5);
       ctx.fillStyle = '#330'; ctx.fillRect(W / 2 - bw / 2, by, bw, 10);
       ctx.fillStyle = boss.hp < boss.maxhp * .5 ? '#ff9f1a' : '#ff3b3b'; ctx.fillRect(W / 2 - bw / 2, by, bw * boss.hp / boss.maxhp, 10);
     }
@@ -3686,7 +3701,7 @@ function objective() {
   }
   if (sub === 'COMMAND CENTER') return !k.red ? 'Open the VAULT off the generator hall (code halves: comms + barracks) and take the RED keycard' : 'Reach the COMMAND LIFT behind the RED door (east corridor)';
   if (G.alert === 'BLACK') return 'SELF-DESTRUCT! Get to the EXTRACTION HELI on the east pad';
-  return 'Get into the silo and take down IRONCLAD (gate code, YELLOW door, or the fuel hatch)';
+  return 'Take out GENERAL VOSS in his office (command floor: gate code, YELLOW door, or the east hatch)';
 }
 
 /* ---------------- PANELS (codepad / notes / datapad) ---------------- */
@@ -3809,7 +3824,7 @@ function menu() {
       <div class="code" style="color:#ff3b3b;border-color:#ff3b3b">RED · ALARM</div>
       <div class="code" style="color:#c070ff;border-color:#c070ff">BLACK · SELF-DESTRUCT</div>
     </div>
-    <p class="sub">Fort Irongate: five sectors, from the outer fence down to the missile silo.<br>Sneak in with your squad — or hold the base against an intruder squad.</p>
+    <p class="sub">Fort Irongate: five sectors, from the outer fence down to the General's office.<br>Sneak in with your squad — or hold the base against an intruder squad.</p>
     <button class="btn" data-act="opmenu">▶ Infiltrate</button><button class="btn" data-act="defmenu" style="border-color:#3ddc84">⛨ Defend the Base</button>
     <div class="keys">
       <b>WASD</b><span>move · SHIFT sprint (loud) · C crouch (quiet)</span>
@@ -3830,7 +3845,7 @@ function opMenu() {
   const d = G.odiff || 2, un = getSaved(), sq = TIERS[Math.max(0, d - 1)];
   const secs = LEVELS.map((l, i) => `<button class="btn alt" data-act="osector" data-arg="${i}" ${i > un ? 'disabled' : ''} style="font-size:11px;padding:8px 10px">${l.name}<br>${l.sub}</button>`).join('');
   showScreen(`<div class="card"><h2 style="color:#4fd8ff">INFILTRATE</h2>
-    <p class="sub">Start outside the fence. Get into Fort Irongate, go down through all five sectors and take out IRONCLAD in the missile silo. A second squad, <b style="color:#b8e07a">BRAVO</b> (SGT. KANE + 3 soldiers), starts on your right (turn it on or off below) and works the sector on its own — grabbing keycards, reading codes, opening gates. Press <b>T</b> to radio KANE. You lead your squad of three — <b style="color:#7fe0d0">VIPER, GHOST and SABER</b> — who move when you move, freezes when a guard looks their way, knifes guards who are alone, and only opens fire when the squad is spotted (or when you say weapons free).</p>
+    <p class="sub">Start outside the fence. Get into Fort Irongate, go down through all five sectors and take out GENERAL VOSS in his office. A second squad, <b style="color:#b8e07a">BRAVO</b> (SGT. KANE + 3 soldiers), starts on your right (turn it on or off below) and works the sector on its own — grabbing keycards, reading codes, opening gates. Press <b>T</b> to radio KANE. You lead your squad of three — <b style="color:#7fe0d0">VIPER, GHOST and SABER</b> — who move when you move, freezes when a guard looks their way, knifes guards who are alone, and only opens fire when the squad is spotted (or when you say weapons free).</p>
     <div class="lbl">DIFFICULTY (BASE GUARDS)</div><div>${diffButtons(d, 'odiff')}</div>
     <div style="margin:8px 0;font-size:12px;color:#9aa58e">Guards: ${['', 'slow to notice, weak aim', 'normal', 'sharp eyes, good aim', 'notice you fast, deadly aim'][d]} · Your squad: <span style="color:${sq.color}">${sq.name}</span> (your level, tougher than the guards)</div>
     <div class="lbl">SECOND SQUAD</div><div><button class="btn ${G.useBravo !== false ? '' : 'alt'}" data-act="obravo" style="font-size:13px;padding:10px 14px">${G.useBravo !== false ? '✔ BRAVO SQUAD: ON' : '✘ BRAVO SQUAD: OFF'}</button><div style="font-size:12px;color:#9aa58e;margin:4px 0">${G.useBravo !== false ? 'SGT. KANE + 3 start on your right and work the sector on their own (press T to radio them)' : 'Just you and your three'}</div></div>
