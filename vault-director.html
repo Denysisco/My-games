@@ -2,16 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vault Director</title>
 <style>
-  :root { --crt: #7dffa0; --crt-dim: #3fae63; --crt-bg: #031007; --amber: #f2b33d; --txt: #e8e2d2; --dim: #9a917f; --bad: #ff5a4a; --good: #7fe08a; --panel: rgba(14,16,18,.95); --line: #3e4a52; --hud: 54px; --toast-top: 92px; color-scheme: dark; }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; height: 100%; background: #07090b; color: var(--txt); font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif; overflow: hidden; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; overscroll-behavior: none; }
-  canvas { position: fixed; left: 0; top: 0; display: block; touch-action: none; }
+  :root { --crt: #7dffa0; --crt-dim: #3fae63; --crt-bg: #031007; --amber: #f2b33d; --txt: #e8e2d2; --dim: #9a917f; --bad: #ff5a4a; --good: #7fe08a; --panel: rgba(14,16,18,.95); --line: #3e4a52; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #07090b; color: var(--txt); font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif; overflow: hidden; user-select: none; }
+  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
   .hidden { display: none !important; }
-  .ov { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; background: rgba(3,5,7,.6); overflow-y: auto; padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px)); }
-  .ov > * { margin: auto; } /* centred, but scrolls instead of clipping when the screen is too short */
+  .ov { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; background: rgba(3,5,7,.6); }
   .btn { font: 600 14px "Trebuchet MS", system-ui, sans-serif; letter-spacing: 1px; background: #1c252c; color: var(--txt); border: 1px solid #4b5d68; padding: 8px 16px; margin: 4px; cursor: pointer; border-radius: 3px; }
   .btn:hover { background: #26343e; border-color: var(--amber); color: #ffd98a; }
   .btn:disabled { opacity: .35; cursor: default; }
@@ -62,66 +61,17 @@
   /* overlays */
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 22px 28px; max-width: 92vw; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
   .card h2 { margin: 0 0 10px; letter-spacing: 3px; color: #f6d27a; }
-  #toast { position: fixed; left: 50%; top: var(--toast-top); transform: translateX(-50%); z-index: 20; pointer-events: none; text-align: center; width: max-content; max-width: calc(100vw - 32px); }
-  #toast div { background: rgba(10,14,18,.88); border: 1px solid #4b5d68; border-left: 4px solid var(--amber); padding: 8px 18px; margin: 5px; color: #ffe2a0; letter-spacing: 1px; font-size: 15px; animation: tfade 4.5s forwards; }
-  body.termopen #toast { top: auto; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
+  #toast { position: fixed; left: 50%; top: 92px; transform: translateX(-50%); z-index: 20; pointer-events: none; text-align: center; }
+  #toast div { background: rgba(10,14,18,.88); border: 1px solid #4b5d68; border-left: 4px solid var(--amber); padding: 8px 18px; margin: 5px; color: #ffe2a0; letter-spacing: 1px; font-size: 15px; animation: tfade 4.5s forwards; white-space: nowrap; }
+  body.termopen #toast { top: auto; bottom: 18px; }
   .tbtn.on, .tbtn.on:hover { background: var(--crt); color: var(--crt-bg); text-shadow: none; cursor: default; }
   #toast div.bad { border-left-color: var(--bad); color: #ffb2a8; }
   #toast div.good { border-left-color: var(--good); color: #c6f5c6; }
   @keyframes tfade { 0% { opacity: 0; transform: translateY(-8px); } 6% { opacity: 1; transform: none; } 85% { opacity: 1; } 100% { opacity: 0; } }
-  #info { position: fixed; z-index: 15; pointer-events: none; background: rgba(10,14,18,.94); border: 1px solid #4b5d68; border-radius: 5px; padding: 10px 14px; font-size: 13px; min-width: 220px; max-width: calc(100vw - 32px); }
+  #info { position: fixed; z-index: 15; background: rgba(10,14,18,.94); border: 1px solid #4b5d68; border-radius: 5px; padding: 10px 46px 10px 14px; font-size: 13px; min-width: 220px; }
+  #info .infox { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; padding: 0; font: 700 15px/1 "Trebuchet MS", system-ui, sans-serif; color: var(--txt); background: #1c252c; border: 1px solid #4b5d68; border-radius: 4px; cursor: pointer; }
+  #info .infox:hover, #info .infox:focus-visible { background: #26343e; border-color: var(--amber); color: #ffd98a; outline: none; }
   #info b { color: #ffd98a; }
-  /* touch: on-screen controls (shown on phones / tablets while you play) */
-  .touchonly { display: none; }
-  body.touch .touchonly { display: grid; } body.touch .keyonly { display: none; }
-  #pad { display: none; }
-  body.touch.playing #pad { display: block; }
-  #pad button, #stick { position: fixed; z-index: 5; touch-action: none; font: 700 13px "Trebuchet MS", system-ui, sans-serif; color: var(--txt); background: rgba(10,14,18,.62); border: 1.5px solid rgba(242,179,61,.55); border-radius: 14px; letter-spacing: 1px; padding: 0; }
-  #pad button:active, #pad button.on { background: rgba(242,179,61,.55); color: #140d02; }
-  #stick { left: calc(14px + env(safe-area-inset-left, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); width: 168px; height: 72px; border-radius: 36px; }
-  #stick span { position: absolute; top: 50%; transform: translateY(-50%); color: rgba(242,179,61,.7); font-size: 20px; pointer-events: none; }
-  #stick .l { left: 14px; } #stick .r { right: 14px; }
-  #knob { position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; background: rgba(242,179,61,.35); border: 2px solid rgba(255,217,138,.8); pointer-events: none; }
-  #stick.run #knob { background: rgba(242,179,61,.75); }
-  #bUse { right: calc(14px + env(safe-area-inset-right, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); width: min(196px, calc(100vw - 214px)); height: 72px; padding: 0 10px !important; line-height: 1.2; font-size: 12px !important; }
-  #bUse b { display: block; font-size: 16px; color: #ffd98a; letter-spacing: 2px; }
-  #bUseL { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  #bUse.idle { opacity: .55; }
-  #bUse.on b { color: #140d02; }
-  #bReload, #bStim { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); width: 58px; height: 50px; }
-  #bReload { right: calc(80px + env(safe-area-inset-right, 0px)); } #bStim { right: calc(14px + env(safe-area-inset-right, 0px)); }
-  #bMap, #bSpeed, #bPause { top: calc(var(--hud) + 8px); width: 46px; height: 40px; }
-  #bPause { right: calc(14px + env(safe-area-inset-right, 0px)); } #bSpeed { right: calc(66px + env(safe-area-inset-right, 0px)); } #bMap { right: calc(118px + env(safe-area-inset-right, 0px)); }
-  body.touch .keyhint { display: none; }
-  /* small screens: the terminal fills the screen, columns stack, wide tables scroll */
-  @media (max-width: 760px), (max-height: 520px) {
-    #term { padding: 0; }
-    #term .crt { width: 100%; height: 100%; border-radius: 0; border: 0; box-shadow: inset 0 0 60px rgba(0,0,0,.85); padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
-    .thead { padding: 10px 14px 6px; flex-wrap: wrap; gap: 6px; }
-    .thead h1 { font-size: 16px; }
-    .ttabs { flex-wrap: nowrap; overflow-x: auto; padding: 6px 10px; }
-    .ttab { flex: none; }
-    .tbody { padding: 10px 12px; font-size: 13px; }
-    .cog { display: none; }
-    .cols { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
-    table.tt { display: block; overflow-x: auto; }
-    #toast div { font-size: 13px; padding: 6px 12px; letter-spacing: .5px; }
-  }
-  @media (max-width: 760px) {
-    .cols { grid-template-columns: minmax(0, 1fr); gap: 0; }
-    .bar { width: 60px; }
-    .gm-row { grid-template-columns: 26px repeat(3, minmax(0, 1fr)) 10px repeat(3, minmax(0, 1fr)); gap: 3px; }
-    .gm { font-size: 9px; padding: 5px 2px; overflow-wrap: anywhere; min-height: 40px; }
-    .gm.flr { font-size: 8px; padding-top: 12px; }
-    .controls { grid-template-columns: auto minmax(0, 1fr); font-size: 13px; }
-    .card { padding: 18px 16px; }
-  }
-  @media (pointer: coarse) {
-    .tbtn { padding: 8px 12px; min-height: 36px; touch-action: manipulation; }
-    .ttab { padding: 8px 12px; touch-action: manipulation; }
-    table.tt td { padding: 7px 6px; }
-    .gm, .btn { touch-action: manipulation; }
-  }
 </style>
 </head>
 <body>
@@ -129,12 +79,12 @@
 <div id="toast"></div>
 <div id="info" class="hidden"></div>
 
-<div id="title" class="ov"><div>
+<div id="title" class="ov">
   <div class="cog"></div>
   <h1 class="logo">VAULT DIRECTOR</h1>
   <div class="tag">THE BOMBS FELL. YOUR VAULT HOLDS. YOU'RE IN CHARGE.</div>
   <div id="titleBtns"></div>
-  <div class="controls keyonly">
+  <div class="controls">
     <span><span class="key">A</span><span class="key">D</span></span><span>walk left / right &nbsp;·&nbsp; <span class="key">Shift</span> run</span>
     <span><span class="key">E</span></span><span>use: your computer, the elevator, the vault door, talk to dwellers, scavenge</span>
     <span><span class="key">W</span><span class="key">S</span></span><span>in the elevator: ride up / down (or press a floor number <span class="key">1</span>–<span class="key">6</span>)</span>
@@ -142,15 +92,7 @@
     <span><span class="key">Wheel</span> <span class="key">Z</span></span><span>zoom in / out &nbsp;·&nbsp; <span class="key">Z</span> whole-vault view &nbsp;·&nbsp; <span class="key">T</span> game speed 1x / 2x / 3x</span>
     <span><span class="key">Esc</span></span><span>pause &amp; save</span>
   </div>
-  <div class="controls touchonly">
-    <span><span class="key">◀ ▶</span></span><span>slide your thumb on the pad to walk · push it all the way to run</span>
-    <span><span class="key">USE</span></span><span>your computer, the elevator, the vault door, talk to dwellers, scavenge</span>
-    <span><span class="key">Tap</span></span><span>tap or hold on the vault to aim and fire your pistol · <span class="key">↻</span> reload · <span class="key">💉</span> stimpak</span>
-    <span><span class="key">1–6</span></span><span>in the elevator: tap a floor on the elevator panel</span>
-    <span><span class="key">Pinch</span></span><span>zoom in / out · <span class="key">MAP</span> whole-vault view · <span class="key">1x</span> game speed</span>
-    <span><span class="key">II</span></span><span>pause &amp; save · turn your phone sideways for a wider view</span>
-  </div>
-</div></div>
+</div>
 
 <div id="term" class="ov hidden"><div class="crt">
   <div class="thead"><h1 id="tTitle">DIRECTOR TERMINAL</h1><span id="tClock" class="dim"></span></div>
@@ -159,16 +101,6 @@
 </div></div>
 
 <div id="pause" class="ov hidden"><div class="card" id="pauseBody"></div></div>
-
-<div id="pad">
-  <div id="stick"><span class="l">◀</span><span class="r">▶</span><div id="knob"></div></div>
-  <button id="bUse" class="idle"><b>USE</b><span id="bUseL"></span></button>
-  <button id="bReload">↻</button>
-  <button id="bStim">💉</button>
-  <button id="bMap">MAP</button>
-  <button id="bSpeed">1x</button>
-  <button id="bPause">II</button>
-</div>
 <script>
 'use strict';
 /* =====================================================================
@@ -266,7 +198,7 @@ const RAIDERS = {
 /* ---------- audio: tiny synth, no files ---------- */
 let AC = null, master = null, sirenOsc = null, sirenGain = null, humGain = null;
 function audioInit() {
-  if (AC) { if (AC.state === 'suspended') AC.resume().catch(() => { }); return; } // iOS starts audio suspended until a tap
+  if (AC) return;
   try {
     AC = new (window.AudioContext || window.webkitAudioContext)();
     master = AC.createGain(); master.gain.value = .55; master.connect(AC.destination);
@@ -1249,16 +1181,8 @@ function rejectVisitor() { const v = G.visitor; if (!v) return; v.flee = true; a
    RENDER: textures, room art (2.5D cutaway), people, surface, lighting, HUD
    ===================================================================== */
 const cv = $('c'), ctx = cv.getContext('2d');
-let VW = 1280, VH = 800, DPR = 1, SAFE = { t: 0, r: 0, b: 0, l: 0 };
-const safeProbe = document.createElement('div'); // reads the phone's notch / home-bar insets
-safeProbe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)';
-document.body.appendChild(safeProbe);
-function resize() {
-  DPR = Math.min(2, window.devicePixelRatio || 1); VW = innerWidth; VH = innerHeight;
-  cv.width = Math.round(VW * DPR); cv.height = Math.round(VH * DPR); cv.style.width = VW + 'px'; cv.style.height = VH + 'px'; // not 100vh: on iOS that's taller than the visible screen
-  const cs = getComputedStyle(safeProbe);
-  SAFE = { t: parseFloat(cs.paddingTop) || 0, r: parseFloat(cs.paddingRight) || 0, b: parseFloat(cs.paddingBottom) || 0, l: parseFloat(cs.paddingLeft) || 0 };
-}
+let VW = 1280, VH = 800, DPR = 1;
+function resize() { DPR = Math.min(2, window.devicePixelRatio || 1); VW = innerWidth; VH = innerHeight; cv.width = Math.round(VW * DPR); cv.height = Math.round(VH * DPR); }
 
 function rr(g, x, y, w, h, r) { r = Math.min(r, w / 2, h / 2); g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 function makeTex(w, h, fn) { const c = document.createElement('canvas'); c.width = w; c.height = h; fn(c.getContext('2d'), w, h); return c; }
@@ -1461,12 +1385,74 @@ function artStorage(g, L) {
     for (let y = 80; y < BACK; y += 48) { g.fillStyle = '#6f7478'; g.fillRect(x, y, 104, 4); for (let b = 0; b < 3; b++) { g.fillStyle = pick(['#8a6a3b', '#7a5a2e', '#5a6a3b', '#6b6b6b']); g.fillRect(x + 6 + b * 32, y - 26, 28, 26); g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(x + 6 + b * 32, y - 14, 28, 2); } }
   }
 }
+// SECURITY: units 1, 3… are the CCTV monitoring station, units 2, 4… the weapons cage and the vault plan
+const SEC_SCREENS = L => { const out = []; for (let j = 0; j < 2; j++) for (let i = 0; i < 3; i++) out.push({ x: L + 28 + i * 70, y: 44 + j * 42, w: 64, h: 36 }); return out; };
+const SEC_PLAN = { x: 134, y: 36, w: 112, h: 74 };
+function secPlanX(wx) { return wx < ELX ? 6 + wx / ELX * 42 : wx < ELX + EW ? 50 + (wx - ELX) / EW * 10 : 62 + (wx - ELX - EW) / (3 * U) * 42; }
 function artSecurity(g, L, k) {
-  g.fillStyle = '#15191c'; rr(g, L + 30, 36, 200, 92, 6); g.fill();
-  for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) { g.fillStyle = '#0a0f12'; g.fillRect(L + 40 + i * 64, 44 + j * 42, 56, 34); }
-  g.fillStyle = '#3b4650'; g.fillRect(L + 40, BACK - 38, 180, 10); g.fillStyle = '#2b333a'; g.fillRect(L + 48, BACK - 28, 8, 28); g.fillRect(L + 204, BACK - 28, 8, 28);
-  g.fillStyle = '#5c6a74'; g.fillRect(L + 120, BACK - 50, 24, 12); g.strokeStyle = '#9aa'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(L + 140, BACK - 50); g.lineTo(L + 150, BACK - 70); g.stroke();
-  if (k === 0) { g.fillStyle = '#5fa8ff'; g.font = 'bold 11px Arial'; g.fillText('SECURITY', L + 36, 146); }
+  if (k % 2 === 0) {
+    // monitor wall: steel bezel, header strip, six screen wells (the camera feeds are drawn live)
+    g.fillStyle = 'rgba(0,0,0,.35)'; rr(g, L + 16, 33, 228, 101, 7); g.fill();
+    const bz = g.createLinearGradient(0, 30, 0, 130); bz.addColorStop(0, '#3d4955'); bz.addColorStop(1, '#222a31');
+    g.fillStyle = bz; rr(g, L + 18, 30, 224, 100, 6); g.fill(); g.strokeStyle = 'rgba(0,0,0,.55)'; g.lineWidth = 1.5; g.stroke();
+    g.fillStyle = '#0a0f13'; rr(g, L + 22, 34, 216, 92, 4); g.fill();
+    g.fillStyle = '#5fa8ff'; g.font = 'bold 7px Arial'; g.fillText('CCTV MONITORING', L + 34, 41);
+    // shield badge in the corner of the header
+    g.fillStyle = '#5fa8ff'; g.beginPath(); g.moveTo(L + 224, 35.5); g.lineTo(L + 231, 37.5); g.lineTo(L + 230, 41); g.quadraticCurveTo(L + 227.5, 44, L + 224, 45); g.quadraticCurveTo(L + 220.5, 44, L + 218, 41); g.lineTo(L + 217, 37.5); g.closePath(); g.fill();
+    g.fillStyle = '#0a0f13'; g.fillRect(L + 223, 37.5, 2, 5); g.fillRect(L + 221.5, 39, 5, 2);
+    for (const s of SEC_SCREENS(L)) { g.fillStyle = '#020405'; g.fillRect(s.x - 2, s.y - 2, s.w + 4, s.h + 4); g.fillStyle = '#071210'; g.fillRect(s.x, s.y, s.w, s.h); }
+    // sloped control console
+    g.fillStyle = '#1b2228'; g.fillRect(L + 20, 152, 220, BACK - 152);
+    g.fillStyle = 'rgba(0,0,0,.35)'; for (let x = L + 34; x < L + 230; x += 10) g.fillRect(x, 161, 5, 14);
+    g.fillStyle = '#12171b'; g.fillRect(L + 20, BACK - 6, 220, 6);
+    const dg = g.createLinearGradient(0, 137, 0, 152); dg.addColorStop(0, '#4d5b69'); dg.addColorStop(1, '#2d3842');
+    g.fillStyle = dg; g.beginPath(); g.moveTo(L + 30, 137); g.lineTo(L + 230, 137); g.lineTo(L + 240, 152); g.lineTo(L + 20, 152); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.14)'; g.fillRect(L + 20, 152, 220, 1.5);
+    // two keyboards, the PA microphone and a mug of something hot
+    for (const kx of [L + 44, L + 164]) {
+      g.fillStyle = '#161b20'; g.beginPath(); g.moveTo(kx + 3, 142.5); g.lineTo(kx + 49, 142.5); g.lineTo(kx + 52, 150); g.lineTo(kx, 150); g.closePath(); g.fill();
+      g.fillStyle = '#5a6874'; for (let r = 0; r < 2; r++) for (let c = 0; c < 9; c++) g.fillRect(kx + 4 + c * 5 + r, 144 + r * 3, 3.5, 1.6);
+    }
+    g.fillStyle = '#3a4048'; g.fillRect(L + 124, 145, 12, 4);
+    g.strokeStyle = '#2a3036'; g.lineWidth = 2; g.beginPath(); g.moveTo(L + 130, 146); g.quadraticCurveTo(L + 127, 128, L + 140, 122); g.stroke();
+    g.fillStyle = '#1a1e22'; rr(g, L + 137, 118, 10, 6, 3); g.fill();
+    g.fillStyle = '#e8e2d0'; rr(g, L + 220, 129, 8, 9, 2); g.fill(); g.strokeStyle = '#e8e2d0'; g.lineWidth = 1.5; g.beginPath(); g.arc(L + 229, 133.5, 2.6, -1.2, 1.2); g.stroke();
+    g.fillStyle = '#5fa8ff'; g.fillRect(L + 221, 132, 6, 2);
+  } else {
+    // weapons cage: rifles, helmets, ammo and a riot shield behind steel mesh
+    const cx = L + 16, cy = 36, cw = 104, ch = BACK - 36;
+    g.fillStyle = '#192026'; g.fillRect(cx, cy, cw, ch);
+    g.fillStyle = '#3b444c'; g.fillRect(cx + 8, 116, cw - 30, 4);
+    for (let i = 0; i < 4; i++) { const x = cx + 14 + i * 16; g.fillStyle = '#16180f'; g.fillRect(x, 48, 4, 70); g.fillRect(x - 1, 60, 6, 9); g.fillStyle = '#5b4228'; g.fillRect(x - 1, 108, 6, 18); }
+    g.fillStyle = '#3b444c'; g.fillRect(cx + 6, 142, cw - 12, 4);
+    for (const hx of [cx + 20, cx + 44]) { g.fillStyle = '#3a4450'; g.beginPath(); g.arc(hx, 142, 9, Math.PI, TAU); g.fill(); g.fillStyle = '#1b2026'; g.fillRect(hx - 2, 136, 11, 3); }
+    for (let i = 0; i < 2; i++) { g.fillStyle = '#4b5a33'; g.fillRect(cx + 10 + i * 26, BACK - 18, 22, 18); g.fillStyle = '#e7d35a'; g.font = 'bold 6px Arial'; g.fillText('AMMO', cx + 13 + i * 26, BACK - 7); }
+    g.fillStyle = '#6f8290'; rr(g, cx + 78, 124, 20, BACK - 126, 4); g.fill(); g.fillStyle = 'rgba(190,220,235,.55)'; g.fillRect(cx + 82, 130, 12, 8);
+    g.save(); g.beginPath(); g.rect(cx, cy, cw, ch); g.clip(); g.strokeStyle = 'rgba(170,190,205,.2)'; g.lineWidth = 1;
+    for (let d = -ch; d < cw + ch; d += 9) { g.beginPath(); g.moveTo(cx + d, cy); g.lineTo(cx + d + ch, cy + ch); g.moveTo(cx + d + ch, cy); g.lineTo(cx + d, cy + ch); g.stroke(); }
+    g.restore();
+    g.strokeStyle = '#5c6a74'; g.lineWidth = 3; g.strokeRect(cx, cy, cw, ch); g.fillStyle = '#5c6a74'; g.fillRect(cx + cw / 2 - 1, cy, 2, ch);
+    g.strokeStyle = '#c9a23a'; g.lineWidth = 1.6; g.beginPath(); g.arc(cx + cw / 2, 106, 3, Math.PI, TAU); g.stroke(); g.fillStyle = '#c9a23a'; rr(g, cx + cw / 2 - 4.5, 106, 9, 8, 1.5); g.fill();
+    g.fillStyle = '#e7b52c'; g.fillRect(cx + 22, cy - 9, 60, 8); g.fillStyle = '#1d1b17'; g.font = 'bold 6px Arial'; g.textAlign = 'center'; g.fillText('ARMS LOCKER', cx + 52, cy - 3); g.textAlign = 'left';
+    // the vault plan board (raiders and the Director are tracked on it live)
+    const P = SEC_PLAN, bx = L + P.x, by = P.y;
+    g.fillStyle = '#4a3a2a'; g.fillRect(bx - 3, by - 3, P.w + 6, P.h + 6);
+    g.fillStyle = '#17304a'; g.fillRect(bx, by, P.w, P.h);
+    g.fillStyle = 'rgba(160,210,255,.1)'; for (let x = bx + 4; x < bx + P.w; x += 8) g.fillRect(x, by, 1, P.h); for (let y = by + 4; y < by + P.h; y += 8) g.fillRect(bx, y, P.w, 1);
+    g.fillStyle = '#cfe6ff'; g.font = 'bold 6px Arial'; g.fillText('VAULT PLAN', bx + 6, by + 9);
+    g.strokeStyle = 'rgba(220,240,255,.7)'; g.lineWidth = 1;
+    for (let f = 0; f < NF; f++) { const y = by + 13 + f * 9.8; g.strokeRect(bx + 6.5, y + .5, 42, 7.5); g.strokeRect(bx + 62.5, y + .5, 42, 7.5); g.fillStyle = 'rgba(220,240,255,.25)'; g.fillRect(bx + 50, y, 10, 8.5); }
+    g.fillStyle = '#f2d36b'; g.save(); g.translate(bx + P.w - 14, by + 3); g.rotate(.12); g.fillRect(0, 0, 13, 12); g.fillStyle = '#5a4a1a'; g.fillRect(2, 4, 9, 1); g.fillRect(2, 7, 7, 1); g.restore();
+    // fire extinguisher, bench and a duffel bag
+    g.fillStyle = '#c62f2f'; rr(g, L + 123, BACK - 34, 9, 30, 3); g.fill(); g.fillStyle = '#2a2a2a'; g.fillRect(L + 125, BACK - 38, 5, 5);
+    g.strokeStyle = '#2a2a2a'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(L + 130, BACK - 36); g.quadraticCurveTo(L + 137, BACK - 28, L + 133, BACK - 14); g.stroke();
+    g.fillStyle = '#5a6672'; g.fillRect(L + 142, BACK - 26, 98, 5); g.fillStyle = '#3b444c'; g.fillRect(L + 148, BACK - 21, 4, 21); g.fillRect(L + 230, BACK - 21, 4, 21);
+    g.fillStyle = '#4f5a33'; rr(g, L + 190, BACK - 40, 36, 14, 6); g.fill(); g.strokeStyle = '#2d3320'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(L + 196, BACK - 39); g.quadraticCurveTo(L + 208, BACK - 50, L + 220, BACK - 39); g.stroke();
+  }
+  // alarm beacon on the ceiling (lights up during raids)
+  g.fillStyle = '#1b1d20'; g.fillRect(L + 121, SIDE - 3, 18, 5);
+  g.fillStyle = '#5a1a16'; g.beginPath(); g.arc(L + 130, SIDE + 2, 6, 0, Math.PI); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(L + 126, SIDE + 3, 3, 2);
 }
 function artOffice(g, room) {
   // vault banner with the number
@@ -1755,11 +1741,33 @@ function drawRoomLive(r, x0, y0) {
     } else if (r.type === 'armory') { if (workers && Math.random() < .3) spark(L + 140 + rand(-8, 8), y0 + BACK - 50, 2, '#9fe6ff'); }
     else if (r.type === 'trade') { if (Math.sin(t * 4) > 0) { ctx.fillStyle = '#ff5b5b'; ctx.fillRect(L + 108, y0 + BACK - 102, 4, 4); } }
     else if (r.type === 'security') {
-      for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) {
-        const sx = L + 40 + i * 64, sy = y0 + 44 + j * 42, n = (i + j * 3 + k * 6 + Math.floor(t * 1.5)) % 7;
-        ctx.fillStyle = ['#183a2a', '#1f2f45', '#2f2a18', '#183a2a', '#3a1818', '#1f2f45', '#24323a'][n]; ctx.fillRect(sx, sy, 56, 34);
-        ctx.fillStyle = 'rgba(160,255,200,.25)'; ctx.fillRect(sx + 6, sy + 22, 18 + (n * 7) % 24, 3); ctx.fillRect(sx + 32, sy + 8, 10, 14);
-        if (G.raid.active && Math.sin(t * 8 + i) > 0) { ctx.fillStyle = 'rgba(255,40,40,.35)'; ctx.fillRect(sx, sy, 56, 34); }
+      if (k % 2 === 0) {
+        glow(L + 130, y0 + 84, 130, 'rgba(110,180,255,.9)', G.blackout ? .04 : .13);
+        const cams = [{ ext: true }, ...G.rooms.filter(q => q.type !== 'empty' && q !== r)];
+        SEC_SCREENS(L).forEach((s, n) => drawCamFeed(cams, s.x, y0 + s.y, s.w, s.h, n + k * 6, t));
+        if (Math.sin(t * 3) > 0) { ctx.fillStyle = '#ff3b3b'; ctx.beginPath(); ctx.arc(L + 29, y0 + 38.5, 2, 0, TAU); ctx.fill(); }
+        for (let i = 0; i < 12; i++) {
+          const on = G.raid.active ? Math.sin(t * 9 + i) > 0 : ((i * 7 + Math.floor(t * 2.5)) % 5) !== 0;
+          ctx.fillStyle = G.raid.active ? (on ? '#ff4a3a' : '#4a1410') : on ? (i % 4 === 0 ? '#ffcf3d' : '#7fe08a') : '#1f3a26'; ctx.fillRect(L + 37 + i * 16, y0 + 139, 4, 2);
+        }
+      } else { // live tracker on the vault plan: raiders in red, you in gold
+        const bx = L + SEC_PLAN.x, by = y0 + SEC_PLAN.y;
+        for (const a of G.actors) {
+          if (!a.alive || a.down || (a.kind !== 'raider' && a.kind !== 'director')) continue;
+          const f = floorOf(a); if (f === 0 && a.x < 0) continue;
+          if (a.kind === 'raider' && Math.sin(t * 8 + a.id) < -.2) continue;
+          ctx.fillStyle = a.kind === 'raider' ? '#ff4a3a' : '#ffd35a'; ctx.beginPath(); ctx.arc(bx + secPlanX(a.inCar ? LOBBY : a.x), by + 17 + f * 9.8, 2, 0, TAU); ctx.fill();
+        }
+        if (G.raid.active && Math.sin(t * 6) > 0) { ctx.fillStyle = '#ff4a3a'; ctx.font = 'bold 6px Arial'; ctx.fillText('● RAID', bx + 46, by + 9); }
+      }
+      if (G.raid.active) { // the beacon spins and sweeps red light across the room
+        const bx = L + 130, by = y0 + SIDE + 4, fx = bx + Math.cos(t * 5) * 150;
+        ctx.fillStyle = Math.sin(t * 10) > 0 ? '#ff4a3a' : '#c0201a'; ctx.beginPath(); ctx.arc(bx, by - 2, 6, 0, Math.PI); ctx.fill();
+        ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, r.w, RH); ctx.clip(); ctx.globalCompositeOperation = 'lighter';
+        glow(bx, by, 40, 'rgba(255,40,30,.9)', .6);
+        const gr = ctx.createLinearGradient(bx, by, fx, y0 + BACK); gr.addColorStop(0, 'rgba(255,40,30,.32)'); gr.addColorStop(1, 'rgba(255,40,30,0)');
+        ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(fx - 45, y0 + BACK + 20); ctx.lineTo(fx + 45, y0 + BACK + 20); ctx.closePath(); ctx.fill();
+        ctx.restore();
       }
     } else if (r.type === 'lounge') {
       ctx.fillStyle = `hsl(${(t * 40) % 360},50%,${30 + 10 * Math.sin(t * 7)}%)`; ctx.fillRect(L + 98, y0 + 49, 64, 40);
@@ -1787,6 +1795,58 @@ function drawVaultDoor(x0, y0) {
   ctx.restore();
   if (d.state === 'broken' && Math.random() < .2) smoke(x0 + rand(-30, 30), cy + rand(-40, 40), 1.6);
   if ((d.state === 'opening' || d.state === 'closing' || G.raid.active) && Math.sin(G.playT * 9) > 0) glow(x0 + 128, y0 + 80, 60, 'rgba(255,170,40,.9)', .5);
+}
+
+// one CCTV screen: cycles through the vault's rooms (and the road outside the door), showing who is in each
+function drawCamFeed(cams, x, y, w, h, n, t) {
+  const ph = t / 5 + n * .37, idx = (n + Math.floor(ph) * 6) % cams.length, cam = cams[idx], sw = ph % 1;
+  ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+  let label = '', alert = false;
+  if (G.blackout && (n + Math.floor(t * 1.5)) % 3) {
+    ctx.fillStyle = '#05080a'; ctx.fillRect(x, y, w, h); ctx.fillStyle = 'rgba(160,200,180,.5)'; ctx.font = 'bold 6px monospace'; ctx.textAlign = 'center'; ctx.fillText('NO SIGNAL', x + w / 2, y + h / 2 + 2); ctx.textAlign = 'left';
+  } else if (sw < .04) { // switching cameras: a burst of static
+    ctx.fillStyle = '#1a1f1c'; ctx.fillRect(x, y, w, h);
+    for (let i = 0; i < 40; i++) { ctx.fillStyle = `rgba(200,220,210,${Math.random() * .5})`; ctx.fillRect(x + Math.random() * w, y + Math.random() * h, rand(2, 10), 1); }
+  } else if (cam.ext) {
+    const S = skyAt(hourOf(G.time)), cw = 520, sc = w / cw, wx0 = -cw + 40, gy = y + h * .64;
+    const sg = ctx.createLinearGradient(0, y, 0, gy); sg.addColorStop(0, S.top); sg.addColorStop(1, S.bot); ctx.fillStyle = sg; ctx.fillRect(x, y, w, gy - y);
+    ctx.fillStyle = '#4a3a2a'; ctx.fillRect(x, gy, w, y + h - gy); ctx.fillStyle = '#6a5438'; ctx.fillRect(x, gy, w, 1.5);
+    ctx.fillStyle = '#5d6266'; ctx.fillRect(x + w - 8, y + 3, 8, gy - y - 3); ctx.fillStyle = doorBlocks() ? '#8c8f86' : '#0b0d0f'; ctx.beginPath(); ctx.arc(x + w, gy - 11, 10, Math.PI / 2, Math.PI * 1.5); ctx.fill();
+    for (const a of G.actors) {
+      if (!a.alive || a.floor !== 0 || a.inCar || a.x > 0 || a.x < wx0) continue;
+      if (a.kind === 'raider') alert = true;
+      secFigure(a, x + (a.x - wx0) * sc, gy + 1, sc);
+    }
+    ctx.fillStyle = `rgba(4,6,16,${(1 - S.sun) * .5})`; ctx.fillRect(x, y, w, h);
+    label = 'GATE';
+  } else {
+    const r = cam, cw = Math.min(r.w, 230), ch = cw * h / w, sx = (r.w - cw) * (Math.sin(t * .2 + n * 1.7) * .5 + .5), sy = RH - ch - 4, sc = w / cw;
+    ctx.drawImage(roomArt(r), sx, sy, cw, ch, x, y, w, h);
+    for (const a of G.actors) {
+      if (!a.alive || a.inCar || a.floor !== r.floor) continue;
+      const lx = a.x - r.x - sx; if (lx < -6 || lx > cw + 6) continue;
+      if (a.kind === 'raider') alert = true;
+      secFigure(a, x + lx * sc, y + (RH - DEPTH / 2 + seatY(a) - sy) * sc, sc);
+    }
+    ctx.fillStyle = `rgba(3,5,12,${(1 - roomLight(r)) * .7})`; ctx.fillRect(x, y, w, h);
+    label = ROOMDEF[r.type].name.split(' ')[0];
+  }
+  ctx.fillStyle = 'rgba(30,90,70,.16)'; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = 'rgba(0,0,0,.22)'; for (let yy = y + 1; yy < y + h; yy += 2) ctx.fillRect(x, yy, w, 1);
+  ctx.font = 'bold 6px monospace'; const camT = 'CAM ' + String(idx + 1).padStart(2, '0');
+  ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(x, y, ctx.measureText(camT).width + 4, 9); if (label) ctx.fillRect(x, y + h - 8, ctx.measureText(label).width + 4, 8);
+  ctx.fillStyle = 'rgba(215,255,228,.92)'; ctx.fillText(camT, x + 2, y + 7);
+  if (label) ctx.fillText(label, x + 2, y + h - 2);
+  if (alert) { const on = Math.sin(t * 8) > 0; ctx.strokeStyle = on ? '#ff3b3b' : 'rgba(255,59,59,.35)'; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, w - 2, h - 2); if (on) { ctx.fillStyle = '#ff5a4a'; ctx.textAlign = 'right'; ctx.fillText('INTRUDER', x + w - 3, y + 7); ctx.textAlign = 'left'; } }
+  ctx.restore();
+}
+function secFigure(a, px, py, sc) { // a tiny monochrome person on a camera feed
+  ctx.fillStyle = a.kind === 'raider' ? '#ff6a5a' : a.kind === 'director' ? '#ffd98a' : '#c4e8ff';
+  if (a.down || (a.act === 'sleep' && a.atSpot)) { ctx.fillRect(px - 5, py - 3, 10, 2.5); return; }
+  const H = 62 * sc * (a.look ? a.look.tall : 1), sw = Math.abs(a.vx) > 1 ? Math.sin(a.walkPh) * H * .08 : 0;
+  ctx.fillRect(px - H * .1, py - H * .72, H * .2, H * .44);
+  ctx.fillRect(px - H * .09 + sw, py - H * .3, H * .08, H * .3); ctx.fillRect(px + H * .01 - sw, py - H * .3, H * .08, H * .3);
+  ctx.beginPath(); ctx.arc(px, py - H * .84, H * .12, 0, TAU); ctx.fill();
 }
 
 /* ---------- the outside ---------- */
@@ -2027,69 +2087,11 @@ function drawSurfaceProps(vx0, vx1) {
 }
 
 /* ---------- HUD ---------- */
-let touchMode = false; // true while you play by touch: on-screen controls, panels moved clear of your thumbs
-// the top bar: one row on big screens (as designed), two or three rows when it would run off a small screen
-function resItems() {
-  const R = G.R, pop = dwellers().filter(a => a.role !== 'bodyguard').length, mood = Math.round(dwellers().reduce((s, a) => s + a.happy, 0) / Math.max(1, dwellers().length));
-  return [['💉 ' + Math.floor(R.stim)], ['🔩 ' + fmt(R.scrap)], [fmt(R.caps), 'cap'], ['👥 ' + pop + '/' + bedCount()], [(mood > 60 ? '😊 ' : mood > 40 ? '😐 ' : '☹ ') + mood + '%'], ['🛡 ' + defenceRating(), 'def'], ['DOOR ' + (G.door.state === 'broken' ? 'BREACHED' : Math.ceil(G.door.hp / G.door.maxhp * 100) + '%'), 'def']];
-}
-function resRow(items, x, y, fs, gap, draw) {
-  ctx.font = 'bold ' + fs + 'px Arial'; let w = 0;
-  for (const [t, k] of items) {
-    const iw = ctx.measureText(t).width + (k === 'cap' ? 16 : 0);
-    if (draw) { if (k === 'cap') { capIcon(x + w + 6, y - 5); } ctx.fillStyle = k === 'def' ? '#9fb7c0' : '#e8e2d2'; ctx.fillText(t, x + w + (k === 'cap' ? 16 : 0), y); }
-    w += iw + gap;
-  }
-  return w - gap;
-}
-let HL = null, HLkey = '';
-function hudLayout() {
-  const key = VW + 'x' + VH + ':' + SAFE.t + ':' + touchMode + ':' + (G.R.caps > 9999) + (G.R.scrap > 999);
-  if (HL && HLkey === key) return HL;
-  HLkey = key;
-  if (VW >= 1180 && !touchMode) HL = { mode: 'wide', h: 54 };
-  else {
-    const rw = resRow(resItems(), 0, 0, 12, 12, false), gw = (VW - SAFE.l - SAFE.r - 32 - rw - 30) / 3;
-    HL = gw >= 70 ? { mode: 'mid', h: SAFE.t + 62 } : { mode: 'narrow', h: SAFE.t + 82 };
-  }
-  const tt = HL.mode === 'wide' ? 92 : touchMode || HL.mode === 'narrow' ? HL.h + 104 : HL.h + 38;
-  document.documentElement.style.setProperty('--hud', HL.h + 'px'); document.documentElement.style.setProperty('--toast-top', tt + 'px');
-  return HL;
-}
-function drawTopBarCompact(L) {
-  const R = G.R, cap = capOf(), h = hourOf(G.time), t = SAFE.t;
-  ctx.fillStyle = 'rgba(8,11,14,.82)'; ctx.fillRect(0, 0, VW, L.h - 2); ctx.fillStyle = 'rgba(242,179,61,.6)'; ctx.fillRect(0, L.h - 2, VW, 2);
-  const x0 = 16 + SAFE.l, x1 = VW - 16 - SAFE.r;
-  ctx.fillStyle = '#f6d27a'; ctx.font = 'bold 15px "Arial Black", Arial'; ctx.fillText('VAULT ' + G.vaultNo, x0, t + 21);
-  const vw = ctx.measureText('VAULT ' + G.vaultNo).width;
-  ctx.font = 'bold 12px Arial'; ctx.fillStyle = '#d8d0bc'; ctx.fillText('DAY ' + dayOf(G.time) + ' · ' + clockStr(G.time) + ' ' + (h >= 6 && h < 20 ? '☀' : '☾') + (G.speed > 1 && !G.raid.active ? ' ▶▶' + G.speed + 'x' : ''), x0 + vw + 10, t + 20);
-  ctx.textAlign = 'right';
-  if (G.raid.active) { const n = raidersAlive().length + G.raid.toSpawn.length; ctx.fillStyle = Math.sin(G.playT * 6) > 0 ? '#ff5a4a' : '#ffb2a8'; ctx.fillText('⚠ RAID · ' + n + ' LEFT', x1, t + 20); }
-  else { const left = G.raid.nextDay - dayOf(G.time); ctx.fillStyle = left <= 0 ? '#ff8a5a' : '#c8bfa8'; ctx.fillText(left <= 0 ? 'RAID TONIGHT' : 'RAID: DAY ' + G.raid.nextDay, x1, t + 20); }
-  ctx.textAlign = 'left';
-  const items = resItems(), rw = resRow(items, 0, 0, 12, 12, false), gw = L.mode === 'mid' ? Math.max(60, Math.min(150, (x1 - x0 - rw - 30) / 3)) : (x1 - x0 - 24) / 3;
-  const gy = t + 30, gaps = [['⚡', 'POWER', R.power, '#ffcf3d', G.blackout], ['💧', 'WATER', R.water, '#5fd0ff', R.water <= 0], ['🍲', 'FOOD', R.food, '#ff8a5a', R.food <= 0]];
-  gaps.forEach(([icon, label, v, col, bad], i) => {
-    const x = x0 + i * (gw + 12), bw = gw - 20;
-    ctx.font = 'bold 13px Arial'; ctx.fillStyle = '#e8e2d2'; ctx.fillText(icon, x, gy + 11);
-    ctx.fillStyle = 'rgba(255,255,255,.1)'; ctx.fillRect(x + 20, gy, bw, 9);
-    ctx.fillStyle = bad && Math.sin(G.playT * 8) > 0 ? '#ff5a4a' : col; ctx.fillRect(x + 20, gy, bw * clamp(v / cap, 0, 1), 9);
-    ctx.fillStyle = '#c8bfa8'; ctx.font = 'bold 9px Arial'; ctx.fillText((bw > 90 ? label + '  ' : '') + Math.floor(v) + ' / ' + cap, x + 20, gy + 21);
-  });
-  if (L.mode === 'mid') resRow(items, x1 - rw, gy + 16, 12, 12, true);
-  else { // own row, shrunk until it fits the screen
-    let fs = 12, gap = 12, w = resRow(items, 0, 0, fs, gap, false);
-    while (w > x1 - x0 && fs > 8) { fs--; gap = Math.max(6, gap - 2); w = resRow(items, 0, 0, fs, gap, false); }
-    resRow(items, x0 + Math.max(0, (x1 - x0 - w) / 2), t + 70, fs, gap, true);
-  }
-}
 function drawHUD() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  const D = G.director, R = G.R, cap = capOf(), h = hourOf(G.time), HLo = hudLayout();
+  const D = G.director, R = G.R, cap = capOf(), h = hourOf(G.time);
   // vignette
   const vg = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * .35, VW / 2, VH / 2, Math.max(VW, VH) * .75); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.55)'); ctx.fillStyle = vg; ctx.fillRect(0, 0, VW, VH);
-  if (HLo.mode !== 'wide') drawTopBarCompact(HLo);
-  else {
   // top bar
   ctx.fillStyle = 'rgba(8,11,14,.82)'; ctx.fillRect(0, 0, VW, 52); ctx.fillStyle = 'rgba(242,179,61,.6)'; ctx.fillRect(0, 52, VW, 2);
   ctx.fillStyle = '#f6d27a'; ctx.font = 'bold 18px "Arial Black", Arial'; ctx.fillText('VAULT ' + G.vaultNo, 16, 24);
@@ -2110,33 +2112,27 @@ function drawHUD() {
   else { const left = G.raid.nextDay - dayOf(G.time); ctx.fillStyle = left <= 0 ? '#ff8a5a' : '#c8bfa8'; ctx.fillText(left <= 0 ? 'RAIDERS EXPECTED TONIGHT' : 'NEXT RAID: NIGHT OF DAY ' + G.raid.nextDay + ' (' + left + ' day' + (left > 1 ? 's' : '') + ')', VW - 16, 24); }
   ctx.fillStyle = '#9fb7c0'; ctx.fillText('🛡 DEFENCE ' + defenceRating() + '   ·   DOOR ' + (G.door.state === 'broken' ? 'BREACHED' : Math.ceil(G.door.hp / G.door.maxhp * 100) + '%'), VW - 16, 44);
   ctx.textAlign = 'left';
-  }
-  // director panel (bottom left; on touch it sits above the walk pad)
-  const bx = touchMode ? 14 + SAFE.l : 12, by = touchMode ? VH - SAFE.b - 158 : VH - 70, pw = touchMode ? Math.max(190, Math.min(260, VW - SAFE.l - SAFE.r - 176)) : 300;
-  ctx.fillStyle = 'rgba(8,11,14,.82)'; rr(ctx, bx, by, pw, 58, 6); ctx.fill(); ctx.strokeStyle = 'rgba(242,179,61,.5)'; ctx.lineWidth = 1; ctx.stroke();
-  ctx.fillStyle = '#f6d27a'; ctx.font = 'bold 13px Arial'; ctx.fillText('DIRECTOR', bx + 12, by + 18);
-  const hw = pw - 100; ctx.fillStyle = '#2a1414'; ctx.fillRect(bx + 88, by + 8, hw, 12); ctx.fillStyle = D.hp / D.maxhp < .3 ? '#ff5a4a' : '#7fe08a'; ctx.fillRect(bx + 88, by + 8, hw * D.hp / D.maxhp, 12);
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 10px Arial'; ctx.fillText(Math.ceil(D.hp) + ' / ' + D.maxhp, bx + 92, by + 18);
+  // director panel (bottom left)
+  const by = VH - 70;
+  ctx.fillStyle = 'rgba(8,11,14,.82)'; rr(ctx, 12, by, 300, 58, 6); ctx.fill(); ctx.strokeStyle = 'rgba(242,179,61,.5)'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = '#f6d27a'; ctx.font = 'bold 13px Arial'; ctx.fillText('DIRECTOR', 24, by + 18);
+  ctx.fillStyle = '#2a1414'; ctx.fillRect(100, by + 8, 200, 12); ctx.fillStyle = D.hp / D.maxhp < .3 ? '#ff5a4a' : '#7fe08a'; ctx.fillRect(100, by + 8, 200 * D.hp / D.maxhp, 12);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 10px Arial'; ctx.fillText(Math.ceil(D.hp) + ' / ' + D.maxhp, 104, by + 18);
   const W = WEAP[D.weapon]; ctx.font = 'bold 12px Arial'; ctx.fillStyle = '#d8d0bc';
-  ctx.fillText(W.name + '   ' + (D.reloadT > 0 ? 'RELOADING…' : D.mag + ' / ' + W.mag), bx + 12, by + 38);
+  ctx.fillText(W.name + '   ' + (D.reloadT > 0 ? 'RELOADING…' : D.mag + ' / ' + W.mag), 24, by + 38);
   const where = D.inCar ? 'ELEVATOR' : D.floor === 0 && D.x < 0 ? 'THE WASTELAND' : ((roomAt(D.floor, D.x) || { type: 'lobby' }).type === 'lobby' || D.x >= ELX && D.x < ELX + EW ? 'ELEVATOR LOBBY' : ROOMDEF[roomAt(D.floor, D.x).type].name);
-  ctx.fillStyle = '#8f9aa0'; ctx.fillText('Floor ' + (floorOf(D) + 1) + ' · ' + where, bx + 12, by + 54);
-  // interaction prompt (on touch the USE button shows it instead)
+  ctx.fillStyle = '#8f9aa0'; ctx.fillText('Floor ' + (floorOf(D) + 1) + ' · ' + where, 24, by + 54);
+  // interaction prompt
   const it = G.hover;
-  if (it && !G.uiOpen && !touchMode) {
+  if (it && !G.uiOpen) {
     ctx.font = 'bold 15px Arial'; const t = '[E]  ' + it.label, w = ctx.measureText(t).width + 30;
     ctx.fillStyle = 'rgba(8,11,14,.88)'; rr(ctx, VW / 2 - w / 2, VH - 64, w, 34, 6); ctx.fill(); ctx.strokeStyle = 'rgba(242,179,61,.7)'; ctx.stroke();
     ctx.fillStyle = '#ffd98a'; ctx.textAlign = 'center'; ctx.fillText(t, VW / 2, VH - 42); ctx.textAlign = 'left';
   }
   if (D.inCar) drawElevatorPanel();
   if (D.busyT > 0) { ctx.fillStyle = 'rgba(8,11,14,.85)'; rr(ctx, VW / 2 - 90, VH / 2 + 60, 180, 14, 5); ctx.fill(); ctx.fillStyle = '#f2b33d'; ctx.fillRect(VW / 2 - 86, VH / 2 + 64, 172 * (1 - D.busyT / D.busyMax), 6); }
-  if (D.sleeping) {
-    ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(0, HLo.h, VW, VH - HLo.h); ctx.fillStyle = '#cfe3ff'; ctx.font = 'bold 22px Arial'; ctx.textAlign = 'center';
-    if (touchMode) { ctx.fillText('Sleeping… zZz', VW / 2, VH / 2); ctx.font = 'bold 16px Arial'; ctx.fillText('(tap to wake)', VW / 2, VH / 2 + 26); }
-    else ctx.fillText('Sleeping… zZz   (press any key to wake)', VW / 2, VH / 2);
-    ctx.textAlign = 'left';
-  }
-  drawMiniVault(HLo);
+  if (D.sleeping) { ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(0, 54, VW, VH - 54); ctx.fillStyle = '#cfe3ff'; ctx.font = 'bold 22px Arial'; ctx.textAlign = 'center'; ctx.fillText('Sleeping… zZz   (press any key to wake)', VW / 2, VH / 2); ctx.textAlign = 'left'; }
+  drawMiniVault();
 }
 function gauge(x, label, icon, v, cap, col, bad) {
   ctx.font = 'bold 15px Arial'; ctx.fillStyle = '#e8e2d2'; ctx.fillText(icon, x, 31);
@@ -2146,36 +2142,21 @@ function gauge(x, label, icon, v, cap, col, bad) {
 }
 function capIcon(x, y) { ctx.fillStyle = '#c9a23a'; ctx.beginPath(); for (let i = 0; i < 16; i++) { const a = i * TAU / 16, r = i % 2 ? 7 : 8.5; ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); } ctx.fill(); ctx.fillStyle = '#e8c860'; ctx.beginPath(); ctx.arc(x, y, 5, 0, TAU); ctx.fill(); }
 function defenceRating() { let s = G.door.level * 6; for (const a of dwellers()) if (a.role === 'guard' || a.role === 'bodyguard') s += 4 + weaponTier(a) * 5 + (a.skills.combat || 0); return s; }
-// where the elevator buttons go: the original column on the right when it fits, a row along the bottom on short screens
-function elevatorLayout() {
-  const top = hudLayout().h + (touchMode ? 56 : 8), bottom = VH - (touchMode ? SAFE.b + 160 : 8);
-  if (!touchMode && VH / 2 - NF * 26 - 36 >= top && VH / 2 + NF * 26 + 24 <= bottom) return { v: true, x: VW - 92, y: VH / 2 - NF * 26, step: 52, r: 20 };
-  const avail = bottom - top;
-  if (avail >= NF * 40 + 60) { const step = Math.min(52, (avail - 60) / NF); return { v: true, x: VW - SAFE.r - 92, y: top + 36 + (avail - 60 - NF * step) / 2, step, r: Math.min(20, step / 2 - 2) }; }
-  const l = touchMode ? 14 + SAFE.l + 168 + 10 : 16, rgt = touchMode ? VW - SAFE.r - 14 - Math.min(196, VW - 214) - 10 : VW - 16;
-  const step = Math.min(60, (rgt - l) / NF), r = Math.min(22, step / 2 - 3);
-  return { v: false, x: (l + rgt) / 2 - step * (NF - 1) / 2, y: VH - SAFE.b - 50, step, r };
-}
-function elevatorButtons() { const E = elevatorLayout(); return { E, b: Array.from({ length: NF }, (_, f) => E.v ? { f, x: E.x + 32, y: E.y + f * E.step + 18 } : { f, x: E.x + f * E.step, y: E.y }) }; }
-function elevatorPanelHit(mx, my) { const { E, b } = elevatorButtons(); for (const q of b) if (Math.hypot(mx - q.x, my - q.y) < E.r + (touchMode ? 8 : 2)) return q.f; return -1; }
+function elevatorPanelHit(mx, my) { const x = VW - 92, y = VH / 2 - NF * 26; for (let f = 0; f < NF; f++) if (Math.hypot(mx - (x + 32), my - (y + f * 52 + 18)) < 22) return f; return -1; }
 function drawElevatorPanel() {
-  const c = G.car, D = G.director, { E, b } = elevatorButtons();
-  ctx.fillStyle = 'rgba(8,11,14,.9)';
-  if (E.v) { rr(ctx, E.x - 10, E.y - 36, 84, NF * E.step + 60, 8); } else { rr(ctx, E.x - E.step / 2, E.y - E.r - 22, NF * E.step, E.r * 2 + 30, 8); }
-  ctx.fill(); ctx.strokeStyle = 'rgba(242,179,61,.6)'; ctx.stroke();
-  ctx.fillStyle = '#f6d27a'; ctx.font = 'bold 11px Arial'; ctx.textAlign = 'center';
-  if (E.v) ctx.fillText('ELEVATOR', E.x + 32, E.y - 18); else ctx.fillText('ELEVATOR · ' + (touchMode ? 'tap a floor · ◀ ▶ step out' : 'W/S · 1–' + NF + ' · A/D step out'), E.x + E.step * (NF - 1) / 2, E.y - E.r - 8);
-  for (const { f, x, y } of b) {
-    const sel = D.carDest === f, here = c.floor === f && c.state !== 'moving';
-    ctx.fillStyle = sel ? '#f2b33d' : here ? '#3a4a3a' : '#22282d'; ctx.beginPath(); ctx.arc(x, y, E.r, 0, TAU); ctx.fill();
+  const c = G.car, D = G.director, x = VW - 92, y = VH / 2 - NF * 26;
+  ctx.fillStyle = 'rgba(8,11,14,.9)'; rr(ctx, x - 10, y - 36, 84, NF * 52 + 60, 8); ctx.fill(); ctx.strokeStyle = 'rgba(242,179,61,.6)'; ctx.stroke();
+  ctx.fillStyle = '#f6d27a'; ctx.font = 'bold 11px Arial'; ctx.textAlign = 'center'; ctx.fillText('ELEVATOR', x + 32, y - 18);
+  for (let f = 0; f < NF; f++) {
+    const by = y + f * 52, sel = D.carDest === f, here = c.floor === f && c.state !== 'moving';
+    ctx.fillStyle = sel ? '#f2b33d' : here ? '#3a4a3a' : '#22282d'; ctx.beginPath(); ctx.arc(x + 32, by + 18, 20, 0, TAU); ctx.fill();
     ctx.strokeStyle = '#8b949a'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.fillStyle = sel ? '#111' : '#e8e2d2'; ctx.font = 'bold 16px Arial'; ctx.fillText(f + 1, x, y + 6);
+    ctx.fillStyle = sel ? '#111' : '#e8e2d2'; ctx.font = 'bold 16px Arial'; ctx.fillText(f + 1, x + 32, by + 24);
   }
-  if (E.v) { ctx.font = '10px Arial'; ctx.fillStyle = '#9a917f'; ctx.fillText(touchMode ? 'tap a floor' : 'W/S · 1–' + NF + ' · click', E.x + 32, E.y + NF * E.step + 4); ctx.fillText(touchMode ? '◀ ▶ step out' : 'A/D: step out', E.x + 32, E.y + NF * E.step + 16); }
-  ctx.textAlign = 'left';
+  ctx.font = '10px Arial'; ctx.fillStyle = '#9a917f'; ctx.fillText('W/S · 1–' + NF + ' · click', x + 32, y + NF * 52 + 4); ctx.fillText('A/D: step out', x + 32, y + NF * 52 + 16); ctx.textAlign = 'left';
 }
-function drawMiniVault(HLo) {
-  const s = 13, h = 9, D = G.director, x0 = touchMode ? 14 + SAFE.l + 8 : VW - 6 * s - 30 - 18, y0 = HLo.mode === 'wide' ? 64 : HLo.h + 14;
+function drawMiniVault() {
+  const s = 13, h = 9, x0 = VW - 6 * s - 30 - 18, y0 = 64, D = G.director;
   ctx.fillStyle = 'rgba(8,11,14,.7)'; rr(ctx, x0 - 8, y0 - 6, 6 * s + 30 + 16, NF * (h + 3) + 12, 5); ctx.fill();
   for (const r of G.rooms) {
     const x = x0 + (r.u < 3 ? r.u * s : 3 * s + 12 + (r.u - 3) * s), y = y0 + r.floor * (h + 3);
@@ -2211,7 +2192,7 @@ addEventListener('keydown', e => {
   keys[e.code] = true;
   if (G && G.state === 'play' && !G.uiOpen) {
     if (e.code === 'KeyZ') { G.overview = !G.overview; }
-    if (e.code === 'KeyT') cycleSpeed();
+    if (e.code === 'KeyT') { if (G.raid.active) toast('Raids always run at 1x'); else { G.speed = G.speed % 3 + 1; toast('Game speed ' + G.speed + 'x'); } }
     if (e.code === 'Equal' || e.code === 'NumpadAdd') G.cam.tz = clamp(G.cam.tz * 1.15, .45, 1.9);
     if (e.code === 'Minus' || e.code === 'NumpadSubtract') G.cam.tz = clamp(G.cam.tz / 1.15, .45, 1.9);
   }
@@ -2229,97 +2210,9 @@ cv.addEventListener('wheel', e => { e.preventDefault(); if (!G || G.uiOpen) retu
 cv.addEventListener('contextmenu', e => e.preventDefault());
 addEventListener('resize', () => { resize(); PAT = {}; });
 
-/* ---------- touch controls (switch on by themselves when you touch the screen, off again when you use a mouse) ---------- */
-const TOUCH = { aim: null, pinch: null, lastT: -1e9 };
-function setTouchMode(on) { if (touchMode === on) return; touchMode = on; document.body.classList.toggle('touch', on); }
-setTouchMode(matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches);
-addEventListener('touchstart', () => { TOUCH.lastT = performance.now(); setTouchMode(true); audioInit(); }, { capture: true, passive: true });
-addEventListener('touchend', () => { TOUCH.lastT = performance.now(); audioInit(); }, { capture: true, passive: true });
-cv.addEventListener('mousemove', () => { if (performance.now() - TOUCH.lastT > 1000) setTouchMode(false); });
-const inPlay = () => G && G.state === 'play' && !G.uiOpen;
-function wakeIfAsleep() { if (G && G.director && G.director.sleeping && G.state === 'play') { wake(); return true; } return false; }
-function aimAt(x, y) { mouse.x = x; mouse.y = y; mouse.wx = G.cam.x + (x - VW / 2) / G.cam.zoom; mouse.wy = G.cam.y + (y - VH / 2) / G.cam.zoom; }
-function endAim() { if (TOUCH.aim && G && G.director) { const D = G.director; D.moveDir = Math.sign(mouse.wx - D.x) || D.moveDir; } TOUCH.aim = null; mouse.down = false; }
-// tap / hold on the vault = aim and fire there · two fingers = pinch zoom · in the elevator, tap a floor button
-cv.addEventListener('touchstart', e => {
-  e.preventDefault();
-  if (!inPlay() || wakeIfAsleep()) return;
-  const D = G.director;
-  for (const t of e.changedTouches) {
-    if (D.inCar && !TOUCH.aim) { const f = elevatorPanelHit(t.clientX, t.clientY); if (f >= 0) { pickFloor(f); continue; } }
-    if (TOUCH.aim && !TOUCH.pinch) {
-      const a = TOUCH.aim; mouse.down = false; G.overview = false;
-      TOUCH.pinch = { a: a.id, b: t.identifier, d0: Math.max(20, Math.hypot(t.clientX - a.x, t.clientY - a.y)), z0: G.cam.tz, pts: { [a.id]: [a.x, a.y], [t.identifier]: [t.clientX, t.clientY] } };
-      continue;
-    }
-    if (!TOUCH.aim) { TOUCH.aim = { id: t.identifier, x: t.clientX, y: t.clientY }; aimAt(t.clientX, t.clientY); mouse.down = true; }
-  }
-}, { passive: false });
-cv.addEventListener('touchmove', e => {
-  e.preventDefault();
-  const P = TOUCH.pinch;
-  for (const t of e.changedTouches) {
-    if (P && P.pts[t.identifier]) P.pts[t.identifier] = [t.clientX, t.clientY];
-    else if (TOUCH.aim && TOUCH.aim.id === t.identifier && !P) { TOUCH.aim.x = t.clientX; TOUCH.aim.y = t.clientY; aimAt(t.clientX, t.clientY); }
-  }
-  if (P && G) { const [a, b] = [P.pts[P.a], P.pts[P.b]]; G.cam.tz = clamp(P.z0 * Math.hypot(a[0] - b[0], a[1] - b[1]) / P.d0, .45, 1.9); }
-}, { passive: false });
-function canvasTouchEnd(e) {
-  for (const t of e.changedTouches) {
-    if (TOUCH.pinch && TOUCH.pinch.pts[t.identifier]) { TOUCH.pinch = null; TOUCH.aim = null; mouse.down = false; }
-    else if (TOUCH.aim && TOUCH.aim.id === t.identifier) endAim();
-  }
-}
-cv.addEventListener('touchend', canvasTouchEnd); cv.addEventListener('touchcancel', canvasTouchEnd);
-
-// walk pad: thumb left / right of centre walks, push to the end to run (and steps you out of the elevator)
-const stick = $('stick'), knob = $('knob'), STK = { id: null, ox: 0, dir: 0 };
-function stickSet(dx) {
-  dx = clamp(dx, -58, 58); knob.style.transform = dx ? 'translateX(' + dx + 'px)' : '';
-  const dir = Math.abs(dx) > 12 ? Math.sign(dx) : 0, run = dir !== 0 && Math.abs(dx) > 46;
-  if (dir && dir !== STK.dir) pressed[dir < 0 ? 'KeyA' : 'KeyD'] = true;
-  STK.dir = dir; keys['KeyA'] = dir < 0; keys['KeyD'] = dir > 0; keys['ShiftLeft'] = run; stick.classList.toggle('run', run);
-}
-function stickRelease() { STK.id = null; stickSet(0); }
-stick.addEventListener('touchstart', e => {
-  e.preventDefault(); if (wakeIfAsleep() || STK.id !== null) return;
-  const t = e.changedTouches[0], r = stick.getBoundingClientRect(); STK.id = t.identifier; STK.ox = r.left + r.width / 2; stickSet(t.clientX - STK.ox);
-}, { passive: false });
-stick.addEventListener('touchmove', e => { e.preventDefault(); for (const t of e.changedTouches) if (t.identifier === STK.id) stickSet(t.clientX - STK.ox); }, { passive: false });
-const stickEnd = e => { for (const t of e.changedTouches) if (t.identifier === STK.id) stickRelease(); };
-stick.addEventListener('touchend', stickEnd); stick.addEventListener('touchcancel', stickEnd);
-addEventListener('blur', () => { stickRelease(); endAim(); TOUCH.pinch = null; });
-document.addEventListener('visibilitychange', () => { if (!document.hidden) return; stickRelease(); endAim(); TOUCH.pinch = null; if (touchMode && inPlay() && !G.director.down) openPause(); });
-
-function cycleSpeed() { if (G.raid.active) toast('Raids always run at 1x'); else { G.speed = G.speed % 3 + 1; toast('Game speed ' + G.speed + 'x'); } }
-function padBtn(id, fn) {
-  const el = $(id), off = () => el.classList.remove('on');
-  el.addEventListener('touchstart', e => { e.preventDefault(); if (wakeIfAsleep() || !inPlay()) return; el.classList.add('on'); fn(); }, { passive: false });
-  el.addEventListener('touchend', off); el.addEventListener('touchcancel', off);
-  el.addEventListener('click', e => { e.preventDefault(); if (!wakeIfAsleep() && inPlay()) fn(); });
-}
-padBtn('bUse', () => { pressed['KeyE'] = true; });
-padBtn('bReload', () => { pressed['KeyR'] = true; });
-padBtn('bStim', () => { pressed['KeyQ'] = true; });
-padBtn('bMap', () => { G.overview = !G.overview; });
-padBtn('bSpeed', cycleSpeed);
-padBtn('bPause', onEscape);
-// keep the pad in step with the game: the USE button says what it will do
-let padPlaying = null; const PADTXT = {};
-function padText(id, t) { if (PADTXT[id] !== t) { PADTXT[id] = t; $(id).textContent = t; } }
-function updatePad() {
-  const playing = !!inPlay();
-  if (playing !== padPlaying) { padPlaying = playing; document.body.classList.toggle('playing', playing); if (!playing) { stickRelease(); endAim(); TOUCH.pinch = null; } }
-  if (!playing || !touchMode) return;
-  const D = G.director; let label = '', can = false;
-  if (D.inCar) { can = carOpenAt(G.car.floor); label = can ? 'Step out' : 'Riding…'; }
-  else if (G.hover && !(D.busyT > 0)) { can = true; label = G.hover.label; }
-  padText('bUseL', label); $('bUse').classList.toggle('idle', !can);
-  padText('bStim', '💉 ' + Math.floor(G.R.stim)); padText('bSpeed', G.speed + 'x'); $('bMap').classList.toggle('on', !!G.overview);
-}
-
 function onEscape() {
   if (!G || G.state !== 'play' || G.director.down) return;
+  if (!$('info').classList.contains('hidden')) { closeInfo(); return; }
   if (!$('term').classList.contains('hidden')) { closeTerminal(); return; }
   if (!$('pause').classList.contains('hidden')) { closePause(); return; }
   openPause();
@@ -2350,7 +2243,7 @@ function doorAction() {
 }
 function elevatorAction() {
   const D = G.director, f = floorOf(D);
-  if (carOpenAt(f)) { boardCar(D, -1); D.x = LOBBY; toast(touchMode ? 'Pick a floor on the elevator panel' : 'Pick a floor: W / S or 1–' + NF); }
+  if (carOpenAt(f)) { boardCar(D, -1); D.x = LOBBY; toast('Pick a floor: W / S or 1–' + NF); }
   else { callCar(f); sfx('click'); }
 }
 function updateHover() {
@@ -2380,28 +2273,29 @@ function talkTo(a) {
   a.say = lines[0].replace(/"/g, ''); a.sayT = 3; a.facing = Math.sign(G.director.x - a.x) || 1;
   const sk = SKILLS.map(s => `${SKILLNAME[s].slice(0, 5)} <b>${a.skills[s]}</b>`).join(' · ');
   const box = $('info');
-  box.innerHTML = `<b style="font-size:15px">${esc(a.name)}</b> &nbsp;<span style="color:#9a917f">${a.role === 'bodyguard' ? 'Bodyguard' : a.role === 'guard' ? 'Guard (' + a.shift + ' shift)' : 'Dweller'}</span><br>
+  box.innerHTML = `<button class="infox" id="infoX" title="Close (Esc)" aria-label="Close">✕</button><b style="font-size:15px">${esc(a.name)}</b> &nbsp;<span style="color:#9a917f">${a.role === 'bodyguard' ? 'Bodyguard' : a.role === 'guard' ? 'Guard (' + a.shift + ' shift)' : 'Dweller'}</span><br>
     Job: <b>${r ? ROOMDEF[r.type].name : a.role === 'bodyguard' ? 'Protecting you' : '— none —'}</b> &nbsp; Weapon: <b>${WEAP[a.weapon].name}</b><br>
     Health <b>${Math.ceil(a.hp)}/${a.maxhp}</b> &nbsp; Mood <b>${Math.round(a.happy)}%</b> &nbsp; Best at: <b>${SKILLNAME[bestSkill(a)]}</b><br><span style="font-size:12px">${sk}</span><br>
     <span style="color:#9a917f;font-size:12px">Change jobs at your computer (Director's Office, floor 1).</span>`;
-  if (touchMode) { box.style.left = Math.max(16, VW / 2 - 170) + 'px'; box.style.top = (hudLayout().h + 56) + 'px'; }
-  else { box.style.left = (VW / 2 - 170) + 'px'; box.style.top = (VH - 200) + 'px'; }
-  box.classList.remove('hidden');
-  clearTimeout(talkTo.t); talkTo.t = setTimeout(() => box.classList.add('hidden'), 6000);
+  box.style.left = (VW / 2 - 170) + 'px'; box.style.top = (VH - 200) + 'px'; box.classList.remove('hidden');
+  $('infoX').onclick = closeInfo; talkTo.who = a;
 }
+// the file stays open until you close it (✕ or Esc) or walk away from that person
+function closeInfo() { $('info').classList.add('hidden'); talkTo.who = null; }
+function infoTick() { const a = talkTo.who, D = G.director; if (a && (!a.alive || floorOf(a) !== floorOf(D) || Math.abs(a.x - D.x) > 160)) closeInfo(); }
 function goSleep() { const D = G.director; D.sleeping = true; D.vx = 0; toast('You lie down on the cot…'); }
 function wake() { const D = G.director; if (!D.sleeping) return; D.sleeping = false; toast('Good morning, Director'); }
 
 /* ---------- the Director terminal ---------- */
 const TABS = [['overview', 'OVERVIEW'], ['dwellers', 'DWELLERS'], ['rooms', 'ROOMS'], ['build', 'BUILD'], ['defence', 'DEFENCE'], ['door', 'VAULT DOOR'], ['log', 'LOG']];
 const TERM = { tab: 'overview', sel: null, room: null, btype: 'quarters', bsize: 1 };
-function openTerminal(tab) { G.uiOpen = true; document.body.classList.add('termopen'); if (tab) TERM.tab = tab; $('term').classList.remove('hidden'); $('info').classList.add('hidden'); renderTerm(); sfx('beep'); }
+function openTerminal(tab) { G.uiOpen = true; document.body.classList.add('termopen'); if (tab) TERM.tab = tab; $('term').classList.remove('hidden'); closeInfo(); renderTerm(); sfx('beep'); }
 function closeTerminal() { document.body.classList.remove('termopen'); $('term').classList.add('hidden'); G.uiOpen = false; mouse.down = false; }
 function bar(v, max, cls) { return `<span class="bar ${cls || ''}"><i style="width:${clamp(v / max * 100, 0, 100)}%"></i></span>`; }
 function roomName(r) { return r ? ROOMDEF[r.type].name + (r.level > 1 ? ' ' + 'I'.repeat(r.level) : '') + ' <span class="dim">(F' + (r.floor + 1) + ')</span>' : '<span class="dim">— none —</span>'; }
 function renderTerm() {
   $('tTitle').textContent = 'VAULT ' + G.vaultNo + ' · DIRECTOR TERMINAL';
-  $('tClock').innerHTML = 'DAY ' + dayOf(G.time) + ' · ' + clockStr(G.time) + (G.raid.active ? ' · <span class="hot">⚠ RAID IN PROGRESS</span>' : '') + ' &nbsp; <button class="tbtn" data-act="close">✕ CLOSE<span class="keyhint"> [ESC]</span></button>';
+  $('tClock').innerHTML = 'DAY ' + dayOf(G.time) + ' · ' + clockStr(G.time) + (G.raid.active ? ' · <span class="hot">⚠ RAID IN PROGRESS</span>' : '') + ' &nbsp; <button class="tbtn" data-act="close">✕ CLOSE [ESC]</button>';
   $('tTabs').innerHTML = TABS.map(([k, n], i) => `<button class="ttab ${TERM.tab === k ? 'on' : ''}" data-act="tab" data-arg="${k}">${i + 1} ${n}</button>`).join('');
   const f = { overview: termOverview, dwellers: termDwellers, rooms: termRooms, build: termBuild, defence: termDefence, door: termDoor, log: termLog }[TERM.tab];
   $('tBody').innerHTML = f();
@@ -2510,7 +2404,7 @@ function termRooms() {
     }
     h += '<div style="margin-top:10px">';
     if (upCost) h += `<button class="tbtn" data-act="upgrade" data-arg="${r.id}" ${G.R.caps < upCost || G.R.scrap < upScrap ? 'disabled' : ''}>UPGRADE TO ${'I'.repeat(r.level + 1)} — ${upCost} caps, ${upScrap} scrap</button>`;
-    if (!d.fixed) h += `<button class="tbtn warn" data-act="demolish" data-arg="${r.id}">${TERM.demo === r.id ? 'SURE? ' + (touchMode ? 'TAP' : 'CLICK') + ' AGAIN TO DEMOLISH' : 'DEMOLISH'} (refund ${Math.round((d.cost || 0) * r.size * .4)} caps)</button>`;
+    if (!d.fixed) h += `<button class="tbtn warn" data-act="demolish" data-arg="${r.id}">${TERM.demo === r.id ? 'SURE? CLICK AGAIN TO DEMOLISH' : 'DEMOLISH'} (refund ${Math.round((d.cost || 0) * r.size * .4)} caps)</button>`;
     h += '</div></div>';
   }
   return h + '</div></div>';
@@ -2618,18 +2512,17 @@ function showTitle() {
 }
 function startPlay() {
   $('title').classList.add('hidden'); $('pause').classList.add('hidden'); $('term').classList.add('hidden');
-  G.state = 'play'; G.uiOpen = false; G.overview = false; G.cam.tz = touchMode ? clamp(Math.min(VW / 620, (VH - hudLayout().h - SAFE.b - 60) / 300), .45, 1.1) : 1.1; siren(false);
+  G.state = 'play'; G.uiOpen = false; G.overview = false; G.cam.tz = 1.1; siren(false);
   if (!mouse.moved) { mouse.x = VW / 2; mouse.y = VH / 2; }
   if (!G.log.length) addLog('Welcome, Director.');
   toast('Welcome to Vault ' + G.vaultNo + ', Director. Your computer is in your office (floor 1).');
-  const use = touchMode ? 'tap USE' : 'press E';
-  if (G.playT < 1) G.hints = [[7, 'Tip: ' + use + ' at your computer to assign jobs, build rooms and plan your defence.'], [19, 'Tip: the elevator is in the middle of every floor — ' + use + ' to call it, then pick a floor.'], [31, 'Tip: the vault door is at the far left of floor 1. Open it to scavenge scrap outside.'], [43, 'Tip: raiders hit the door every 5th night. Keep guards armed and stimpaks stocked.']];
+  if (G.playT < 1) G.hints = [[7, 'Tip: press E at your computer to assign jobs, build rooms and plan your defence.'], [19, 'Tip: the elevator is in the middle of every floor — press E to call it, then pick a floor.'], [31, 'Tip: the vault door is at the far left of floor 1. Open it to scavenge scrap outside.'], [43, 'Tip: raiders hit the door every 5th night. Keep guards armed and stimpaks stocked.']];
 }
 function openPause() {
   G.uiOpen = true; $('pause').classList.remove('hidden');
   $('pauseBody').innerHTML = `<h2>PAUSED</h2><div style="color:#9a917f;margin-bottom:14px">Vault ${G.vaultNo} · Day ${dayOf(G.time)} · ${clockStr(G.time)}</div>
     <button class="btn big" id="pRes">RESUME</button><br><button class="btn" id="pSave">SAVE</button><button class="btn" id="pLoad" ${hasSave() ? '' : 'disabled'}>LOAD LAST SAVE</button><button class="btn" id="pQuit">QUIT TO TITLE</button>
-    <div class="controls keyonly" style="margin-top:18px">${$('title').querySelector('.controls.keyonly').innerHTML}</div><div class="controls touchonly" style="margin-top:18px">${$('title').querySelector('.controls.touchonly').innerHTML}</div>`;
+    <div class="controls" style="margin-top:18px">${$('title').querySelector('.controls').innerHTML}</div>`;
   $('pRes').onclick = closePause; $('pSave').onclick = () => saveGame();
   $('pLoad').onclick = () => { if (loadGame()) startPlay(); };
   $('pQuit').onclick = () => { closePause(); G.state = 'title'; siren(false); showTitle(); };
@@ -2647,15 +2540,11 @@ function showGameOver() {
 function updateCamera(dt) {
   const D = G.director, c = G.cam;
   let tx, ty, tz;
-  const tch = touchMode && G.state === 'play', top = tch ? hudLayout().h : 0, bot = VH - SAFE.b - (G.overview ? 96 : 60), mid = ((top + bot) / 2 - VH / 2);
-  if ((G.overview || G.state !== 'play') && tch) { tz = Math.min((VW - SAFE.l - SAFE.r) / (FLOOR_W + 260), (bot - top) / (NF * FH + 90)); tx = FLOOR_W / 2 - 60; ty = (floorY(NF - 1) - RH) / 2 + 30 - mid / tz; }
-  else if (G.overview || G.state !== 'play') { tz = Math.min(VW / (FLOOR_W + 260), (VH - 70) / (NF * FH + 90)); tx = FLOOR_W / 2 - 60; ty = (floorY(NF - 1) - RH) / 2 + 30; }
-  else if (tch) { tz = c.tz; tx = D.x; ty = (D.inCar ? G.car.y : feetY(floorOf(D))) - 78 - mid / tz; }
+  if (G.overview || G.state !== 'play') { tz = Math.min(VW / (FLOOR_W + 260), (VH - 70) / (NF * FH + 90)); tx = FLOOR_W / 2 - 60; ty = (floorY(NF - 1) - RH) / 2 + 30; }
   else { tz = c.tz; tx = D.x + (mouse.x - VW / 2) * .1 / tz; ty = (D.inCar ? G.car.y : feetY(floorOf(D))) - 78 + (mouse.y - VH / 2) * .06 / tz; }
   const k = Math.min(1, dt * 6);
   c.zoom += (tz - c.zoom) * k; c.x += (tx - c.x) * k; c.y += (ty - c.y) * k;
-  if (tch && !TOUCH.aim) { mouse.wx = D.x + (D.moveDir || D.facing || 1) * 300; mouse.wy = (D.inCar ? G.car.y - DEPTH - 4 : feetY(floorOf(D))) - 38; } // not aiming: look where you walk
-  else { mouse.wx = c.x + (mouse.x - VW / 2) / c.zoom; mouse.wy = c.y + (mouse.y - VH / 2) / c.zoom; }
+  mouse.wx = c.x + (mouse.x - VW / 2) / c.zoom; mouse.wy = c.y + (mouse.y - VH / 2) / c.zoom;
 }
 let lastT = 0;
 function frame(ts) {
@@ -2664,7 +2553,7 @@ function frame(ts) {
     if (G) {
       if (G.state === 'play' && !G.uiOpen) {
         const D = G.director;
-        updateHover();
+        updateHover(); infoTick();
         if (pressed['KeyE'] && !D.inCar && !(D.busyT > 0) && G.hover) { pressed['KeyE'] = false; G.hover.act(); }
         let steps = D.sleeping ? 12 : G.raid.active ? 1 : G.speed;
         for (let i = 0; i < steps; i++) {
@@ -2673,7 +2562,6 @@ function frame(ts) {
         }
       } else if (G.state === 'title') { G.time += dt * 2; carTick(dt); for (const a of G.actors) if (a.kind !== 'director') { a.thinkT -= dt; if (a.thinkT <= 0) { a.thinkT = .5; think(a); } navTick(a, dt); a.anim += dt; if (Math.abs(a.vx) > 1) { a.act = 'walk'; a.walkPh += dt * Math.abs(a.vx) * .075; } else if (a.atSpot && a.goal) a.act = a.goal.act; } }
       pressed = {};
-      updatePad();
       updateCamera(dt);
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearRect(0, 0, VW, VH);
       drawSky(); drawWorld();
