@@ -1454,38 +1454,106 @@ function artSecurity(g, L, k) {
   g.fillStyle = '#5a1a16'; g.beginPath(); g.arc(L + 130, SIDE + 2, 6, 0, Math.PI); g.fill();
   g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(L + 126, SIDE + 3, 3, 2);
 }
+// DIRECTOR'S OFFICE: periscope to the surface, executive desk, bookcase, the vault banner, clock + status board, bed
+// (the terminal stays at x 150 and the bed at x 446, where you use them)
+const OFF = { scope: { x: 96, y: 32, w: 138, h: 56 }, crt: { x: 134, y: 105, w: 40, h: 28 }, clock: { x: 384, y: 48, r: 14 }, board: { x: 358, y: 74, w: 52, h: 48 }, lamp: { x: 226, y: 126 }, phone: { x: 103, y: 128 }, sconce: { x: 462, y: 76 } };
 function artOffice(g, room) {
-  // vault banner with the number
-  const bx = 300;
-  g.fillStyle = '#1d2b4a'; g.fillRect(bx - 50, 34, 100, 120); g.fillStyle = '#d8b064'; g.fillRect(bx - 50, 34, 100, 5); g.fillRect(bx - 50, 149, 100, 5);
-  g.strokeStyle = '#d8b064'; g.lineWidth = 6; g.beginPath(); g.arc(bx, 86, 28, 0, TAU); g.stroke(); g.lineWidth = 3; for (let i = 0; i < 12; i++) { const a = i * TAU / 12; g.beginPath(); g.moveTo(bx + Math.cos(a) * 30, 86 + Math.sin(a) * 30); g.lineTo(bx + Math.cos(a) * 38, 86 + Math.sin(a) * 38); g.stroke(); }
-  g.fillStyle = '#d8b064'; g.font = 'bold 20px "Arial Black", Arial'; g.textAlign = 'center'; g.fillText(G.vaultNo, bx, 93); g.font = 'bold 9px Arial'; g.fillText('VAULT', bx, 136); g.textAlign = 'left';
-  // bookshelf
-  g.fillStyle = '#4a3020'; g.fillRect(372, 50, 58, BACK - 50); for (let y = 70; y < BACK - 10; y += 30) { g.fillStyle = '#2e1d12'; g.fillRect(376, y, 50, 3); for (let x = 378; x < 424; x += 7) { g.fillStyle = pick(['#8a2f2f', '#2f4f8a', '#3f6f3f', '#8a7a3f', '#5a3a6a']); g.fillRect(x, y - 22 + (x % 3), 6, 22 - (x % 3)); } }
-  // map board
-  g.fillStyle = '#e9dcb8'; g.fillRect(40, 48, 100, 70); g.strokeStyle = '#5a4632'; g.lineWidth = 4; g.strokeRect(40, 48, 100, 70);
-  g.strokeStyle = '#2f5fae'; g.lineWidth = 1.5; for (let i = 0; i < 4; i++) { g.strokeRect(50, 56 + i * 14, 36, 10); g.strokeRect(94, 56 + i * 14, 36, 10); }
-  // desk + computer
-  g.fillStyle = '#5a3a22'; g.fillRect(96, BACK - 46, 132, 12); g.fillStyle = '#4a2e1a'; g.fillRect(100, BACK - 34, 30, 34); g.fillRect(194, BACK - 34, 30, 34);
-  g.fillStyle = '#2c2f33'; rr(g, 132, BACK - 96, 56, 46, 5); g.fill(); g.fillStyle = '#3a3e42'; g.fillRect(150, BACK - 52, 20, 6); g.fillStyle = '#23262a'; g.fillRect(138, BACK - 50, 46, 5);
-  // cot
-  g.fillStyle = '#5c6064'; g.fillRect(410, BACK - 26, 74, 4); g.fillRect(412, BACK - 22, 3, 22); g.fillRect(478, BACK - 22, 3, 22);
-  g.fillStyle = '#3b5a8a'; rr(g, 414, BACK - 34, 66, 9, 3); g.fill(); g.fillStyle = '#f4efe2'; rr(g, 414, BACK - 38, 16, 7, 3); g.fill();
-  // plant
-  g.fillStyle = '#6b4a2e'; g.fillRect(56, BACK - 26, 22, 26); g.fillStyle = '#3f8f46'; for (let i = 0; i < 6; i++) { g.beginPath(); g.ellipse(67 + Math.cos(i) * 8, BACK - 36 - i * 4, 5, 11, Math.cos(i * 2) * .6, 0, TAU); g.fill(); }
+  const rnd = mulberry32(41);
+  // rug in front of the desk
+  g.fillStyle = '#6e1f22'; g.beginPath(); g.moveTo(66, BACK + 3); g.lineTo(292, BACK + 3); g.lineTo(304, RH - 3); g.lineTo(54, RH - 3); g.closePath(); g.fill();
+  g.strokeStyle = '#c9a25a'; g.lineWidth = 2; g.stroke();
+  g.strokeStyle = 'rgba(201,162,90,.55)'; g.lineWidth = 1; g.beginPath(); g.moveTo(76, BACK + 7); g.lineTo(282, BACK + 7); g.lineTo(292, RH - 7); g.lineTo(66, RH - 7); g.closePath(); g.stroke();
+  // bookcase
+  g.fillStyle = '#5a3a22'; g.fillRect(10, 29, 62, 6);
+  g.fillStyle = '#3e2616'; g.fillRect(12, 35, 58, BACK - 35); g.fillStyle = '#24160c'; g.fillRect(16, 39, 50, BACK - 43);
+  for (let s = 0; s < 4; s++) {
+    const sy = 39 + s * 36, by = sy + 32; g.fillStyle = '#4a2e1a'; g.fillRect(14, by, 54, 4);
+    if (s === 1) { // a little trophy and a few books
+      g.fillStyle = '#d8b064'; g.fillRect(24, by - 4, 10, 4); g.fillRect(27, by - 10, 4, 6); g.beginPath(); g.arc(29, by - 15, 6, 0, Math.PI); g.fill();
+      for (let x = 42; x < 64; x += 6) { g.fillStyle = pick(['#8a2f2f', '#2f4f8a', '#3f6f3f', '#8a7a3f', '#5a3a6a']); g.fillRect(x, by - 22 + (x % 4), 5, 22 - (x % 4)); }
+      continue;
+    }
+    let x = 18; while (x < 62) { const w = 3 + Math.floor(rnd() * 4), h = 18 + Math.floor(rnd() * 10); g.fillStyle = ['#8a2f2f', '#2f4f8a', '#3f6f3f', '#8a7a3f', '#5a3a6a', '#7a5a3a', '#2f6a6a'][Math.floor(rnd() * 7)]; g.fillRect(x, by - h, w, h); g.fillStyle = 'rgba(255,230,180,.25)'; g.fillRect(x, by - h + 4, w, 1); x += w + (rnd() < .15 ? 3 : 0.6); }
+  }
+  // periscope housing (the live surface view is drawn into it)
+  g.fillStyle = '#3a4046'; g.fillRect(118, SIDE, 12, 8);
+  g.fillStyle = '#2b3036'; rr(g, 88, 24, 154, 72, 6); g.fill();
+  g.fillStyle = '#4a525a'; rr(g, 90, 26, 150, 68, 5); g.fill();
+  g.fillStyle = '#0b0e10'; g.fillRect(95, 31, 140, 58);
+  g.fillStyle = '#2b3036'; for (let x = 96; x < 236; x += 14) { g.beginPath(); g.arc(x, 28.5, 1.3, 0, TAU); g.arc(x, 91.5, 1.3, 0, TAU); g.fill(); }
+  // executive desk
+  const top = BACK - 48;
+  g.fillStyle = '#4a2c18'; g.fillRect(84, top + 8, 164, BACK - top - 8);
+  g.fillStyle = '#5a3820'; g.fillRect(84, top + 8, 46, BACK - top - 8); g.fillRect(202, top + 8, 46, BACK - top - 8);
+  g.fillStyle = '#2e1a0e'; g.fillRect(130, top + 8, 72, BACK - top - 22);
+  for (const px of [84, 202]) for (let d = 0; d < 3; d++) { const y = top + 12 + d * 12; g.strokeStyle = 'rgba(0,0,0,.4)'; g.lineWidth = 1; g.strokeRect(px + 4.5, y + .5, 37, 10); g.fillStyle = '#d8b064'; g.fillRect(px + 19, y + 4, 8, 2); }
+  g.fillStyle = '#c9a25a'; rr(g, 146, top + 12, 40, 9, 2); g.fill(); g.fillStyle = '#3a2410'; g.font = 'bold 6px Arial'; g.textAlign = 'center'; g.fillText('DIRECTOR', 166, top + 19); g.textAlign = 'left';
+  g.fillStyle = '#6b4226'; g.fillRect(78, top, 176, 9); g.fillStyle = 'rgba(255,220,170,.18)'; g.fillRect(78, top, 176, 2); g.fillStyle = '#c9a25a'; g.fillRect(78, top + 8, 176, 1.5);
+  // on the desk: hotline phone, pen cup, CRT terminal, keyboard, banker's lamp
+  g.fillStyle = '#9e1f1f'; rr(g, 92, top - 10, 22, 10, 3); g.fill(); g.fillStyle = '#b8282a'; rr(g, 89, top - 15, 28, 6, 3); g.fill(); g.fillStyle = '#e8e2d0'; g.beginPath(); g.arc(103, top - 5, 3, 0, TAU); g.fill();
+  g.fillStyle = '#2f3a44'; g.fillRect(118, top - 9, 7, 9); g.strokeStyle = '#c9a25a'; g.lineWidth = 1; g.beginPath(); g.moveTo(120, top - 9); g.lineTo(119, top - 15); g.moveTo(123, top - 9); g.lineTo(125, top - 14); g.stroke();
+  g.fillStyle = '#2c2f33'; rr(g, 128, 100, 52, 42, 5); g.fill(); g.fillStyle = '#3a3e42'; rr(g, 131, 103, 46, 33, 3); g.fill();
+  g.fillStyle = '#062010'; g.fillRect(OFF.crt.x, OFF.crt.y, OFF.crt.w, OFF.crt.h); g.fillStyle = '#4a4e52'; g.fillRect(168, 137, 4, 2);
+  g.fillStyle = '#1b1e22'; g.fillRect(184, top - 4, 26, 4); g.fillStyle = '#5a6066'; for (let i = 0; i < 6; i++) g.fillRect(186 + i * 4, top - 3, 3, 1.5);
+  g.fillStyle = '#c9a25a'; g.beginPath(); g.ellipse(226, top - 1, 8, 2, 0, 0, TAU); g.fill(); g.fillRect(225, top - 17, 2, 16);
+  g.fillStyle = '#1f6b3a'; g.beginPath(); g.moveTo(214, top - 16); g.lineTo(238, top - 16); g.lineTo(235, top - 24); g.lineTo(217, top - 24); g.closePath(); g.fill(); g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(218, top - 23, 16, 1.5);
+  // the vault banner
+  g.fillStyle = '#c9a25a'; g.fillRect(254, 30, 92, 4); g.beginPath(); g.arc(254, 32, 4, 0, TAU); g.arc(346, 32, 4, 0, TAU); g.fill();
+  g.fillStyle = '#1d2b4a'; g.beginPath(); g.moveTo(262, 34); g.lineTo(338, 34); g.lineTo(338, 150); g.lineTo(300, 138); g.lineTo(262, 150); g.closePath(); g.fill();
+  g.strokeStyle = '#d8b064'; g.lineWidth = 2; g.beginPath(); g.moveTo(266, 38); g.lineTo(334, 38); g.lineTo(334, 143); g.lineTo(300, 132); g.lineTo(266, 143); g.closePath(); g.stroke();
+  const bx = 300; g.strokeStyle = '#d8b064'; g.lineWidth = 6; g.beginPath(); g.arc(bx, 82, 24, 0, TAU); g.stroke(); g.lineWidth = 3;
+  for (let i = 0; i < 12; i++) { const a = i * TAU / 12; g.beginPath(); g.moveTo(bx + Math.cos(a) * 26, 82 + Math.sin(a) * 26); g.lineTo(bx + Math.cos(a) * 33, 82 + Math.sin(a) * 33); g.stroke(); }
+  g.fillStyle = '#d8b064'; g.font = 'bold 18px "Arial Black", Arial'; g.textAlign = 'center'; g.fillText(G.vaultNo, bx, 89); g.font = 'bold 9px Arial'; g.fillText('VAULT', bx, 126); g.textAlign = 'left';
+  g.strokeStyle = '#c9a25a'; g.lineWidth = 1; for (let x = 263; x < 338; x += 3) { const y = x < 300 ? 150 - (x - 262) * 12 / 38 : 138 + (x - 300) * 12 / 38; g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 4); g.stroke(); }
+  // wall clock (hands drawn live) and the status board
+  const C = OFF.clock; g.fillStyle = '#5a3a22'; g.beginPath(); g.arc(C.x, C.y, C.r + 3, 0, TAU); g.fill(); g.fillStyle = '#ece4cc'; g.beginPath(); g.arc(C.x, C.y, C.r, 0, TAU); g.fill();
+  g.fillStyle = '#3a2410'; for (let i = 0; i < 12; i++) { const a = i * TAU / 12; g.fillRect(C.x + Math.cos(a) * (C.r - 3) - .8, C.y + Math.sin(a) * (C.r - 3) - .8, 1.6, 1.6); }
+  const B = OFF.board; g.fillStyle = '#2c2f33'; rr(g, B.x - 4, B.y - 4, B.w + 8, B.h + 8, 4); g.fill(); g.fillStyle = '#04120a'; g.fillRect(B.x, B.y, B.w, B.h);
+  // filing cabinet, a potted fern
+  g.fillStyle = '#5c6268'; g.fillRect(358, BACK - 54, 32, 54); g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(358, BACK - 54, 32, 2);
+  for (let d = 0; d < 3; d++) { const y = BACK - 51 + d * 17; g.strokeStyle = 'rgba(0,0,0,.35)'; g.strokeRect(360.5, y + .5, 27, 15); g.fillStyle = '#c9cdd0'; g.fillRect(369, y + 6, 10, 2.5); g.fillStyle = '#e8e2d0'; g.fillRect(366, y + 2, 7, 3); }
+  g.fillStyle = '#6b4a2e'; g.beginPath(); g.moveTo(393, BACK - 22); g.lineTo(409, BACK - 22); g.lineTo(406, BACK); g.lineTo(396, BACK); g.closePath(); g.fill();
+  g.fillStyle = '#3f8f46'; for (let i = 0; i < 7; i++) { g.beginPath(); g.ellipse(401 + Math.cos(i * 1.7) * 7, BACK - 30 - i * 5, 4, 12, Math.cos(i * 2.3) * .8, 0, TAU); g.fill(); }
+  // the Director's bed
+  g.fillStyle = '#c9a25a'; g.fillRect(OFF.sconce.x - 1, OFF.sconce.y - 4, 2, 6); g.fillStyle = '#e9d29a'; g.beginPath(); g.moveTo(OFF.sconce.x - 7, OFF.sconce.y + 8); g.lineTo(OFF.sconce.x + 7, OFF.sconce.y + 8); g.lineTo(OFF.sconce.x + 4, OFF.sconce.y); g.lineTo(OFF.sconce.x - 4, OFF.sconce.y); g.closePath(); g.fill();
+  g.fillStyle = '#4a2c18'; rr(g, 414, BACK - 54, 8, 54, 2); g.fill(); g.fillStyle = '#5a3820'; g.beginPath(); g.arc(418, BACK - 55, 4, 0, TAU); g.fill();
+  g.fillStyle = '#5a3820'; g.fillRect(418, BACK - 18, 86, 6); g.fillRect(421, BACK - 12, 4, 12); g.fillRect(497, BACK - 12, 4, 12);
+  g.fillStyle = '#e8e2d2'; rr(g, 420, BACK - 28, 84, 10, 3); g.fill();
+  g.fillStyle = '#f4efe2'; rr(g, 423, BACK - 35, 18, 8, 3); g.fill();
+  g.fillStyle = '#1d2b4a'; rr(g, 440, BACK - 31, 64, 12, 4); g.fill(); g.fillStyle = '#c9a25a'; g.fillRect(444, BACK - 27, 56, 1.5);
+  g.fillStyle = '#4a2c18'; rr(g, 502, BACK - 38, 7, 38, 2); g.fill();
 }
+// VAULT DOOR: frame with hydraulic clamps (live), door console, warning beacon, checkpoint sign, gun rack
+const DOORC = { scr: { x: 110, y: 70, w: 36, h: 22 }, beacon: { x: 122, y: 36 } };
 function artEntrance(g) {
-  // door frame in the left wall (the door itself is drawn live)
-  g.fillStyle = '#2a2d30'; g.beginPath(); g.arc(0, BACK - 92, 104, -Math.PI / 2, Math.PI / 2); g.fill();
+  // door frame in the left wall (the door and its clamps are drawn live)
+  g.fillStyle = '#2a2d30'; g.beginPath(); g.arc(0, BACK - 92, 106, -Math.PI / 2, Math.PI / 2); g.fill();
   g.fillStyle = '#121416'; g.beginPath(); g.arc(0, BACK - 92, 90, -Math.PI / 2, Math.PI / 2); g.fill();
-  g.strokeStyle = '#6a6f74'; g.lineWidth = 6; g.beginPath(); g.arc(0, BACK - 92, 97, -Math.PI / 2, Math.PI / 2); g.stroke();
+  g.strokeStyle = '#6a6f74'; g.lineWidth = 7; g.beginPath(); g.arc(0, BACK - 92, 98, -Math.PI / 2, Math.PI / 2); g.stroke();
+  g.fillStyle = '#9aa0a4'; for (let i = 0; i <= 14; i++) { const a = -Math.PI / 2 + i * Math.PI / 14; g.beginPath(); g.arc(Math.cos(a) * 98, BACK - 92 + Math.sin(a) * 98, 1.6, 0, TAU); g.fill(); }
   hazard(g, 0, BACK - 4, 150, 8);
-  // control panel
-  g.fillStyle = '#3b4146'; rr(g, 112, 92, 34, 46, 4); g.fill(); g.fillStyle = '#ffcf3d'; g.fillRect(118, 100, 22, 8); g.fillStyle = '#d63a3a'; g.beginPath(); g.arc(129, 124, 6, 0, TAU); g.fill();
-  // ammo crates + a rifle rack on the back wall
+  // pipework along the top of the wall
+  g.fillStyle = '#4b5258'; g.fillRect(104, 24, 156, 7); g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(104, 24, 156, 1.5);
+  g.fillStyle = '#3a4046'; for (const x of [140, 200, 248]) g.fillRect(x, 22, 5, 11);
+  g.strokeStyle = '#b8322a'; g.lineWidth = 2; g.beginPath(); g.arc(226, 27.5, 6, 0, TAU); g.moveTo(220, 27.5); g.lineTo(232, 27.5); g.moveTo(226, 21.5); g.lineTo(226, 33.5); g.stroke();
+  // warning beacon (spins live)
+  const Bc = DOORC.beacon; g.fillStyle = '#2b2f33'; g.fillRect(Bc.x - 7, Bc.y + 4, 14, 6); g.fillStyle = '#6a4a12'; g.beginPath(); g.arc(Bc.x, Bc.y + 4, 6, Math.PI, TAU); g.fill();
+  // checkpoint sign
+  g.fillStyle = '#16140f'; rr(g, 150, 38, 102, 22, 3); g.fill(); g.strokeStyle = '#f2b33d'; g.lineWidth = 1.5; g.stroke();
+  g.fillStyle = '#f2b33d'; g.font = 'bold 11px Arial'; g.textAlign = 'center'; g.fillText('⚠ CHECKPOINT ⚠', 201, 51); g.font = 'bold 5.5px Arial'; g.fillStyle = '#c8bfa8'; g.fillText('ALL ENTRANTS MUST BE CLEARED', 201, 57.5); g.textAlign = 'left';
+  // door control console (its screen is drawn live)
+  g.fillStyle = '#2b3136'; rr(g, 104, 64, 48, 72, 5); g.fill(); g.fillStyle = '#3b4248'; rr(g, 106, 66, 44, 68, 4); g.fill();
+  g.fillStyle = '#05080a'; g.fillRect(DOORC.scr.x - 1, DOORC.scr.y - 1, DOORC.scr.w + 2, DOORC.scr.h + 2);
+  hazard(g, 110, 100, 18, 16); g.fillStyle = '#2b3136'; g.beginPath(); g.arc(119, 108, 6.5, 0, TAU); g.fill(); g.fillStyle = '#d63a3a'; g.beginPath(); g.arc(119, 108, 5, 0, TAU); g.fill(); g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(117.5, 106.5, 1.6, 0, TAU); g.fill();
+  g.fillStyle = '#16191c'; g.fillRect(136, 98, 5, 26); g.fillStyle = '#9aa0a4'; g.fillRect(137.5, 102, 2, 12); g.fillStyle = '#d63a3a'; g.beginPath(); g.arc(138.5, 101, 3.5, 0, TAU); g.fill();
+  g.fillStyle = '#c8bfa8'; g.font = 'bold 5px Arial'; g.fillText('DOOR CTRL', 113, 130);
+  // first-aid kit
+  g.fillStyle = '#e9eef0'; rr(g, 156, 66, 20, 15, 2); g.fill(); g.fillStyle = '#d63a3a'; g.fillRect(164, 68, 4, 11); g.fillRect(160, 71.5, 12, 4);
+  // gun rack
+  g.fillStyle = '#2b2f33'; g.fillRect(170, 86, 76, 50); g.fillStyle = '#3b4248'; g.fillRect(170, 86, 76, 3); g.fillRect(170, 118, 76, 3);
+  for (let i = 0; i < 4; i++) { const x = 180 + i * 18; g.fillStyle = '#16180f'; g.fillRect(x, 90, 4, 34); g.fillRect(x - 1, 98, 6, 6); g.fillStyle = i === 3 ? '#6b4a2a' : '#5b4228'; g.fillRect(x - 1, 118, 6, 16); }
+  // ammo crates
   g.fillStyle = '#4b5a33'; g.fillRect(214, BACK - 22, 30, 22); g.fillRect(220, BACK - 38, 22, 16); g.fillStyle = '#e7d35a'; g.font = 'bold 7px Arial'; g.fillText('AMMO', 218, BACK - 9);
-  g.fillStyle = '#2b2f33'; g.fillRect(180, 84, 60, 6); for (let i = 0; i < 3; i++) { g.fillStyle = '#16180f'; g.fillRect(186 + i * 18, 90, 4, 46); g.fillStyle = '#5b4228'; g.fillRect(185 + i * 18, 122, 6, 16); }
-  g.fillStyle = '#f2b33d'; g.font = 'bold 11px Arial'; g.fillText('CHECKPOINT', 160, 48);
 }
 function artEmpty(g, w) {
   g.save(); g.globalAlpha = .9; g.fillStyle = g.createPattern(TEX.rock, 'repeat'); g.fillRect(0, 0, w, RH); g.restore();
@@ -1774,12 +1842,8 @@ function drawRoomLive(r, x0, y0) {
       glow(L + 238, y0 + BACK - 106, 50, 'rgba(255,214,150,.9)', .35);
     }
   }
-  if (r.type === 'office') {
-    ctx.fillStyle = '#062010'; ctx.fillRect(x0 + 136, y0 + BACK - 92, 48, 34);
-    ctx.fillStyle = '#7dffa0'; for (let i = 0; i < 4; i++) ctx.fillRect(x0 + 140, y0 + BACK - 88 + i * 7, 12 + ((i * 13 + Math.floor(t * 2)) % 28), 2);
-    glow(x0 + 160, y0 + BACK - 75, 46, 'rgba(110,255,150,.9)', .3);
-  }
-  if (r.type === 'entrance') drawVaultDoor(x0, y0);
+  if (r.type === 'office') drawOfficeLive(x0, y0);
+  if (r.type === 'entrance') { drawVaultDoor(x0, y0); drawDoorRoomLive(x0, y0); }
   if (r.steal > 0) { ctx.fillStyle = 'rgba(255,40,40,.18)'; ctx.fillRect(x0, y0, r.w, RH); bubble(x0 + r.w / 2, y0 + 40, 'RAIDERS LOOTING!'); r.steal -= .02; }
 }
 function drawVaultDoor(x0, y0) {
@@ -1794,7 +1858,6 @@ function drawVaultDoor(x0, y0) {
   if (dmg > .3) { ctx.strokeStyle = 'rgba(20,15,10,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-30, -40); ctx.lineTo(-10, -12); ctx.lineTo(-24, 10); if (dmg > .6) { ctx.moveTo(20, 30); ctx.lineTo(40, 10); ctx.lineTo(30, -20); } ctx.stroke(); }
   ctx.restore();
   if (d.state === 'broken' && Math.random() < .2) smoke(x0 + rand(-30, 30), cy + rand(-40, 40), 1.6);
-  if ((d.state === 'opening' || d.state === 'closing' || G.raid.active) && Math.sin(G.playT * 9) > 0) glow(x0 + 128, y0 + 80, 60, 'rgba(255,170,40,.9)', .5);
 }
 
 // one CCTV screen: cycles through the vault's rooms (and the road outside the door), showing who is in each
@@ -1847,6 +1910,80 @@ function secFigure(a, px, py, sc) { // a tiny monochrome person on a camera feed
   ctx.fillRect(px - H * .1, py - H * .72, H * .2, H * .44);
   ctx.fillRect(px - H * .09 + sw, py - H * .3, H * .08, H * .3); ctx.fillRect(px + H * .01 - sw, py - H * .3, H * .08, H * .3);
   ctx.beginPath(); ctx.arc(px, py - H * .84, H * .12, 0, TAU); ctx.fill();
+}
+
+// the office's live bits: periscope view of the surface, terminal, lamps, clock, status board, hotline
+function drawOfficeLive(x0, y0) {
+  const t = G.playT, h = hourOf(G.time), S = skyAt(h), P = OFF.scope, px = x0 + P.x, py = y0 + P.y;
+  ctx.save(); ctx.beginPath(); ctx.rect(px, py, P.w, P.h); ctx.clip();
+  const sg = ctx.createLinearGradient(0, py, 0, py + P.h); sg.addColorStop(0, S.top); sg.addColorStop(1, S.bot); ctx.fillStyle = sg; ctx.fillRect(px, py, P.w, P.h);
+  if (S.sun < .5) { ctx.fillStyle = '#fff'; for (let i = 0; i < 40; i++) { const [sx, sy, sz] = STARS[i]; ctx.globalAlpha = (1 - S.sun * 2) * (.4 + .6 * Math.abs(Math.sin(t * .7 + sx * 50))); ctx.fillRect(px + sx * P.w, py + sy * P.h * .8, sz * .7, sz * .7); } ctx.globalAlpha = 1; }
+  if (h >= 6 && h <= 20) { const f = (h - 6) / 14, sx = px + P.w * (.1 + f * .8), sy = py + P.h * (.8 - Math.sin(f * Math.PI) * .6); glow(sx, sy, 34, 'rgba(255,220,150,.9)', .5); ctx.fillStyle = '#fff3d0'; ctx.beginPath(); ctx.arc(sx, sy, 5, 0, TAU); ctx.fill(); }
+  else { const f = ((h + 24 - 20) % 24) / 10, sx = px + P.w * (.15 + f * .7), sy = py + P.h * (.7 - Math.sin(f * Math.PI) * .45); ctx.fillStyle = '#e8eefc'; ctx.beginPath(); ctx.arc(sx, sy, 4, 0, TAU); ctx.fill(); ctx.fillStyle = S.top; ctx.beginPath(); ctx.arc(sx + 2, sy - 1, 3.5, 0, TAU); ctx.fill(); }
+  for (let k = 0; k < 2; k++) {
+    const base = py + P.h * (.66 + k * .1); ctx.fillStyle = mixDark(['#2a2a36', '#1a1b22'][k], S.sun); ctx.beginPath(); ctx.moveTo(px, py + P.h);
+    for (let i = 0; i <= 20; i++) ctx.lineTo(px + i * P.w / 20, base - RIDGES[k * 2][(i + 7 * k) % 60] * P.h * .28);
+    ctx.lineTo(px + P.w, py + P.h); ctx.fill();
+    if (k === 1) for (let i = 0; i < 6; i++) ctx.fillRect(px + 10 + i * 23, base - 6 - (i * 7) % 12, 6 + (i % 3) * 3, 14 + (i * 7) % 12);
+  }
+  ctx.fillStyle = mixDark('#3a2e24', S.sun); ctx.fillRect(px, py + P.h * .88, P.w, P.h * .12);
+  for (const a of G.actors) if (a.alive && a.floor === 0 && !a.inCar && a.x < 0) { // anyone out on the road
+    const fx = px + (a.x + SURF_W) / SURF_W * P.w, fy = py + P.h * .9; ctx.fillStyle = a.kind === 'raider' ? '#ff5a4a' : a.kind === 'visitor' ? '#7fe08a' : '#ffd98a'; ctx.fillRect(fx - 1, fy - 5, 2, 5); ctx.beginPath(); ctx.arc(fx, fy - 6.5, 1.3, 0, TAU); ctx.fill();
+  }
+  ctx.strokeStyle = 'rgba(200,255,220,.28)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px + P.w / 2, py + 4); ctx.lineTo(px + P.w / 2, py + P.h - 4); ctx.moveTo(px + 6, py + P.h / 2); ctx.lineTo(px + P.w - 6, py + P.h / 2); ctx.stroke();
+  for (let i = -3; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(px + P.w / 2 + i * 14, py + P.h / 2 - 2); ctx.lineTo(px + P.w / 2 + i * 14, py + P.h / 2 + 2); ctx.stroke(); }
+  const vg = ctx.createRadialGradient(px + P.w / 2, py + P.h / 2, P.h * .3, px + P.w / 2, py + P.h / 2, P.w * .62); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.6)'); ctx.fillStyle = vg; ctx.fillRect(px, py, P.w, P.h);
+  ctx.font = 'bold 6px monospace'; ctx.fillStyle = 'rgba(210,255,225,.85)'; ctx.fillText('SURFACE · PERISCOPE', px + 4, py + 8);
+  ctx.restore();
+  // the terminal
+  const C = OFF.crt; ctx.fillStyle = '#7dffa0'; for (let i = 0; i < 4; i++) ctx.fillRect(x0 + C.x + 4, y0 + C.y + 4 + i * 6, 6 + ((i * 13 + Math.floor(t * 2)) % 26), 2);
+  if (Math.sin(t * 4) > 0) ctx.fillRect(x0 + C.x + 4, y0 + C.y + 22, 4, 2);
+  glow(x0 + C.x + C.w / 2, y0 + C.y + C.h / 2, 40, 'rgba(110,255,150,.9)', .28);
+  // banker's lamp + bedside sconce
+  glow(x0 + OFF.lamp.x, y0 + OFF.lamp.y, 30, 'rgba(255,214,140,.9)', .5);
+  if (h >= 19 || h < 7) glow(x0 + OFF.sconce.x, y0 + OFF.sconce.y + 10, 34, 'rgba(255,214,150,.9)', .4);
+  // wall clock (game time)
+  const K = OFF.clock, cx = x0 + K.x, cy = y0 + K.y, ha = (h % 12) / 12 * TAU - Math.PI / 2, ma = (G.time % 60) / 60 * TAU - Math.PI / 2;
+  ctx.strokeStyle = '#1d1b17'; ctx.lineCap = 'round'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(ha) * 7, cy + Math.sin(ha) * 7); ctx.stroke();
+  ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(ma) * 11, cy + Math.sin(ma) * 11); ctx.stroke(); ctx.fillStyle = '#b8322a'; ctx.beginPath(); ctx.arc(cx, cy, 1.5, 0, TAU); ctx.fill();
+  // status board
+  const B = OFF.board, bx = x0 + B.x, by = y0 + B.y, R = G.R, cap = capOf();
+  ctx.font = 'bold 6px monospace'; ctx.fillStyle = '#7dffa0'; ctx.fillText('VAULT STATUS', bx + 3, by + 8);
+  [['P', R.power, '#ffcf3d'], ['W', R.water, '#5fd0ff'], ['F', R.food, '#ff8a5a']].forEach(([l, v, c], i) => { const y = by + 13 + i * 8; ctx.fillStyle = '#7dffa0'; ctx.fillText(l, bx + 3, y + 5); ctx.fillStyle = 'rgba(125,255,160,.15)'; ctx.fillRect(bx + 10, y, 38, 5); ctx.fillStyle = c; ctx.fillRect(bx + 10, y, 38 * clamp(v / cap, 0, 1), 5); });
+  const left = G.raid.nextDay - dayOf(G.time);
+  if (G.raid.active) { if (Math.sin(t * 8) > 0) { ctx.fillStyle = '#ff4a3a'; ctx.fillText('!! RAID !!', bx + 3, by + 44); } }
+  else { ctx.fillStyle = left <= 0 ? '#ffb36b' : '#7dffa0'; ctx.fillText(left <= 0 ? 'RAID TONIGHT' : 'RAID IN ' + left + 'D', bx + 3, by + 44); }
+  // the hotline lights up during a raid
+  if (G.raid.active && Math.sin(t * 7) > 0) { const pp = OFF.phone; glow(x0 + pp.x, y0 + pp.y, 18, 'rgba(255,60,40,.9)', .7); ctx.fillStyle = '#ff6a5a'; ctx.beginPath(); ctx.arc(x0 + pp.x, y0 + pp.y + 9, 3, 0, TAU); ctx.fill(); }
+}
+// the vault door room's live bits: clamps that grip the door, the console screen, the warning beacon
+function drawDoorRoomLive(x0, y0) {
+  const d = G.door, t = G.playT, cy = y0 + BACK - 92, broken = d.state === 'broken', k = broken ? 1 : clamp(d.open * 4, 0, 1);
+  ctx.save(); ctx.beginPath(); ctx.rect(x0, y0 + SIDE, U, RH - SIDE); ctx.clip();
+  for (let i = 0; i < 7; i++) {
+    const a = -1.05 + i * 2.1 / 6, inner = broken ? 96 : 82 + k * 14;
+    ctx.save(); ctx.translate(x0, cy); ctx.rotate(a);
+    ctx.fillStyle = '#5c6268'; ctx.fillRect(inner, -6, 106 - inner, 12); ctx.fillStyle = '#3a3e42'; ctx.fillRect(inner, -6, 4, 12);
+    ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.fillRect(inner, -6, 106 - inner, 2); ctx.fillStyle = '#e7b52c'; ctx.fillRect(inner + 6, -2, 4, 4);
+    ctx.restore();
+  }
+  ctx.restore();
+  const S = DOORC.scr, sx = x0 + S.x, sy = y0 + S.y, moving = d.state === 'opening' || d.state === 'closing';
+  const st = broken ? 'BREACHED' : moving ? d.state.toUpperCase() : doorBlocks() ? 'SEALED' : 'OPEN', col = broken ? '#ff4a3a' : moving || !doorBlocks() ? '#ffcf3d' : '#7dffa0';
+  ctx.font = 'bold 6px monospace';
+  if (!((broken || moving) && Math.sin(t * 8) < 0)) { ctx.fillStyle = col; ctx.fillText(st, sx + 2, sy + 8); }
+  ctx.fillStyle = 'rgba(125,255,160,.15)'; ctx.fillRect(sx + 2, sy + 12, S.w - 4, 4); ctx.fillStyle = d.hp < d.maxhp * .4 ? '#ff5a4a' : '#7dffa0'; ctx.fillRect(sx + 2, sy + 12, (S.w - 4) * clamp(d.hp / d.maxhp, 0, 1), 4);
+  ctx.fillStyle = 'rgba(125,255,160,.8)'; ctx.fillText('LV' + d.level + ' ' + Math.ceil(d.hp / d.maxhp * 100) + '%', sx + 2, sy + 21);
+  glow(sx + S.w / 2, sy + S.h / 2, 24, broken ? 'rgba(255,60,40,.9)' : 'rgba(110,255,150,.9)', .2);
+  if (moving || G.raid.active || broken) {
+    const Bc = DOORC.beacon, bx = x0 + Bc.x, by = y0 + Bc.y + 4, red = G.raid.active || broken, fx = bx + Math.cos(t * 6) * 120;
+    ctx.fillStyle = Math.sin(t * 12) > 0 ? (red ? '#ff4a3a' : '#ffb347') : (red ? '#c0201a' : '#d08a1a'); ctx.beginPath(); ctx.arc(bx, by, 6, Math.PI, TAU); ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, U, RH); ctx.clip(); ctx.globalCompositeOperation = 'lighter';
+    const c = red ? '255,50,30' : '255,170,40'; glow(bx, by - 2, 36, 'rgba(' + c + ',.9)', .6);
+    const gr = ctx.createLinearGradient(bx, by, fx, y0 + BACK); gr.addColorStop(0, 'rgba(' + c + ',.3)'); gr.addColorStop(1, 'rgba(' + c + ',0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(fx - 40, y0 + BACK + 20); ctx.lineTo(fx + 40, y0 + BACK + 20); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
 }
 
 /* ---------- the outside ---------- */
