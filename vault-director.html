@@ -137,7 +137,7 @@ const DEPTH = 30;         // visible floor depth (2.5D)
 const ELX = 3 * U;        // lobby left edge
 const FLOOR_W = ELX + EW + 3 * U;
 const LOBBY = ELX + EW / 2;
-const SURF_W = 2400;      // how far the surface goes to the left
+const SURF_W = 4800;      // how far the surface goes to the left
 const CAR_W = 96, CAR_H = 146;
 const floorY = f => f * FH;
 const feetY = f => floorY(f) - DEPTH / 2;
@@ -272,7 +272,7 @@ function blankState() {
     rooms: [], actors: [], bullets: [], parts: [], floaters: [], piles: [], decals: [],
     door: { hp: 500, maxhp: 500, level: 1, state: 'closed', open: 0, hitT: 0 },
     car: { floor: 0, y: floorY(0), target: -1, state: 'idle', doors: 0, timer: 0, dir: 0, calls: new Set(), dests: new Set(), hold: 0 },
-    raid: { active: false, nextDay: 5, warned: false, manualT: -1, spawned: 0, toSpawn: [], spawnT: 0, start: 0, killed: 0, loot: { caps: 0, scrap: 0 }, wave: 0 },
+    raid: { active: false, nextDay: 5, warned: false, rollDay: -1, surpriseDay: -1, surprise: false, manualT: -1, spawned: 0, toSpawn: [], spawnT: 0, start: 0, killed: 0, loot: { caps: 0, scrap: 0 }, wave: 0 },
     stance: 'hide', log: [], visitor: null, visitorDay: 2, director: null,
     cam: { x: 600, y: -120, zoom: 1, tz: 1 }, overview: false, blackout: false, shake: 0,
     stats: { raidsWon: 0, raidersKilled: 0, joined: 0, lost: 0 }, lastSaveT: 0, midnightDay: 1,
@@ -423,11 +423,11 @@ function newGame() {
   spawnPiles(); G.mealNow = mealId(G.time);
   addLog('Vault ' + G.vaultNo + ' sealed. You are its Director. 14 dwellers and 2 bodyguards answer to you.');
   addLog('Raiders tend to hit vaults every few nights. Expect the first wave on night 5.');
+  addLog('Scouts may also spot a surprise raiding party on any other night (15% chance).');
 }
 function spawnPiles() {
   G.piles = [];
-  const xs = [-420, -760, -1100, -1450, -1820, -2150];
-  for (const x of xs) G.piles.push({ x: x + rand(-60, 60), left: randi(1, 3), kind: pick(['car', 'crates', 'scrap', 'barrels']) });
+  for (const x of PILE_XS) G.piles.push({ x: x + rand(-60, 60), left: randi(1, 3), kind: pick(['car', 'crates', 'scrap', 'barrels']) });
 }
 function addLog(t) { G.log.unshift({ day: dayOf(G.time), time: G.time, t }); if (G.log.length > 80) G.log.pop(); }
 
@@ -445,7 +445,7 @@ function saveGame(quiet) {
     const s = {
       v: 1, vaultNo: G.vaultNo, time: G.time, speed: G.speed, nextId: G.nextId, R: G.R, stance: G.stance, stats: G.stats, log: G.log.slice(0, 40),
       door: { hp: G.door.hp, maxhp: G.door.maxhp, level: G.door.level, state: G.door.state === 'broken' ? 'broken' : 'closed' },
-      raid: { nextDay: G.raid.nextDay }, visitorDay: G.visitorDay,
+      raid: { nextDay: G.raid.nextDay, rollDay: G.raid.rollDay, surpriseDay: G.raid.surpriseDay }, visitorDay: G.visitorDay,
       rooms: G.rooms.map(r => ({ id: r.id, type: r.type, floor: r.floor, u: r.u, size: r.size, level: r.level })),
       actors: G.actors.filter(a => a.team === 'vault' && a.alive && a.kind !== 'visitor').map(a => ({ id: a.id, kind: a.kind, down: a.down, name: a.name, gender: a.gender, look: a.look, x: a.inCar ? LOBBY : a.x, floor: a.inCar ? G.car.floor : a.floor, hp: a.hp, maxhp: a.maxhp, role: a.role, job: a.job, shift: a.shift, skills: a.skills, happy: a.happy, weapon: a.weapon, bed: a.bed, speed: a.speed, xp: a.xp, train: a.train })),
       piles: G.piles,
@@ -462,7 +462,7 @@ function loadGame() {
   G = blankState();
   Object.assign(G, { vaultNo: s.vaultNo, time: s.time, speed: s.speed || 1, nextId: s.nextId, R: Object.assign(G.R, s.R), stance: s.stance || 'hide', stats: Object.assign(G.stats, s.stats || {}), log: s.log || [], visitorDay: s.visitorDay || dayOf(s.time) + 1 });
   Object.assign(G.door, s.door); G.door.open = G.door.state === 'broken' ? 1 : 0;
-  G.raid.nextDay = s.raid.nextDay;
+  G.raid.nextDay = s.raid.nextDay; G.raid.rollDay = s.raid.rollDay ?? -1; G.raid.surpriseDay = s.raid.surpriseDay ?? -1;
   G.rooms = s.rooms.map(q => Object.assign(newRoom(q.type, q.floor, q.u, q.size, q.level), { id: q.id }));
   sortRooms(); G.rooms.forEach(computeSpots);
   for (const q of s.actors) {
@@ -472,7 +472,7 @@ function loadGame() {
     G.actors.push(a);
   }
   if (!G.director) return false;
-  G.piles = s.piles || []; if (!G.piles.length) spawnPiles();
+  G.piles = s.piles || []; if (G.piles.length < PILE_XS.length) spawnPiles(); // older saves had a smaller wasteland
   G.nextId = Math.max(G.nextId, ...G.rooms.map(r => r.id + 1), ...G.actors.map(a => a.id + 1));
   assignBeds();
   G.cam.x = G.director.x; G.cam.y = feetY(G.director.floor) - 90; G.midnightDay = dayOf(G.time); G.mealNow = mealId(G.time);
@@ -913,9 +913,15 @@ function raidSchedule(dt) {
   if (d >= R.nextDay) {
     if (h >= 20 && !R.warned) { R.warned = true; toast('Scouts spotted raiders — they\'ll hit the door tonight!', 'bad'); sfx('alarm'); addLog('Raiders spotted heading for the vault.'); }
     if (h >= 23 || d > R.nextDay) startRaid(false);
+    return;
   }
+  // any other night: a 15% chance scouts spot a surprise raiding party at 20:00, and it hits at 23:00
+  if (h >= 20 && R.rollDay !== d) { R.rollDay = d; if (Math.random() < SURPRISE_RAID) { R.surpriseDay = d; toast('Scouts spotted a raiding party — a surprise attack is coming tonight!', 'bad'); sfx('alarm'); addLog('Scouts spotted a surprise raiding party heading for the vault.'); } }
+  if (R.surpriseDay === d && h >= 23) { R.surpriseDay = -1; startRaid(false, true); }
 }
-function startRaid(manual) {
+const SURPRISE_RAID = .15;
+function raidTonight() { return !G.raid.active && (G.raid.nextDay <= dayOf(G.time) || G.raid.surpriseDay === dayOf(G.time)); }
+function startRaid(manual, surprise) {
   const R = G.raid; R.wave++;
   const day = dayOf(G.time), n = clamp(2 + Math.floor(day / 4) + R.wave, 4, 14);
   const types = [];
@@ -924,14 +930,14 @@ function startRaid(manual) {
     types.push(R.wave >= 3 && roll < .15 ? 'butcher' : R.wave >= 2 && roll < .32 ? 'brute' : roll < .62 ? 'gunner' : 'thug');
   }
   if (R.wave % 3 === 0) types.push('boss');
-  R.active = true; R.manual = manual; R.toSpawn = types; R.spawnT = 0; R.start = G.playT; R.killed = 0; R.escaped = 0; R.loot = { caps: 0, scrap: 0 }; R.size = types.length;
+  R.active = true; R.manual = manual; R.surprise = !!surprise; R.toSpawn = types; R.spawnT = 0; R.start = G.playT; R.killed = 0; R.escaped = 0; R.loot = { caps: 0, scrap: 0 }; R.size = types.length;
   if (G.door.state === 'open' || G.door.state === 'opening') {
     if (G.director.floor === 0 && G.director.x < 30) { R.waitDirector = true; toast('GET INSIDE — the door locks down once you\'re in', 'bad'); }
     else { setDoor(false); toast('LOCKDOWN — closing the vault door', 'bad'); }
   }
   G.speed = 1; siren(true); sfx('alarm');
   toast('RAID! ' + types.length + ' raiders are coming for the door', 'bad');
-  addLog('Raid: ' + types.length + ' raiders attacked' + (manual ? ' (you lit the flare)' : '') + '.');
+  addLog('Raid: ' + types.length + ' raiders attacked' + (manual ? ' (you lit the flare)' : surprise ? ' (a surprise attack)' : '') + '.');
   if (G.visitor && G.visitor.alive) { G.visitor.flee = true; }
 }
 function raidTick(dt) {
@@ -954,7 +960,7 @@ function endRaid() {
   for (const a of G.actors) if (a.kind === 'raider' && !a.alive) a.corpseT = Math.min(a.corpseT, 25);
   const escaped = R.escaped || 0;
   G.R.caps += R.loot.caps; G.R.scrap += R.loot.scrap; G.stats.raidsWon++;
-  if (!R.manual || dayOf(G.time) >= R.nextDay) { R.nextDay = dayOf(G.time) + (hourOf(G.time) < 6 ? 4 : 5); R.warned = false; }
+  if ((!R.manual && !R.surprise) || dayOf(G.time) >= R.nextDay) { R.nextDay = dayOf(G.time) + (hourOf(G.time) < 6 ? 4 : 5); R.warned = false; }
   toast('RAID OVER — +' + R.loot.caps + ' caps, +' + R.loot.scrap + ' scrap' + (revived ? ' · ' + revived + ' patched up' : '') + (lost ? ' · ' + lost + ' lost' : ''), lost ? 'bad' : 'good');
   addLog('Raid over: ' + R.killed + ' raiders killed' + (escaped ? ', ' + escaped + ' fled' : '') + '. Loot: ' + R.loot.caps + ' caps, ' + R.loot.scrap + ' scrap.');
   assignBeds();
@@ -2104,7 +2110,7 @@ function drawOfficeLive(x0, y0) {
   [['P', R.power, '#ffcf3d'], ['W', R.water, '#5fd0ff'], ['F', R.food, '#ff8a5a']].forEach(([l, v, c], i) => { const y = by + 13 + i * 8; ctx.fillStyle = '#7dffa0'; ctx.fillText(l, bx + 3, y + 5); ctx.fillStyle = 'rgba(125,255,160,.15)'; ctx.fillRect(bx + 10, y, 38, 5); ctx.fillStyle = c; ctx.fillRect(bx + 10, y, 38 * clamp(v / cap, 0, 1), 5); });
   const left = G.raid.nextDay - dayOf(G.time);
   if (G.raid.active) { if (Math.sin(t * 8) > 0) { ctx.fillStyle = '#ff4a3a'; ctx.fillText('!! RAID !!', bx + 3, by + 44); } }
-  else { ctx.fillStyle = left <= 0 ? '#ffb36b' : '#7dffa0'; ctx.fillText(left <= 0 ? 'RAID TONIGHT' : 'RAID IN ' + left + 'D', bx + 3, by + 44); }
+  else { ctx.fillStyle = raidTonight() ? '#ffb36b' : '#7dffa0'; ctx.fillText(raidTonight() ? 'RAID TONIGHT' : 'RAID IN ' + left + 'D', bx + 3, by + 44); }
   // picture light washing down the banner
   ctx.save(); ctx.globalCompositeOperation = 'lighter'; const lg = ctx.createLinearGradient(0, y0 + 40, 0, y0 + 148); lg.addColorStop(0, 'rgba(255,214,150,.2)'); lg.addColorStop(1, 'rgba(255,214,150,0)');
   ctx.fillStyle = lg; ctx.beginPath(); ctx.moveTo(x0 + 288, y0 + 40); ctx.lineTo(x0 + 312, y0 + 40); ctx.lineTo(x0 + 340, y0 + 148); ctx.lineTo(x0 + 260, y0 + 148); ctx.closePath(); ctx.fill(); ctx.restore();
@@ -2152,6 +2158,100 @@ function drawDoorRoomLive(x0, y0) {
     const gr = ctx.createLinearGradient(bx, by, fx, y0 + BACK); gr.addColorStop(0, 'rgba(' + c + ',.3)'); gr.addColorStop(1, 'rgba(' + c + ',0)');
     ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(fx - 40, y0 + BACK + 20); ctx.lineTo(fx + 40, y0 + BACK + 20); ctx.closePath(); ctx.fill();
     ctx.restore();
+  }
+}
+
+/* ---------- the wider wasteland: landmarks along the road out ---------- */
+const PILE_XS = [-420, -760, -1100, -1450, -1820, -2150, -2550, -2950, -3350, -3750, -4150, -4550];
+const POLES = [-640, -1260, -1860, -2460, -3010, -3670, -4240];
+const TOWER_X = -4350, CAMP_X = -4700;
+const LANDMARKS = [
+  { x: -1990, w: 95, draw: lmGasStation }, { x: -2750, w: 100, draw: lmBillboard }, { x: -3150, w: 105, draw: lmBus },
+  { x: -3550, w: 112, draw: lmHouse }, { x: TOWER_X, w: 64, draw: lmTower }, { x: -4460, w: 26, draw: lmWarnSign }, { x: CAMP_X, w: 84, draw: lmCamp },
+];
+function drawPowerLines(vx0, vx1, y) {
+  for (let i = 0; i < POLES.length; i++) {
+    const px = POLES[i], nx = i === 0 ? -166 : POLES[i - 1]; if (Math.max(px, nx) < vx0 - 40 || Math.min(px, nx) > vx1 + 40) continue;
+    ctx.strokeStyle = 'rgba(20,18,16,.8)'; ctx.lineWidth = 1;
+    for (const o of [-12.5, 12.5]) { ctx.beginPath(); ctx.moveTo(px + o, y - 134); ctx.quadraticCurveTo((px + nx) / 2 + o, y - 104, i === 0 ? nx : nx + o, i === 0 ? y - 150 : y - 134); ctx.stroke(); }
+    ctx.fillStyle = '#4a3a2c'; ctx.fillRect(px - 2.5, y - 140, 5, 140); ctx.fillRect(px - 16, y - 132, 32, 4);
+    ctx.fillStyle = '#9aa0a4'; ctx.fillRect(px - 14, y - 136, 3, 4); ctx.fillRect(px + 11, y - 136, 3, 4);
+  }
+}
+function lmGasStation(x, y) {
+  ctx.fillStyle = '#5a5650'; ctx.fillRect(x - 70, y - 62, 52, 62); ctx.fillStyle = '#1a1816'; ctx.fillRect(x - 64, y - 52, 22, 18); ctx.fillRect(x - 36, y - 42, 12, 42);
+  ctx.fillStyle = '#4a4640'; ctx.fillRect(x - 74, y - 66, 60, 5);
+  ctx.fillStyle = '#6a6e72'; ctx.fillRect(x - 58, y - 120, 6, 120); ctx.fillRect(x + 50, y - 120, 6, 120);
+  ctx.fillStyle = '#8a3a2a'; ctx.beginPath(); ctx.moveTo(x - 86, y - 136); ctx.lineTo(x + 58, y - 136); ctx.lineTo(x + 72, y - 128); ctx.lineTo(x + 64, y - 120); ctx.lineTo(x - 86, y - 120); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#d8cdb2'; ctx.fillRect(x - 86, y - 138, 144, 3); ctx.fillStyle = '#e8dcc0'; ctx.font = 'bold 9px Arial'; ctx.fillText('SERVICE', x - 76, y - 125);
+  for (const px of [x - 4, x + 26]) { ctx.fillStyle = '#9e3a2a'; rr(ctx, px - 7, y - 40, 14, 40, 3); ctx.fill(); ctx.fillStyle = '#1e1c1a'; ctx.fillRect(px - 4, y - 34, 8, 7); ctx.strokeStyle = '#1e1c1a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(px + 7, y - 26); ctx.quadraticCurveTo(px + 14, y - 14, px + 9, y - 4); ctx.stroke(); }
+  ctx.fillStyle = '#4a4640'; ctx.fillRect(x + 84, y - 152, 4, 152);
+  ctx.fillStyle = '#e8dcc0'; rr(ctx, x + 66, y - 184, 40, 32, 3); ctx.fill(); ctx.textAlign = 'center'; ctx.font = 'bold 13px Arial';
+  ctx.fillStyle = '#b8322a'; ctx.fillText('GA', x + 80, y - 164); ctx.globalAlpha = .25; ctx.fillText('S', x + 97, y - 164); ctx.globalAlpha = 1;
+  ctx.font = 'bold 7px Arial'; ctx.fillStyle = '#3a2a1a'; ctx.fillText('29¢ / gal', x + 86, y - 156); ctx.textAlign = 'left';
+}
+function lmBillboard(x, y) {
+  ctx.fillStyle = '#4a3a2c'; ctx.fillRect(x - 56, y - 140, 7, 140); ctx.fillRect(x + 49, y - 140, 7, 140);
+  ctx.strokeStyle = '#3a2e22'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 50, y - 40); ctx.lineTo(x + 50, y - 100); ctx.moveTo(x - 50, y - 100); ctx.lineTo(x + 50, y - 40); ctx.stroke();
+  ctx.fillStyle = '#5a4a3a'; ctx.fillRect(x - 96, y - 212, 192, 74); ctx.fillStyle = '#d9c9a0'; ctx.fillRect(x - 92, y - 208, 184, 66);
+  ctx.strokeStyle = '#f2c33d'; ctx.lineWidth = 2; for (let i = 0; i < 12; i++) { const a = i * TAU / 12; ctx.beginPath(); ctx.moveTo(x - 62 + Math.cos(a) * 21, y - 175 + Math.sin(a) * 21); ctx.lineTo(x - 62 + Math.cos(a) * 27, y - 175 + Math.sin(a) * 27); ctx.stroke(); }
+  ctx.fillStyle = '#f2c33d'; ctx.beginPath(); ctx.arc(x - 62, y - 175, 18, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#7a4a12'; ctx.beginPath(); ctx.arc(x - 62, y - 173, 9, .25, Math.PI - .25); ctx.stroke(); ctx.fillStyle = '#7a4a12'; ctx.beginPath(); ctx.arc(x - 68, y - 180, 2, 0, TAU); ctx.arc(x - 56, y - 180, 2, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#2f4f8a'; ctx.font = 'bold 13px "Arial Black", Arial'; ctx.fillText('A BRIGHTER', x - 32, y - 185); ctx.fillText('FUTURE…', x - 32, y - 169);
+  ctx.font = 'bold 10px Arial'; ctx.fillStyle = '#b8322a'; ctx.fillText('UNDERGROUND!', x - 32, y - 152);
+  ctx.fillStyle = '#5a4a3a'; ctx.beginPath(); ctx.moveTo(x + 92, y - 208); ctx.lineTo(x + 56, y - 208); ctx.lineTo(x + 72, y - 192); ctx.lineTo(x + 64, y - 178); ctx.lineTo(x + 92, y - 170); ctx.closePath(); ctx.fill();
+}
+function lmBus(x, y) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(-.05);
+  ctx.fillStyle = '#b08a34'; rr(ctx, -100, -64, 200, 56, 8); ctx.fill();
+  ctx.fillStyle = 'rgba(122,74,34,.75)'; for (const [rx, ry, w, h] of [[-62, -22, 22, 9], [10, -50, 16, 6], [70, -18, 18, 8], [-90, -46, 10, 12]]) { ctx.beginPath(); ctx.ellipse(rx, ry, w, h, .3, 0, TAU); ctx.fill(); }
+  for (let i = 0; i < 7; i++) { const wx = -90 + i * 22; ctx.fillStyle = '#1a1c1e'; ctx.fillRect(wx, -56, 17, 18); if (i % 3 === 1) { ctx.fillStyle = 'rgba(180,200,210,.35)'; ctx.beginPath(); ctx.moveTo(wx, -56); ctx.lineTo(wx + 10, -56); ctx.lineTo(wx, -44); ctx.fill(); } }
+  ctx.fillStyle = '#2a2420'; ctx.fillRect(66, -54, 18, 46); ctx.fillStyle = '#5a3a1a'; ctx.fillRect(-100, -32, 166, 3);
+  ctx.fillStyle = '#e8dcc0'; ctx.font = 'bold 7px Arial'; ctx.fillText('CITY LINES · ROUTE 12', -88, -21);
+  ctx.fillStyle = '#141414'; ctx.beginPath(); ctx.arc(-62, -6, 11, 0, TAU); ctx.fill(); ctx.fillStyle = '#3a3a3a'; ctx.beginPath(); ctx.arc(-62, -6, 4, 0, TAU); ctx.fill(); ctx.fillStyle = '#2a2420'; ctx.fillRect(52, -10, 12, 4);
+  ctx.restore();
+}
+function lmHouse(x, y) {
+  ctx.fillStyle = '#6b5a48'; ctx.fillRect(x - 70, y - 86, 140, 86); ctx.fillStyle = '#5a4a3a'; for (let yy = y - 80; yy < y; yy += 8) ctx.fillRect(x - 70, yy, 140, 1.5);
+  ctx.fillStyle = '#7a4a3a'; ctx.fillRect(x - 46, y - 130, 12, 34);
+  ctx.fillStyle = '#3a2e24'; ctx.beginPath(); ctx.moveTo(x - 80, y - 86); ctx.lineTo(x - 10, y - 130); ctx.lineTo(x + 16, y - 112); ctx.lineTo(x + 28, y - 96); ctx.lineTo(x + 50, y - 104); ctx.lineTo(x + 80, y - 86); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#141210'; ctx.fillRect(x - 54, y - 64, 22, 20); ctx.fillRect(x + 32, y - 64, 22, 20); ctx.fillRect(x - 10, y - 50, 20, 50);
+  ctx.strokeStyle = '#6b4a2e'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x + 30, y - 60); ctx.lineTo(x + 56, y - 48); ctx.moveTo(x + 30, y - 50); ctx.lineTo(x + 56, y - 58); ctx.stroke();
+  ctx.fillStyle = '#7a6a54'; for (const side of [-1, 1]) { for (let i = 0; i < 4; i++) if (!(side > 0 && i === 2)) ctx.fillRect(x + side * (78 + i * 9) - 2, y - 22, 4, 22); ctx.fillRect(x + side * 74 + (side < 0 ? -32 : 0), y - 16, 32, 3); }
+}
+function lmTower(x, y) {
+  ctx.strokeStyle = '#4a4e52'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - 26, y); ctx.lineTo(x - 4, y - 250); ctx.moveTo(x + 26, y); ctx.lineTo(x + 4, y - 250); ctx.stroke();
+  ctx.lineWidth = 1.4; ctx.beginPath(); for (let i = 0; i < 10; i++) { const y1 = y - i * 25, y2 = y - (i + 1) * 25, w1 = 26 - i * 2.2, w2 = 26 - (i + 1) * 2.2; ctx.moveTo(x - w1, y1); ctx.lineTo(x + w2, y2); ctx.moveTo(x + w1, y1); ctx.lineTo(x - w2, y2); ctx.moveTo(x - w2, y2); ctx.lineTo(x + w2, y2); } ctx.stroke();
+  ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, y - 250); ctx.lineTo(x, y - 282); ctx.stroke();
+  ctx.fillStyle = '#5a5e62'; ctx.beginPath(); ctx.ellipse(x + 10, y - 196, 4, 9, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#4a4a44'; ctx.fillRect(x + 30, y - 34, 34, 34); ctx.fillStyle = '#3a3a34'; ctx.beginPath(); ctx.moveTo(x + 26, y - 34); ctx.lineTo(x + 68, y - 34); ctx.lineTo(x + 64, y - 42); ctx.lineTo(x + 30, y - 42); ctx.fill(); ctx.fillStyle = '#1a1a18'; ctx.fillRect(x + 50, y - 24, 9, 24);
+}
+function lmWarnSign(x, y) {
+  ctx.fillStyle = '#4a3a2c'; ctx.fillRect(x - 2, y - 60, 4, 60);
+  ctx.save(); ctx.translate(x, y - 66); ctx.rotate(.08); ctx.fillStyle = '#7a6a4a'; ctx.fillRect(-24, -12, 48, 24);
+  ctx.fillStyle = '#e8e2d0'; ctx.beginPath(); ctx.arc(0, -4, 4.5, 0, TAU); ctx.fill(); ctx.fillRect(-2.5, -1, 5, 3); ctx.fillStyle = '#2a2018'; ctx.fillRect(-2.5, -6, 2, 2); ctx.fillRect(.5, -6, 2, 2);
+  ctx.fillStyle = '#b8322a'; ctx.font = 'bold 7px Arial'; ctx.textAlign = 'center'; ctx.fillText('TURN BACK', 0, 9); ctx.textAlign = 'left'; ctx.restore();
+}
+function lmCamp(x, y) {
+  ctx.fillStyle = '#4a3a2c'; ctx.fillRect(x - 82, y - 92, 3, 92); ctx.fillStyle = '#8a2a22'; ctx.beginPath(); ctx.moveTo(x - 79, y - 90); ctx.lineTo(x - 52, y - 86); ctx.lineTo(x - 58, y - 80); ctx.lineTo(x - 50, y - 72); ctx.lineTo(x - 79, y - 74); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#e8e2d0'; ctx.beginPath(); ctx.arc(x - 66, y - 82, 3, 0, TAU); ctx.fill();
+  for (const [tx, w, h, c] of [[x - 44, 30, 42, '#6b5a3a'], [x + 40, 26, 36, '#5a4a2a']]) { ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(tx - w, y); ctx.lineTo(tx, y - h); ctx.lineTo(tx + w, y); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#1a140e'; ctx.beginPath(); ctx.moveTo(tx - 7, y); ctx.lineTo(tx, y - h * .55); ctx.lineTo(tx + 7, y); ctx.closePath(); ctx.fill(); }
+  ctx.fillStyle = '#5a6a3a'; rr(ctx, x + 68, y - 24, 14, 24, 3); ctx.fill(); ctx.fillStyle = '#8a3a2a'; ctx.fillRect(x + 68, y - 14, 14, 3);
+  ctx.fillStyle = '#4a4440'; for (let i = 0; i < 7; i++) { ctx.beginPath(); ctx.ellipse(x - 14 + i * 4.6, y - 1, 3, 2, 0, 0, TAU); ctx.fill(); }
+  ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - 8, y - 2); ctx.lineTo(x + 8, y - 10); ctx.moveTo(x + 8, y - 2); ctx.lineTo(x - 8, y - 10); ctx.stroke();
+}
+// lights out on the road that should still show at night: the radio mast's beacon and the raiders' campfire
+function drawSurfaceLights(vx0, vx1) {
+  const t = G.playT, y = -DEPTH;
+  if (TOWER_X > vx0 - 300 && TOWER_X < vx1 + 300 && Math.sin(t * 3) > 0) { glow(TOWER_X, y - 284, 20, 'rgba(255,40,30,.9)', .9); ctx.fillStyle = '#ff4a3a'; ctx.beginPath(); ctx.arc(TOWER_X, y - 284, 2.5, 0, TAU); ctx.fill(); }
+  if (CAMP_X > vx0 - 200 && CAMP_X < vx1 + 200) {
+    const fx = CAMP_X, fb = y - 4;
+    glow(fx, fb - 10, 80, 'rgba(255,140,50,.9)', .4 + .1 * Math.sin(t * 11));
+    for (let i = 0; i < 5; i++) {
+      const bx = fx - 10 + i * 5, fl = 16 + 8 * Math.sin(t * 9 + i * 1.9) + 4 * Math.sin(t * 23 + i * 3.1);
+      const fg = ctx.createLinearGradient(0, fb, 0, fb - fl); fg.addColorStop(0, 'rgba(255,232,150,.95)'); fg.addColorStop(.5, 'rgba(255,140,40,.85)'); fg.addColorStop(1, 'rgba(255,60,20,0)');
+      ctx.fillStyle = fg; ctx.beginPath(); ctx.moveTo(bx - 4, fb); ctx.quadraticCurveTo(bx - 3, fb - fl * .6, bx + Math.sin(t * 7 + i) * 2, fb - fl); ctx.quadraticCurveTo(bx + 3, fb - fl * .6, bx + 4, fb); ctx.fill();
+    }
   }
 }
 
@@ -2268,7 +2368,7 @@ function drawWorld() {
   for (let f = 0; f < NF; f++) { const y0 = floorY(f) - RH, L = G.blackout ? .3 : (hourOf(G.time) >= 22 || hourOf(G.time) < 6) ? .7 : 1; if (L < 1) { ctx.fillStyle = `rgba(3,5,12,${(1 - L) * .7})`; ctx.fillRect(ELX, y0, EW, RH); } }
   if (G.raid.active) { const p = .07 + .08 * (Math.sin(G.playT * 5) * .5 + .5); ctx.fillStyle = `rgba(255,20,20,${p})`; ctx.fillRect(0, -RH, FLOOR_W, floorY(NF - 1) + RH); }
   // the outside at night
-  if (vx0 < 0) { const S = skyAt(hourOf(G.time)); if (S.sun < 1) { ctx.fillStyle = `rgba(4,6,16,${(1 - S.sun) * .62})`; ctx.fillRect(-SURF_W - 600, -2000, SURF_W + 574, 2000 + bottom + 3000); } }
+  if (vx0 < 0) { const S = skyAt(hourOf(G.time)); if (S.sun < 1) { ctx.fillStyle = `rgba(4,6,16,${(1 - S.sun) * .62})`; ctx.fillRect(-SURF_W - 600, -2000, SURF_W + 574, 2000 + bottom + 3000); } drawSurfaceLights(vx0, vx1); }
   // effects
   for (const b of G.bullets) { ctx.strokeStyle = b.team === 'raider' ? 'rgba(255,140,90,.9)' : 'rgba(255,240,160,.95)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(b.px, b.py); ctx.lineTo(b.x, b.y); ctx.stroke(); }
   for (const p of G.parts) {
@@ -2360,10 +2460,13 @@ function drawLobbyFront(f, y0) {
 }
 function drawSurfaceProps(vx0, vx1) {
   const y = -DEPTH;
+  drawPowerLines(vx0, vx1, y);
+  for (const L of LANDMARKS) if (L.x + L.w + 150 > vx0 && L.x - L.w - 150 < vx1) L.draw(L.x, y);
   // road sign + wreck + dead trees + rocks (fixed layout)
   const r = mulberry32(77);
   for (let x = -SURF_W - 400; x < -60; x += 140) {
     const k = r(); if (x < vx0 - 200 || x > vx1 + 200) continue;
+    if (LANDMARKS.some(L => Math.abs(x - L.x) < L.w + 40)) continue;
     if (k < .18) { ctx.strokeStyle = '#2a2018'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 6, y - 90); ctx.moveTo(x + 4, y - 50); ctx.lineTo(x + 30, y - 76); ctx.moveTo(x + 5, y - 70); ctx.lineTo(x - 20, y - 98); ctx.stroke(); }
     else if (k < .36) { ctx.fillStyle = '#3a332c'; ctx.beginPath(); ctx.ellipse(x, y + 4, 26, 14, 0, Math.PI, TAU); ctx.fill(); }
     else if (k < .44) { ctx.fillStyle = '#4a3a2c'; ctx.fillRect(x - 3, y - 70, 6, 70); ctx.fillStyle = '#7a6a4a'; ctx.fillRect(x - 30, y - 74, 60, 22); ctx.fillStyle = '#2a2018'; ctx.font = 'bold 10px Arial'; ctx.fillText('VAULT ' + G.vaultNo + ' →', x - 27, y - 60); }
@@ -2415,7 +2518,7 @@ function drawHUD() {
   // raid line (top right)
   ctx.textAlign = 'right'; ctx.font = 'bold 13px Arial';
   if (G.raid.active) { const n = raidersAlive().length + G.raid.toSpawn.length; ctx.fillStyle = Math.sin(G.playT * 6) > 0 ? '#ff5a4a' : '#ffb2a8'; ctx.fillText('⚠ RAID — ' + n + ' RAIDER' + (n === 1 ? '' : 'S') + ' LEFT', VW - 16, 24); }
-  else { const left = G.raid.nextDay - dayOf(G.time); ctx.fillStyle = left <= 0 ? '#ff8a5a' : '#c8bfa8'; ctx.fillText(left <= 0 ? 'RAIDERS EXPECTED TONIGHT' : 'NEXT RAID: NIGHT OF DAY ' + G.raid.nextDay + ' (' + left + ' day' + (left > 1 ? 's' : '') + ')', VW - 16, 24); }
+  else { const left = G.raid.nextDay - dayOf(G.time); ctx.fillStyle = raidTonight() ? '#ff8a5a' : '#c8bfa8'; ctx.fillText(raidTonight() ? 'RAIDERS EXPECTED TONIGHT' : 'NEXT RAID: NIGHT OF DAY ' + G.raid.nextDay + ' (' + left + ' day' + (left > 1 ? 's' : '') + ')', VW - 16, 24); }
   ctx.fillStyle = '#9fb7c0'; ctx.fillText('🛡 DEFENCE ' + defenceRating() + '   ·   DOOR ' + (G.door.state === 'broken' ? 'BREACHED' : Math.ceil(G.door.hp / G.door.maxhp * 100) + '%'), VW - 16, 44);
   ctx.textAlign = 'left';
   // director panel (bottom left)
@@ -2561,8 +2664,9 @@ function updateHover() {
 function scavenge(p) {
   const D = G.director; D.busyT = D.busyMax = 1.6; sfx('click');
   D.busyDone = () => {
-    p.left--; const scrap = randi(2, 7), caps = randi(4, 24); G.R.scrap += scrap; G.R.caps += caps;
-    let extra = ''; if (Math.random() < .15) { G.R.stim = Math.min(stimCap(), G.R.stim + 1); extra = ' + a stimpak'; }
+    const far = 1 + Math.min(1.5, Math.max(0, -p.x - 400) / 2400); // the further out you go, the better the pickings
+    p.left--; const scrap = Math.round(randi(2, 7) * far), caps = Math.round(randi(4, 24) * far); G.R.scrap += scrap; G.R.caps += caps;
+    let extra = ''; if (Math.random() < .15 * far) { G.R.stim = Math.min(stimCap(), G.R.stim + 1); extra = ' + a stimpak'; }
     G.floaters.push({ x: p.x, y: feetY(0) - 70, t: '+' + scrap + ' scrap  +' + caps + ' caps' + extra, life: 2, color: '#ffd35a' }); sfx('pickup');
   };
 }
@@ -2639,7 +2743,7 @@ function termOverview() {
       Population: <b>${pop.length}</b> dwellers + 2 bodyguards &nbsp; Beds: <b>${bedCount()}</b><br>
       Average mood: <b>${mood}%</b> ${bar(mood, 100)}<br>
       Defence rating: <b>${defenceRating()}</b> &nbsp; Door: <b>${G.door.state === 'broken' ? 'BREACHED' : Math.ceil(G.door.hp) + '/' + G.door.maxhp}</b><br>
-      ${G.raid.active ? '<span class="hot">RAID IN PROGRESS</span>' : 'Next raid: <b>night of day ' + G.raid.nextDay + '</b> ' + (left <= 0 ? '<span class="hot">(TONIGHT)</span>' : '(' + left + ' day' + (left > 1 ? 's' : '') + ')')}<br>
+      ${G.raid.active ? '<span class="hot">RAID IN PROGRESS</span>' : 'Next raid: <b>night of day ' + G.raid.nextDay + '</b> ' + (left <= 0 ? '<span class="hot">(TONIGHT)</span>' : '(' + left + ' day' + (left > 1 ? 's' : '') + ')')}${G.raid.surpriseDay === dayOf(G.time) && !G.raid.active ? '<br><span class="hot">Scouts report a surprise raiding party coming TONIGHT</span>' : ''}<br>
       Raids survived: <b>${G.stats.raidsWon}</b> &nbsp; Raiders killed: <b>${G.stats.raidersKilled}</b> &nbsp; Lost: <b>${G.stats.lost}</b></div>
     <div class="box"><h3>TIME</h3>Speed: ${[1, 2, 3].map(s => `<button class="tbtn ${G.speed === s ? 'on' : ''}" data-act="speed" data-arg="${s}">${s}x</button>`).join('')}
       <div class="dim" style="margin-top:6px">One hour passes every ${(10 / G.speed).toFixed(1)}s. Raids always run at 1x. Sleep on your cot to skip the night.</div></div>
@@ -2733,7 +2837,7 @@ function termDefence() {
     <div class="dim" style="margin-top:6px">Raiders have to break the door before they get in. Guards can't shoot through it.</div></div>
     <div class="box"><h3>WHEN RAIDERS GET IN</h3><button class="tbtn ${G.stance === 'hide' ? 'on' : ''}" data-act="stance" data-arg="hide">CIVILIANS HIDE</button><button class="tbtn ${G.stance === 'fight' ? 'on' : ''}" data-act="stance" data-arg="fight">ARMED DWELLERS FIGHT</button>
       <div class="dim" style="margin-top:6px">${G.stance === 'hide' ? 'Unarmed and non-guard dwellers run to the deepest floor.' : 'Anyone the Armory has armed joins the fight.'} Guards and your bodyguards always fight.</div></div>
-    <div class="box"><h3>RAIDS</h3>${G.raid.active ? '<span class="hot">A raid is happening right now.</span>' : `Next raid: <b>night of day ${G.raid.nextDay}</b>.<br><br><button class="tbtn warn" data-act="raidnow" ${G.raid.manualT > 0 ? 'disabled' : ''}>🔥 FIRE A FLARE — START A RAID NOW</button><div class="dim">Raiders arrive in ~10 seconds. Good for testing your defences (and earning loot).</div>`}</div></div>
+    <div class="box"><h3>RAIDS</h3>${G.raid.active ? '<span class="hot">A raid is happening right now.</span>' : `Next raid: <b>night of day ${G.raid.nextDay}</b>.<br><span class="dim">Any other night there's a 15% chance of a surprise raid. Scouts warn you at 20:00.</span>${G.raid.surpriseDay === dayOf(G.time) ? '<br><span class="hot">A surprise raiding party is coming TONIGHT.</span>' : ''}<br><br><button class="tbtn warn" data-act="raidnow" ${G.raid.manualT > 0 ? 'disabled' : ''}>🔥 FIRE A FLARE — START A RAID NOW</button><div class="dim">Raiders arrive in ~10 seconds. Good for testing your defences (and earning loot).</div>`}</div></div>
   <div><div class="box"><h3>GUARDS</h3><table class="tt"><tr><th>NAME</th><th>POST</th><th>SHIFT</th><th>WEAPON</th><th>COMBAT</th></tr>`;
   for (const a of guards) h += `<tr><td>${esc(a.name)}</td><td>${a.role === 'bodyguard' ? 'Your bodyguard' : roomName(roomOf(a.job))}</td><td>${a.role === 'bodyguard' ? '—' : a.shift}</td><td>${WEAP[a.weapon].name}</td><td>${a.skills.combat}</td></tr>`;
   h += `</table><div class="dim" style="margin-top:6px">Put more dwellers in the Vault Door / Security rooms to add guards. The Armory arms guards first.</div></div></div></div>`;
@@ -2864,7 +2968,7 @@ function frame(ts) {
         let steps = D.sleeping ? 12 : G.raid.active ? 1 : G.speed;
         for (let i = 0; i < steps; i++) {
           simTick(dt); if (i === 0) pressed = {};
-          if (D.sleeping && (G.raid.active || G.raid.warned && hourOf(G.time) >= 20 || (hourOf(G.time) >= 6 && hourOf(G.time) < 7))) { wake(); break; }
+          if (D.sleeping && (G.raid.active || (G.raid.warned || G.raid.surpriseDay === dayOf(G.time)) && hourOf(G.time) >= 20 || (hourOf(G.time) >= 6 && hourOf(G.time) < 7))) { wake(); break; }
         }
       } else if (G.state === 'title') { G.time += dt * 2; carTick(dt); for (const a of G.actors) if (a.kind !== 'director') { a.thinkT -= dt; if (a.thinkT <= 0) { a.thinkT = .5; think(a); } navTick(a, dt); a.anim += dt; if (Math.abs(a.vx) > 1) { a.act = 'walk'; a.walkPh += dt * Math.abs(a.vx) * .075; } else if (a.atSpot && a.goal) a.act = a.goal.act; } }
       pressed = {};
