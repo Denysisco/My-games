@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Image Maker</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #181b24; --line: #2a2f3d; --text: #e8eaf0;
+    --muted: #8a91a5; --accent: #7c5cff; --accent2: #00d4ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 60px; }
+  h1 {
+    margin: 0 0 4px; font-size: 32px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  textarea {
+    width: 100%; min-height: 90px; resize: vertical; padding: 12px;
+    background: #0b0d12; color: var(--text); border: 1px solid var(--line);
+    border-radius: 10px; font: inherit;
+  }
+  textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  .label { font-size: 13px; color: var(--muted); margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .05em; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line);
+    background: transparent; color: var(--text); cursor: pointer; font: inherit; font-size: 14px;
+  }
+  .chip.on { background: var(--accent); border-color: var(--accent); }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; align-items: center; }
+  button.main {
+    padding: 12px 22px; border: 0; border-radius: 10px; cursor: pointer; font: inherit; font-weight: 700;
+    background: linear-gradient(90deg, var(--accent), var(--accent2)); color: #fff;
+  }
+  button.main:disabled { opacity: .5; cursor: wait; }
+  button.ghost {
+    padding: 12px 16px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer;
+    background: transparent; color: var(--text); font: inherit;
+  }
+  select {
+    padding: 11px; border-radius: 10px; background: #0b0d12; color: var(--text);
+    border: 1px solid var(--line); font: inherit;
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin-top: 20px; }
+  .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .imgbox { position: relative; aspect-ratio: var(--ar, 1); background: #0b0d12; display: grid; place-items: center; }
+  .imgbox img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: zoom-in; opacity: 0; transition: opacity .3s; }
+  .imgbox img.ready { opacity: 1; }
+  .spin {
+    position: absolute; width: 38px; height: 38px; border-radius: 50%;
+    border: 4px solid var(--line); border-top-color: var(--accent2); animation: spin 1s linear infinite;
+  }
+  .err { position: absolute; padding: 12px; text-align: center; color: #ff8a8a; font-size: 14px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .tile .bar { display: flex; gap: 6px; padding: 8px; }
+  .tile .bar button {
+    flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--line);
+    background: transparent; color: var(--text); cursor: pointer; font: inherit; font-size: 13px;
+  }
+  .tile .cap { padding: 0 10px 10px; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  h2 { font-size: 18px; margin: 34px 0 0; display: flex; justify-content: space-between; align-items: center; }
+  h2 button { font-size: 13px; padding: 6px 10px; }
+  .empty { color: var(--muted); margin-top: 12px; }
+  .viewer {
+    position: fixed; inset: 0; background: rgba(0,0,0,.9); display: none;
+    place-items: center; padding: 16px; z-index: 10; cursor: zoom-out;
+  }
+  .viewer.open { display: grid; }
+  .viewer img { max-width: 100%; max-height: 100%; border-radius: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎨 Image Maker</h1>
+  <p class="sub">Type what you want drawn and hit Make it. Free, no account, no key.</p>
+
+  <div class="card">
+    <textarea id="prompt" placeholder="e.g. a cat astronaut riding a skateboard on the moon"></textarea>
+
+    <div class="label">Style</div>
+    <div class="chips" id="styles"></div>
+
+    <div class="row">
+      <select id="size" title="Shape">
+        <option value="1024x1024">Square</option>
+        <option value="768x1344">Tall (phone)</option>
+        <option value="1344x768">Wide</option>
+      </select>
+      <select id="count" title="How many">
+        <option value="1">1 image</option>
+        <option value="2">2 images</option>
+        <option value="4" selected>4 images</option>
+      </select>
+      <button class="ghost" id="surprise">🎲 Surprise me</button>
+      <button class="main" id="go">Make it ✨</button>
+    </div>
+  </div>
+
+  <div class="grid" id="results"></div>
+
+  <h2>History <button class="ghost" id="clear">Clear</button></h2>
+  <div class="grid" id="history"></div>
+  <p class="empty" id="noHistory">Nothing yet. Your images show up here.</p>
+</div>
+
+<div class="viewer" id="viewer"><img alt=""></div>
+
+<script>
+// Images come from Pollinations (image.pollinations.ai): a free service that needs no API key.
+const BASE = 'https://image.pollinations.ai/prompt/';
+
+const STYLES = {
+  'None': '',
+  'Realistic': ', photorealistic, highly detailed, sharp focus, natural lighting',
+  'Anime': ', anime style, vibrant colors, studio quality',
+  'Cartoon': ', cartoon style, bold outlines, bright colors',
+  'Pixel art': ', pixel art, 16-bit retro game style',
+  '3D': ', 3D render, octane render, soft lighting',
+  'Painting': ', oil painting, visible brush strokes, artistic',
+  'Sketch': ', pencil sketch, black and white, hand drawn',
+  'Cyberpunk': ', cyberpunk, neon lights, futuristic city, night',
+  'Minecraft': ', minecraft style, blocky voxel world',
+};
+
+const IDEAS = [
+  'a cat astronaut riding a skateboard on the moon',
+  'a giant robot made of pizza fighting a dragon',
+  'a tiny village inside a glass bottle on a beach',
+  'a military base hidden inside a snowy mountain',
+  'a lamborghini made of ice driving through a desert',
+  'a wolf wearing sunglasses playing electric guitar',
+  'an underwater city with glowing jellyfish streetlights',
+  'a floating island with waterfalls at sunset',
+  'a samurai frog standing in the rain',
+  'a haunted gaming setup at midnight with RGB lights',
+];
+
+const $ = id => document.getElementById(id);
+let style = 'None';
+
+const stylesEl = $('styles');
+for (const name of Object.keys(STYLES)) {
+  const b = document.createElement('button');
+  b.className = 'chip' + (name === style ? ' on' : '');
+  b.textContent = name;
+  b.onclick = () => {
+    style = name;
+    stylesEl.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b));
+  };
+  stylesEl.appendChild(b);
+}
+
+function imageUrl(prompt, w, h, seed) {
+  const q = new URLSearchParams({ width: w, height: h, seed, nologo: 'true' });
+  return BASE + encodeURIComponent(prompt) + '?' + q;
+}
+
+function makeTile(item) {
+  const [w, h] = item.size.split('x').map(Number);
+  const tile = document.createElement('div');
+  tile.className = 'tile';
+  tile.innerHTML = `
+    <div class="imgbox" style="--ar:${w}/${h}"><div class="spin"></div><img alt=""></div>
+    <div class="bar"><button data-a="save">⬇ Save</button><button data-a="again">🔁 Again</button></div>
+    <div class="cap"></div>`;
+  tile.querySelector('.cap').textContent = item.text;
+  const img = tile.querySelector('img');
+  img.alt = item.text;
+  img.onload = () => { img.classList.add('ready'); tile.querySelector('.spin')?.remove(); };
+  img.onerror = () => {
+    tile.querySelector('.spin')?.remove();
+    const e = document.createElement('div');
+    e.className = 'err';
+    e.textContent = 'Could not draw this one. Try again in a bit.';
+    tile.querySelector('.imgbox').appendChild(e);
+  };
+  img.onclick = () => openViewer(item.url);
+  img.src = item.url;
+  tile.querySelector('[data-a="save"]').onclick = () => download(item);
+  tile.querySelector('[data-a="again"]').onclick = () => {
+    $('prompt').value = item.text;
+    generate();
+  };
+  return tile;
+}
+
+async function download(item) {
+  const name = item.text.slice(0, 40).replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'image';
+  try {
+    const blob = await (await fetch(item.url)).blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name + '.jpg';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } catch {
+    window.open(item.url, '_blank');
+  }
+}
+
+function openViewer(url) {
+  $('viewer').querySelector('img').src = url;
+  $('viewer').classList.add('open');
+}
+$('viewer').onclick = () => $('viewer').classList.remove('open');
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem('imageMakerHistory')) || []; } catch { return []; }
+}
+function saveHistory(list) {
+  try { localStorage.setItem('imageMakerHistory', JSON.stringify(list.slice(0, 40))); } catch {}
+}
+function renderHistory() {
+  const list = loadHistory();
+  $('history').replaceChildren(...list.map(makeTile));
+  $('noHistory').style.display = list.length ? 'none' : '';
+}
+
+function generate() {
+  const text = $('prompt').value.trim();
+  if (!text) { $('prompt').focus(); return; }
+  const full = text + STYLES[style];
+  const size = $('size').value;
+  const [w, h] = size.split('x');
+  const n = Number($('count').value);
+  const items = [];
+  for (let i = 0; i < n; i++) {
+    const seed = Math.floor(Math.random() * 1e9);
+    items.push({ text, size, url: imageUrl(full, w, h, seed) });
+  }
+  $('results').replaceChildren(...items.map(makeTile));
+  saveHistory([...items, ...loadHistory()]);
+  renderHistory();
+
+  $('go').disabled = true;
+  setTimeout(() => { $('go').disabled = false; }, 2000);
+}
+
+$('go').onclick = generate;
+$('prompt').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); generate(); }
+});
+$('surprise').onclick = () => {
+  $('prompt').value = IDEAS[Math.floor(Math.random() * IDEAS.length)];
+  generate();
+};
+$('clear').onclick = () => { saveHistory([]); renderHistory(); };
+
+renderHistory();
+</script>
+</body>
+</html>
