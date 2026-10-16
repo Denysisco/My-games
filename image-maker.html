@@ -184,7 +184,7 @@ function makeTile(item) {
   };
   img.onclick = () => openViewer(item.url);
   img.src = item.url;
-  tile.querySelector('[data-a="save"]').onclick = () => download(item);
+  tile.querySelector('[data-a="save"]').onclick = e => download(item, e.currentTarget);
   tile.querySelector('[data-a="again"]').onclick = () => {
     $('prompt').value = item.text;
     generate();
@@ -192,18 +192,42 @@ function makeTile(item) {
   return tile;
 }
 
-async function download(item) {
-  const name = item.text.slice(0, 40).replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'image';
+// Get the image as a file: fetch it directly, or redraw it on a canvas if fetch is blocked.
+async function getBlob(url) {
   try {
-    const blob = await (await fetch(item.url)).blob();
+    const res = await fetch(url);
+    if (res.ok) return await res.blob();
+  } catch {}
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.src = url;
+  await img.decode();
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  canvas.getContext('2d').drawImage(img, 0, 0);
+  return await new Promise((ok, fail) => canvas.toBlob(b => b ? ok(b) : fail(), 'image/jpeg', 0.95));
+}
+
+async function download(item, btn) {
+  const name = item.text.slice(0, 40).replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'image';
+  const label = btn.textContent;
+  btn.textContent = '⏳ Saving…';
+  btn.disabled = true;
+  try {
+    const blob = await getBlob(item.url);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = name + '.jpg';
+    document.body.appendChild(a);
     a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    btn.textContent = '✅ Saved';
   } catch {
-    window.open(item.url, '_blank');
+    btn.textContent = '❌ Failed';
   }
+  setTimeout(() => { btn.textContent = label; btn.disabled = false; }, 2000);
 }
 
 function openViewer(url) {
